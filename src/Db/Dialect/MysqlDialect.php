@@ -37,7 +37,7 @@ final class MysqlDialect implements DialectInterface
         return ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
     }
 
-    public function lastInsertId(PDO $pdo, string $table): string
+    public function lastInsertId(PDO $pdo): string
     {
         return (string) $pdo->lastInsertId();
     }

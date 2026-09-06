@@ -6,7 +6,7 @@
 
 **Architecture:** 표와 페이저를 `posts/_table.php`·`posts/_pager.php` 조각으로 뽑아 두 화면이 함께 쓴다. 모달은 페이지당 `<dialog>` 하나를 두고 눌린 이름의 회원 번호를 스크립트가 채운다. 글 목록은 기존 전체 글 화면에 `?author=` 를 더해 재사용하고, 댓글 목록만 새 화면을 만든다.
 
-**Tech Stack:** PHP 8.4 / Slim 4 / PDO(SQLite·MySQL·PostgreSQL), PHPUnit 10, daisyUI 5 CDN, PHP 파일 템플릿(`PhpTemplate`).
+**Tech Stack:** PHP 8.4 / Slim 4 / PDO(SQLite·MySQL/MariaDB), PHPUnit 10, daisyUI 5 CDN, PHP 파일 템플릿(`PhpTemplate`).
 
 스펙: `docs/superpowers/specs/2026-08-31-author-modal-design.md`
 

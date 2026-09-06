@@ -106,7 +106,6 @@ final class PackageSchema
         return match ($this->db->dialect()->name()) {
             'sqlite' => $this->db->selectOne("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [$physical]) !== null,
             'mysql' => $this->db->selectOne('SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?', [$physical]) !== null,
-            'pgsql' => $this->db->selectOne('SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?', [$physical]) !== null,
         };
     }
 

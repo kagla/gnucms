@@ -46,7 +46,6 @@ final class Schema
                 $exists = match ($db->dialect()->name()) {
                     'sqlite' => $db->selectOne("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?", [$physical]),
                     'mysql' => $db->selectOne('SELECT index_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?', [$db->tableName($table), $physical]),
-                    'pgsql' => $db->selectOne('SELECT indexname FROM pg_indexes WHERE schemaname = current_schema() AND indexname = ?', [$physical]),
                 };
                 if ($exists === null) $db->execute('CREATE INDEX ' . $db->index($index) . ' ON ' . $db->table($table) . ' (' . $db->q($column) . ')');
             }

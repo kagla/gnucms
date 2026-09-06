@@ -5267,7 +5267,7 @@ BIZCLIENT 모듈 도입 전 준비 사항 — 사전 점검 / 설치 / 연동 / 
 | 메모리 | 4 GB 이상 RAM 권장 |
 | 디스크 공간 | SMS 100만 건 전송 시 약 400 MB 사용 |
 | JDK | **1.8 이상** |
-| DBMS | MySQL / Oracle / MSSQL (정식 지원). Sybase / DB2 / DB2 AS400 / CUBRID / EDB / PostgreSQL (버전 따라 지원) |
+| DBMS | MySQL / Oracle / MSSQL (정식 지원). Sybase / DB2 / DB2 AS400 / CUBRID / EDB (버전 따라 지원) |
 
 ### 방화벽 오픈
 

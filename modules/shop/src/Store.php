@@ -31,7 +31,7 @@ final class Store
         $this->db->update($table, $data, 'id = :id', ['id' => $id]);
     }
 
-    /** 트랜잭션의 첫 SQL로 호출해 세 DB 모두에서 주문 단위 쓰기를 직렬화한다. */
+    /** 트랜잭션의 첫 SQL로 호출해 지원 DB 모두에서 주문 단위 쓰기를 직렬화한다. */
     public function lockOrder(string $id): array
     {
         if (!$this->db->pdo()->inTransaction()) throw DomainError::internal('주문 잠금에는 트랜잭션이 필요합니다.');

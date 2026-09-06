@@ -203,7 +203,7 @@ $migrate)`로 실행한다. `$migrate(Connection $db, int $previousVersion)`는 
 실패한 설치의 실제 테이블도 백업하고, 성공 상태의 테이블이 누락되면 백업을 중단한다.
 SQLite 설치 전 스냅숏은 `storage/backups/extensions/`에 보존하며 관리자 관리 화면 또는
 일반 전체 백업 목록과는 별개다. 이 스냅숏은 자동 정리하지 않으므로 운영자가 보관 정책에
-따라 관리한다. MySQL/PG는 갱신 전 전체 백업을 별도로 확보한다.
+따라 관리한다. MySQL/MariaDB는 갱신 전 전체 백업을 별도로 확보한다.
 
 패키지 목록·bootstrap·공개 GET·웹훅에서는 설치를 실행하지 않는다. `Schema::VERSION`은
 코어 구조 판이며 각 패키지의 스키마 판과 독립적이다. 운영 서버에서 Composer를 실행할

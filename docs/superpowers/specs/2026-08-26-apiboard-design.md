@@ -10,7 +10,7 @@ DB에 묶이지 않고, 저가형 공유 PHP 호스팅에 FTP로 폴더째 올�
 
 목표:
 
-1. **DB 무관** — SQLite, MySQL, PostgreSQL에서 동일하게 동작한다. 말이 아니라 테스트로 증명한다.
+1. **DB 무관** — SQLite, MySQL/MariaDB에서 동일하게 동작한다. 말이 아니라 테스트로 증명한다.
 2. **무한 게시판** — 게시판을 몇 개 만들든 게시글 테이블은 하나다. 테이블이 늘어나지 않는다.
 3. **무한 댓글/대댓글** — 깊이 제한이 없다.
 4. **API 우선** — JSON API가 본체다. 관리자 화면은 그 API의 첫 클라이언트다.
@@ -22,7 +22,7 @@ DB에 묶이지 않고, 저가형 공유 PHP 호스팅에 FTP로 폴더째 올�
 - 런타임 의존성 없음. 배포물에 `vendor/` 가 없다.
 - CLI 접근을 가정하지 않는다. 설치를 웹으로 할 수 있어야 한다.
 - `mod_rewrite` 를 가정하지 않는다. 없으면 쿼리스트링 라우팅으로 폴백한다.
-- PDO 드라이버는 `pdo_sqlite`, `pdo_mysql`, `pdo_pgsql` 중 쓰는 것만 있으면 된다.
+- PDO 드라이버는 `pdo_sqlite`, `pdo_mysql` 중 쓰는 것만 있으면 된다.
 - MySQL 5.7 을 지원한다. 따라서 재귀 CTE(`WITH RECURSIVE`)와 `JSON` 타입 함수를 쓰지 않는다.
 
 ## 3. 아키텍처
@@ -39,7 +39,7 @@ apiboard/
   storage/
     uploads/       첨부 저장소 (문서 루트 밖)
   src/
-    Db/            Connection, Dialect/{SqliteDialect,MysqlDialect,PgsqlDialect}, Schema
+    Db/            Connection, Dialect/{SqliteDialect,MysqlDialect}, Schema
     Auth/          TokenVerifier, TokenIssuer, Identity, Acl
     Repository/    BoardRepository, PostRepository, CommentRepository
     Service/       BoardService, PostService, CommentService, AttachmentService
@@ -69,7 +69,7 @@ public/index.php
 ```
 
 Repository 는 배열을 주고받고 도메인 객체를 만들지 않는다. Service 는 SQL 을 모른다.
-이 경계 덕분에 Service 는 SQLite 인메모리로 빠르게 테스트하고, Repository 는 세 DB 에
+이 경계 덕분에 Service 는 SQLite 인메모리로 빠르게 테스트하고, Repository 는 지원 DB 에
 반복 실행하는 식으로 테스트 비용을 나눌 수 있다.
 
 ### 3.3 라우팅
@@ -86,20 +86,19 @@ Repository 는 배열을 주고받고 도메인 객체를 만들지 않는다. S
 
 DDL 에서 다음 세 자리만 방언별로 치환한다.
 
-| 치환자 | SQLite | MySQL | PostgreSQL |
-|---|---|---|---|
-| `{AUTO_PK}` | `INTEGER PRIMARY KEY AUTOINCREMENT` | `BIGINT AUTO_INCREMENT PRIMARY KEY` | `BIGSERIAL PRIMARY KEY` |
-| `{DATETIME}` | `TEXT` | `DATETIME` | `TIMESTAMP` |
-| `{TEXT}` | `TEXT` | `LONGTEXT` | `TEXT` |
+| 치환자 | SQLite | MySQL |
+|---|---|---|
+| `{AUTO_PK}` | `INTEGER PRIMARY KEY AUTOINCREMENT` | `BIGINT AUTO_INCREMENT PRIMARY KEY` |
+| `{DATETIME}` | `TEXT` | `DATETIME` |
+| `{TEXT}` | `TEXT` | `LONGTEXT` |
 
-그 외 방언 차이는 네 가지뿐이다.
+그 외 방언 차이는 세 가지뿐이다.
 
-- 식별자 인용: SQLite/PG 는 `"x"`, MySQL 은 `` `x` ``
-- `lastInsertId()`: PG 만 시퀀스 이름이 필요하다 (`posts_id_seq`)
+- 식별자 인용: SQLite 는 `"x"`, MySQL 은 `` `x` ``
 - `CREATE TABLE` 뒤에 붙는 문자열: MySQL 만 엔진/문자셋이 필요하다 (`ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
 - 접속 직후 세션 설정: 시간대를 UTC 로 맞추고, MySQL 은 잘림을 오류로 만든다 (`STRICT_ALL_TABLES`)
 
-날짜는 항상 UTC `Y-m-d H:i:s` 문자열로 저장한다. 세 DB 모두 이 형식을 사전순 정렬해도
+날짜는 항상 UTC `Y-m-d H:i:s` 문자열로 저장한다. 지원 DB 모두 이 형식을 사전순 정렬해도
 시간순과 일치하므로 `ORDER BY created_at` 이 안전하다.
 
 ### 4.2 boards
@@ -126,8 +125,8 @@ CREATE TABLE boards (
 CREATE UNIQUE INDEX ux_boards_key ON boards (board_key);
 ```
 
-`perm_*` 는 `guest` | `member` | `admin` 세 값을 가진다. ENUM 을 쓰지 않는 이유는 문법이 세 DB
-제각각이고, 값을 늘릴 때 DDL 변경이 필요하기 때문이다. `VARCHAR` 에 애플리케이션 검증으로 둔다.
+`perm_*` 는 `guest` | `member` | `admin` 세 값을 가진다. ENUM 을 쓰지 않는 이유는 문법이 지원 DB마다
+다르고, 값을 늘릴 때 DDL 변경이 필요하기 때문이다. `VARCHAR` 에 애플리케이션 검증으로 둔다.
 
 분류는 별도 테이블이 아니라 `boards.categories` JSON 배열이고, 글은 `posts.category` 에
 이름 문자열을 그대로 갖는다. 테이블로 빼면 이름 변경이 글에 자동으로 전파되지만, 이
@@ -341,7 +340,7 @@ POST   /maintenance/gc              고아 첨부 정리      (전역 관리자)
 방법이 없으면 복구 엔드포인트에 도달할 수단이 없다. 관리 권한이 없는 요청자가 이 값을 주면
 오류가 아니라 조용히 무시한다.
 
-검색 `q` 는 제목과 본문에 대한 `LIKE '%...%'` 다. MySQL `MATCH AGAINST` 나 PG `tsvector` 는
+검색 `q` 는 제목과 본문에 대한 `LIKE '%...%'` 다. MySQL `MATCH AGAINST` 는
 이식되지 않고 저가 호스팅에서 인덱스를 만들 권한도 불확실하므로 쓰지 않는다. `%` 와 `_` 는 이스케이프한다.
 
 ### 7.2 댓글 트리 응답
@@ -449,13 +448,13 @@ PHPUnit 을 개발 전용 의존성으로 쓴다. 배포물에는 포함되지 �
 
 - Service 계층 테스트는 SQLite 인메모리로 전부 돌린다. 빠르고 항상 실행된다.
 - Repository 계층 테스트는 DSN 을 파라미터화한다. 기본은 SQLite 이고,
-  `TEST_MYSQL_DSN` / `TEST_PGSQL_DSN` 환경변수가 있으면 같은 스위트를 그 DB 에도 반복 실행한다.
+  `TEST_MYSQL_DSN` 환경변수가 있으면 같은 스위트를 그 DB 에도 반복 실행한다.
 
 이식성이 이 프로젝트의 핵심 주장이므로 처음부터 이 구조로 쓴다. 나중에 끼워 넣기 어렵다.
 
 핵심 테스트 대상:
 
-- 세 DB 에서 동일한 CRUD 결과
+- 지원 DB 에서 동일한 CRUD 결과
 - 깊이 10 이상의 댓글 트리 조립
 - 삭제된 중간 댓글의 자리표시자 처리
 - 권한 판정 6.1 의 다섯 분기 전부

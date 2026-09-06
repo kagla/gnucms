@@ -6,7 +6,7 @@
 
 - PHP 8.2 이상에서 동작하는 Slim 4 기반 CMS다. 운영 환경은 PHP 8.4를 권장한다.
 - 애플리케이션 코드는 `src/`, 기본 화면은 `templates/default/`, 공개 자산과 진입점은 `www/`에 있다.
-- SQLite, MySQL/MariaDB, PostgreSQL을 지원한다. DB 관련 변경은 가능한 한 세 DB에서 같은 의미로 동작해야 한다.
+- SQLite와 MySQL/MariaDB를 지원한다. DB 관련 변경은 두 DB 계열에서 같은 의미로 동작해야 한다.
 - `config/config.php`, `storage/`의 런타임 데이터와 `vendor/`는 로컬·배포 환경의 파일이며 저장소에 커밋하지 않는다.
 
 ## 배포 환경

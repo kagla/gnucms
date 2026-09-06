@@ -60,17 +60,6 @@ final class ExtensionBackupTest extends DatabaseTestCase
                 $sql = $archive['database/mysql.sql']->getContent();
                 self::assertStringContainsString($db->tableName('ext_payload'), $sql);
                 self::assertStringContainsString('extension-backup-sentinel', $sql);
-            } else {
-                $dump = $root . '/data.dump';
-                $sql = $root . '/data.sql';
-                file_put_contents($dump, $archive['database/postgresql.dump']->getContent());
-                $process = proc_open(['pg_restore', '--file=' . $sql, $dump], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-                self::assertIsResource($process);
-                foreach ($pipes as $pipe) fclose($pipe);
-                self::assertSame(0, proc_close($process));
-                $contents = file_get_contents($sql);
-                self::assertStringContainsString($db->tableName('ext_payload'), $contents);
-                self::assertStringContainsString('extension-backup-sentinel', $contents);
             }
         } finally {
             $db->execute('DROP TABLE IF EXISTS ' . $db->table('ext_payload'));

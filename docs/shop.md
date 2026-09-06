@@ -157,7 +157,7 @@ php modules/shop/bin/maintenance.php sync --order=<주문번호>
 PUPPETEER_MODULE=/설치경로/puppeteer-core CHROME_BIN=/설치경로/chrome node tests/Browser/Shop.cjs
 ```
 
-DB 테스트는 `connectionProvider`로 SQLite·MySQL/MariaDB·PostgreSQL을 실행한다. 동시 주문, 금액·채널 변조, 중복 콜백, 부분·전체 취소, 반품 수량, 교환품 재반품, 통신 단절·재요청 한도, 외부 환불 연결, 날짜 경계와 정산 차이를 검증한다. 브라우저 테스트는 외부 SDK를 대체하고 실제 결제 요청을 보내지 않는다.
+DB 테스트는 `connectionProvider`로 SQLite·MySQL/MariaDB를 실행한다. 동시 주문, 금액·채널 변조, 중복 콜백, 부분·전체 취소, 반품 수량, 교환품 재반품, 통신 단절·재요청 한도, 외부 환불 연결, 날짜 경계와 정산 차이를 검증한다. 브라우저 테스트는 외부 SDK를 대체하고 실제 결제 요청을 보내지 않는다.
 
 테스트 결제와 실제 승인·취소는 구분해야 한다. 운영 개통 전 각 PG 채널에서 PC와 모바일의 승인, 부분·전체 취소, 서명된 웹훅 수신, 실제 정산서 대조를 수행한다. 이 저장소 테스트에는 가맹점 실계정·실카드가 없으므로 실제 거래의 성공을 보증하지 않는다. 결제사의 부분 취소 횟수·가능 기간과 계약상 제한은 사용하는 채널의 최신 문서를 확인한다.
 

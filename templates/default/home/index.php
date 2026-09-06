@@ -75,7 +75,7 @@ $hot = array_slice($pool, 0, 6);
       <div class="hero-panel-head"><span>GNUCMS</span><span class="hero-panel-status">Live</span></div>
       <ul class="hero-facts" aria-label="GNUCMS 특징">
         <li><?= $this->icon('board', 17) ?><div><strong>콘텐츠를 한곳에서</strong><span>게시판, 페이지, 회원 관리를 매끄럽게</span></div></li>
-        <li><?= $this->icon('grid', 17) ?><div><strong>환경에 구애받지 않게</strong><span>SQLite · MySQL · PostgreSQL 지원</span></div></li>
+        <li><?= $this->icon('grid', 17) ?><div><strong>환경에 구애받지 않게</strong><span>SQLite · MySQL/MariaDB 지원</span></div></li>
         <li><?= $this->icon('sparkle', 17) ?><div><strong>가볍고 유연하게</strong><span>필요한 기능만 담은 단순한 PHP 구조</span></div></li>
       </ul>
     </div>

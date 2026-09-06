@@ -21,8 +21,8 @@
 
 | 단계 | 화면 | 다음으로 못 가는 조건 |
 |---|---|---|
-| 1 서버 점검 | 항목 표. 필수: PHP ≥ 8.1, `pdo`, `pdo_sqlite`·`pdo_mysql`·`pdo_pgsql` 중 하나, `mbstring`, `fileinfo`, `openssl`, `config/` 쓰기 가능, `storage/` 쓰기 가능. 안내만: `mod_rewrite`(감지 가능할 때), `gd` | 필수 항목 하나라도 실패 |
-| 2 데이터베이스 | 종류 라디오(SQLite 기본 / MySQL / PostgreSQL). SQLite: 파일 경로(기본 `storage/board.sqlite`). MySQL: 호스트·포트(3306)·DB 이름·계정·비밀번호. PostgreSQL: 호스트·포트(5432)·DB 이름·계정·비밀번호. 단추는 "접속 시험 후 다음" 하나 | 접속 실패(원문 메시지 표시). 서버에 해당 PDO 드라이버가 없는 종류는 라디오를 비활성화 |
+| 1 서버 점검 | 항목 표. 필수: PHP ≥ 8.1, `pdo`, `pdo_sqlite`·`pdo_mysql` 중 하나, `mbstring`, `fileinfo`, `openssl`, `config/` 쓰기 가능, `storage/` 쓰기 가능. 안내만: `mod_rewrite`(감지 가능할 때), `gd` | 필수 항목 하나라도 실패 |
+| 2 데이터베이스 | 종류 라디오(SQLite 기본 / MySQL). SQLite: 파일 경로(기본 `storage/board.sqlite`). MySQL: 호스트·포트(3306)·DB 이름·계정·비밀번호. 단추는 "접속 시험 후 다음" 하나 | 접속 실패(원문 메시지 표시). 서버에 해당 PDO 드라이버가 없는 종류는 라디오를 비활성화 |
 | 2-보조 | 접속됐는데 GNUCMS 표(`site_settings`)가 이미 있으면 "기존 데이터베이스를 이어 씁니다" 확인 상자를 보이고, 체크해야 넘어간다. 이 경우 표는 새로 만들지 않고, 관리자가 이미 있으면 4단계를 건너뛴다 | 체크 안 함 |
 | 3 사이트 | 사이트 이름(기본 GNUCMS), 사이트 주소(요청 host 로 자동 채움), 발신 메일(`no-reply@host`) | 형식 오류 |
 | 4 첫 관리자 | 이메일, 표시 이름, 비밀번호, 비밀번호 확인(눈 아이콘 토글). 표시 이름 규칙은 회원가입과 같다(`UserRepository::displayNameRule()`) | 형식 오류, 비밀번호 8자 미만, 확인 불일치 |
@@ -52,7 +52,7 @@ run():
   3. storage/upgrade.lock 을 flock(LOCK_EX|LOCK_NB). 못 잡으면 → throw MaintenanceRequired(busy)
   4. 잠금 안에서 도장을 다시 읽는다(다른 요청이 방금 끝냈을 수 있다). 같으면 return
   5. 백업: SQLite 면 VACUUM INTO 'storage/backups/board-v{옛판}-{Ymd-His}.sqlite'.
-     backups/ 는 최근 5개만 남긴다. MySQL/PostgreSQL 은 건너뛰고 backup=null
+     backups/ 는 최근 5개만 남긴다. MySQL/MariaDB는 건너뛰고 backup=null
   6. Schema::migrateAll()  (도장 갱신 포함)
   7. site_settings 에 schema_upgraded_at(now), schema_backup(경로 또는 ''), 
      upgrade-failed.json 있으면 삭제
@@ -74,7 +74,7 @@ run():
 
 ## 4. 관리 콘솔 표시
 
-사이트 설정(`admin/settings.php`) 폼 아래에 읽기 전용 "데이터 구조" 카드: 판 번호(`Schema::VERSION`), 마지막으로 옮긴 시각(`schema_upgraded_at`, 없으면 "설치 이후 없음"), 백업 목록(파일명·크기·시각, 최신순). DB 가 SQLite 가 아니면 "MySQL/PostgreSQL 은 DB 도구로 백업하세요" 한 줄. 컨트롤러는 `SchemaUpgrader::status()` 로 받는다.
+사이트 설정(`admin/settings.php`) 폼 아래에 읽기 전용 "데이터 구조" 카드: 판 번호(`Schema::VERSION`), 마지막으로 옮긴 시각(`schema_upgraded_at`, 없으면 "설치 이후 없음"), 백업 목록(파일명·크기·시각, 최신순). DB 가 SQLite 가 아니면 "MySQL/MariaDB는 DB 도구로 백업하세요" 한 줄. 컨트롤러는 `SchemaUpgrader::status()` 로 받는다.
 
 ## 5. 검증
 
@@ -86,6 +86,6 @@ run():
 
 ## 범위 밖
 
-- MySQL/PostgreSQL 덤프.
+- MySQL/MariaDB 덤프.
 - 판을 되돌리는(다운그레이드) 기능. 백업 파일을 손으로 되돌린다.
 - 설치기의 소셜 로그인·메일 서버 설정(관리 콘솔에서 한다).

@@ -6,7 +6,7 @@
 
 **Architecture:** `src/Db/SchemaUpgrader` 가 `Kernel::create()` 에서 `Schema::ensureCurrent()` 를 대신한다. 옮기지 못하면 `MaintenanceRequired` 를 던지고 `public/index.php` 가 `MaintenancePage` 로 503 을 낸다. 설치기는 `src/Install/{ServerCheck,DbSetup,InstallSession,Installer}` 네 클래스로 나누고 `public/install.php` 는 단계 라우팅과 HTML 만 맡는다.
 
-**Tech Stack:** PHP 8.1+, PDO(SQLite/MySQL/PostgreSQL), Slim 4, PHPUnit 10. 설치기와 점검 화면은 Slim·테마·DB 없이 도는 독립 HTML.
+**Tech Stack:** PHP 8.1+, PDO(SQLite/MySQL/MariaDB), Slim 4, PHPUnit 10. 설치기와 점검 화면은 Slim·테마·DB 없이 도는 독립 HTML.
 
 설계 원문: `docs/superpowers/specs/2026-08-30-installer-and-upgrader-design.md`
 
@@ -1003,7 +1003,7 @@ Expected: FAIL — '데이터 구조' 없음.
       <div><dt>마지막으로 옮긴 시각</dt><dd><?= $schema['upgraded_at'] !== null ? $this->e($schema['upgraded_at']) . ' UTC' : '설치 이후 없음' ?></dd></div>
     </dl>
     <?php if (!$schema['can_backup']): ?>
-      <p class="schema-note">MySQL/PostgreSQL 은 앱이 백업하지 못합니다. mysqldump·pg_dump 같은 DB 도구로 백업하세요.</p>
+      <p class="schema-note">MySQL/MariaDB는 앱이 백업하지 못합니다. mysqldump 같은 DB 도구로 백업하세요.</p>
     <?php elseif ($schema['backups'] === []): ?>
       <p class="schema-note">아직 백업이 없습니다. 판이 바뀔 때 <code>storage/backups/</code> 에 최근 <?= (int) $schema['keep'] ?>개까지 남깁니다.</p>
     <?php else: ?>
@@ -1219,7 +1219,7 @@ namespace GnuCms\Install;
 final class ServerCheck
 {
     public const MIN_PHP = '8.1.0';
-    public const DRIVERS = ['pdo_sqlite', 'pdo_mysql', 'pdo_pgsql'];
+    public const DRIVERS = ['pdo_sqlite', 'pdo_mysql'];
 
     private string $configDir;
     private string $storageDir;
@@ -1256,7 +1256,7 @@ final class ServerCheck
 
         $drivers = array_values(array_filter(self::DRIVERS, fn (string $d): bool => $this->has($d)));
         $items[] = $this->item(
-            'PDO 드라이버 (sqlite·mysql·pgsql 중 하나)',
+            'PDO 드라이버 (sqlite·mysql 중 하나)',
             $drivers !== [],
             true,
             $drivers === [] ? '하나도 없습니다. 호스팅에 요청하세요' : '있음: ' . implode(', ', $drivers)
@@ -1332,7 +1332,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `Connection::create()`, `Schema::exists()`, `DomainError::validation()`.
-- Produces: `DbSetup::TYPES` (`['sqlite' => 'SQLite', 'mysql' => 'MySQL / MariaDB', 'pgsql' => 'PostgreSQL']`), `DbSetup::availableTypes(?array $extensions = null): string[]`, `DbSetup::dsnFrom(array $input): array{dsn: string, username: ?string, password: ?string}`, `DbSetup::probe(array $dbConfig): array{dialect: string, has_tables: bool, has_admin: bool}`.
+- Produces: `DbSetup::TYPES` (`['sqlite' => 'SQLite', 'mysql' => 'MySQL / MariaDB']`), `DbSetup::availableTypes(?array $extensions = null): string[]`, `DbSetup::dsnFrom(array $input): array{dsn: string, username: ?string, password: ?string}`, `DbSetup::probe(array $dbConfig): array{dialect: string, has_tables: bool, has_admin: bool}`.
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
@@ -1369,7 +1369,7 @@ final class DbSetupTest extends TestCase
 
     public function testAvailableTypesFollowLoadedDrivers(): void
     {
-        self::assertSame(['sqlite', 'pgsql'], DbSetup::availableTypes(['pdo', 'pdo_sqlite', 'pdo_pgsql']));
+        self::assertSame(['sqlite', 'mysql'], DbSetup::availableTypes(['pdo', 'pdo_sqlite', 'pdo_mysql']));
         self::assertSame([], DbSetup::availableTypes(['pdo']));
     }
 
@@ -1395,11 +1395,11 @@ final class DbSetupTest extends TestCase
         self::assertSame('p', $db['password']);
     }
 
-    public function testPgsqlDsnUsesDefaultPort(): void
+    public function testMysqlDsnUsesDefaultPort(): void
     {
-        $db = DbSetup::dsnFrom(['type' => 'pgsql', 'host' => 'localhost', 'name' => 'site', 'user' => 'u']);
+        $db = DbSetup::dsnFrom(['type' => 'mysql', 'host' => 'localhost', 'name' => 'site', 'user' => 'u']);
 
-        self::assertSame('pgsql:host=localhost;port=5432;dbname=site', $db['dsn']);
+        self::assertSame('mysql:host=localhost;port=3306;dbname=site;charset=utf8mb4', $db['dsn']);
         self::assertSame('', $db['password']);
     }
 
@@ -1491,10 +1491,9 @@ final class DbSetup
     public const TYPES = [
         'sqlite' => 'SQLite',
         'mysql'  => 'MySQL / MariaDB',
-        'pgsql'  => 'PostgreSQL',
     ];
 
-    private const DEFAULT_PORT = ['mysql' => 3306, 'pgsql' => 5432];
+    private const MYSQL_PORT = 3306;
 
     /**
      * 이 서버에서 쓸 수 있는 종류. pdo_{종류} 확장이 있어야 한다.
@@ -1539,7 +1538,7 @@ final class DbSetup
         $errors = [];
         $host = trim((string) ($input['host'] ?? ''));
         $portRaw = trim((string) ($input['port'] ?? ''));
-        $port = $portRaw === '' ? self::DEFAULT_PORT[$type] : (int) $portRaw;
+        $port = $portRaw === '' ? self::MYSQL_PORT : (int) $portRaw;
         $name = trim((string) ($input['name'] ?? ''));
         $user = trim((string) ($input['user'] ?? ''));
 
@@ -1559,9 +1558,7 @@ final class DbSetup
             throw DomainError::validation($errors);
         }
 
-        $dsn = $type === 'mysql'
-            ? 'mysql:host=' . $host . ';port=' . $port . ';dbname=' . $name . ';charset=utf8mb4'
-            : 'pgsql:host=' . $host . ';port=' . $port . ';dbname=' . $name;
+        $dsn = 'mysql:host=' . $host . ';port=' . $port . ';dbname=' . $name . ';charset=utf8mb4';
 
         return ['dsn' => $dsn, 'username' => $user, 'password' => (string) ($input['password'] ?? '')];
     }
@@ -2440,13 +2437,13 @@ if ($step === 2) {
             . ($values['type'] === $key ? ' checked' : '') . ($on ? '' : ' disabled') . '>' . h($label)
             . ($on ? '' : '<span class="hint">드라이버 없음</span>') . '</label>';
     }
-    $body = '<p class="intro">SQLite 는 파일 하나로 끝나고, MySQL·PostgreSQL 은 DB 서버 접속 정보가 필요합니다.</p>'
+    $body = '<p class="intro">SQLite 는 파일 하나로 끝나고, MySQL/MariaDB는 DB 서버 접속 정보가 필요합니다.</p>'
         . (isset($errors['_']) ? '<p class="alert">' . h($errors['_']) . '</p>' : '')
         . '<form method="post"><div class="radios">' . $radios . '</div>' . err($errors, 'type')
         . '<div id="sqlite">' . field('SQLite 파일 경로', 'sqlite_path', $values['sqlite_path'], $errors, 'text', '웹에서 접근할 수 없는 폴더의 절대 경로') . '</div>'
         . '<div id="server">'
         . field('호스트', 'host', $values['host'], $errors)
-        . field('포트', 'port', $values['port'], $errors, 'text', '비우면 기본값 (MySQL 3306, PostgreSQL 5432)', 'inputmode="numeric"')
+        . field('포트', 'port', $values['port'], $errors, 'text', '비우면 기본값 (MySQL/MariaDB 3306)', 'inputmode="numeric"')
         . field('DB 이름', 'name', $values['name'], $errors)
         . field('DB 계정', 'user', $values['user'], $errors)
         . field('DB 비밀번호', 'password', '', $errors, 'password', '', 'autocomplete="off"')
@@ -2634,8 +2631,8 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### 코드를 새 판으로 올릴 때
 
 파일만 덮어쓰면 된다. 첫 요청에서 앱이 DB 의 스키마 판을 견주어 다르면 스스로 옮긴다.
-SQLite 는 옮기기 전에 `storage/backups/` 에 복사본을 남긴다(최근 5개). MySQL/PostgreSQL 은
-앱이 백업하지 못하므로 올리기 전에 `mysqldump`/`pg_dump` 로 받아 둔다.
+SQLite 는 옮기기 전에 `storage/backups/` 에 복사본을 남긴다(최근 5개). MySQL/MariaDB는
+앱이 백업하지 못하므로 올리기 전에 `mysqldump` 로 받아 둔다.
 
 옮기지 못하면 방문자에게 503 점검 화면이 나가고 `storage/logs/error.log` 에 원인이 남는다.
 원인을 고치면 60초 뒤 요청에서 다시 시도한다. 되돌리려면 `storage/board.sqlite` 를 백업

@@ -89,7 +89,7 @@ final class WriteRateLimiter
                 array_diff_key($params, ['expired3' => true])
             );
         } else {
-            // SQLite와 PostgreSQL은 같은 ON CONFLICT 문법을 지원한다. WHERE가 거짓이면
+            // SQLite는 ON CONFLICT 문법을 지원한다. WHERE가 거짓이면
             // 기존 행을 건드리지 않아 rowCount=0으로 정확히 거절할 수 있다.
             $changed = $this->db->execute(
                 'INSERT INTO ' . $table

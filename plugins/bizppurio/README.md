@@ -89,7 +89,7 @@ API 연동용 모듈 비밀번호 칸의 눈 아이콘으로 입력한 값 또�
 - 실행 허용: `storage/extensions-runtime/permits/` (백업 제외).
 - 영속 활성 상태: `storage/extensions/enabled.json` (전체 백업 v2에 포함).
 
-SQLite, MySQL/MariaDB, PostgreSQL과 DB prefix를 지원한다. 설치·갱신은 관리자 POST에서
+SQLite, MySQL/MariaDB와 DB prefix를 지원한다. 설치·갱신은 관리자 POST에서
 실행하고 bootstrap·GET·웹훅에서는 실행하지 않는다. SQLite 갱신 전 자동 스냅숏과
 패키지 전체 백업/복구 규약은 [확장 안내](../../docs/extensions.md)를 따른다.
 패키지 폴더에는 런타임 파일을 쓰지 않는다.
