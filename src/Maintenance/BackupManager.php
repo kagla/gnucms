@@ -27,7 +27,7 @@ use ZipArchive;
 final class BackupManager
 {
     public const FORMAT = 'gnucms-full-backup';
-    public const FORMAT_VERSION = 1;
+    public const FORMAT_VERSION = 2;
 
     private Connection $db;
     private array $config;
@@ -137,7 +137,7 @@ final class BackupManager
                 throw new RuntimeException('백업에 복원용 설정 파일이 없습니다.');
             }
             $components = $manifest['components'] ?? null;
-            foreach (['uploads', 'editor', 'avatars'] as $component) {
+            foreach (array_merge(['uploads', 'editor', 'avatars'], ($manifest['format_version'] ?? 1) >= 2 ? ['extensions'] : []) as $component) {
                 if (!is_array($components) || !is_array($components[$component] ?? null)
                     || ($components[$component]['path'] ?? null) !== 'files/' . $component
                     || !is_bool($components[$component]['present'] ?? null)) {
@@ -147,7 +147,11 @@ final class BackupManager
 
             $driver = (string) ($manifest['database']['driver'] ?? '');
             $databaseEntry = (string) ($manifest['database']['path'] ?? '');
-            $this->verifyDatabaseEntry($archiveHandle, $path, $databaseEntry, $driver);
+            $prefix = $manifest['database']['prefix'] ?? '';
+            if (!is_string($prefix) || ($prefix !== '' && preg_match('/^[A-Za-z][A-Za-z0-9_]{0,28}_$/D', $prefix) !== 1)) {
+                throw new RuntimeException('백업의 DB 테이블 접두사가 올바르지 않습니다.');
+            }
+            $this->verifyDatabaseEntry($archiveHandle, $path, $databaseEntry, $driver, $prefix);
         } finally {
             $this->closeArchive($archiveHandle);
         }
@@ -188,6 +192,10 @@ final class BackupManager
             $this->verify($archive);
             $path = $this->resolveArchive($archive);
             $manifest = $this->readManifest($path);
+            if (($manifest['database']['prefix'] ?? '') !== $this->db->prefix()) {
+                throw new RuntimeException('현재 설정과 DB 테이블 접두사가 다른 백업은 자동 복원할 수 없습니다.');
+            }
+            (new \GnuCms\Extension\RuntimePermit($this->storageDir))->revokeAll();
             $this->restoreSqliteArchive($path, $manifest);
 
             return ['restored' => basename($path), 'safety_backup' => (string) $safety['name']];
@@ -422,6 +430,7 @@ final class BackupManager
 
     private function dumpDatabase(string $destination, string $driver): void
     {
+        $extensionTables = (new \GnuCms\Extension\PackageSchema($this->db, $this->storageDir))->backupTables();
         if ($driver === 'sqlite') {
             $this->db->pdo()->exec("VACUUM INTO '" . str_replace("'", "''", $destination) . "'");
             return;
@@ -437,7 +446,9 @@ final class BackupManager
         }
         $username = (string) ($this->config['db']['username'] ?? '');
         $password = (string) ($this->config['db']['password'] ?? '');
-        $tables = array_map(fn (string $table): string => $this->db->tableName($table), Schema::TABLES);
+        $tables = array_map(fn (string $table): string => $this->db->tableName($table), array_merge(
+            Schema::TABLES, $extensionTables
+        ));
 
         if ($driver === 'mysql') {
             $binary = $this->findExecutable('mysqldump');
@@ -516,6 +527,7 @@ final class BackupManager
             }
             $source = $item->getPathname();
             $relative = str_replace('\\', '/', substr($source, strlen(rtrim($root, '/\\')) + 1));
+            if ($prefix === 'files/extensions' && (str_ends_with($relative, '.lock') || str_starts_with(basename($relative), '.'))) continue;
             $entry = $prefix . '/' . $relative;
             if (!$this->validEntryName($entry)) {
                 throw new RuntimeException('백업할 파일 경로를 안전하게 표현할 수 없습니다: ' . $relative);
@@ -577,7 +589,7 @@ final class BackupManager
             throw new RuntimeException('GNUCMS 백업 형식을 읽을 수 없습니다: ' . $e->getMessage(), 0, $e);
         }
         if (!is_array($manifest) || ($manifest['format'] ?? null) !== self::FORMAT
-            || ($manifest['format_version'] ?? null) !== self::FORMAT_VERSION
+            || !in_array($manifest['format_version'] ?? null, [1, self::FORMAT_VERSION], true)
             || !is_string($manifest['created_at'] ?? null)
             || !in_array($manifest['database']['driver'] ?? null, ['sqlite', 'mysql', 'pgsql'], true)) {
             throw new RuntimeException('지원하는 GNUCMS 전체 백업 형식이 아닙니다.');
@@ -586,7 +598,7 @@ final class BackupManager
         return $manifest;
     }
 
-    private function verifyDatabaseEntry(object $archive, string $archivePath, string $entry, string $driver): void
+    private function verifyDatabaseEntry(object $archive, string $archivePath, string $entry, string $driver, string $prefix): void
     {
         if (!$this->validEntryName($entry)) {
             throw new RuntimeException('데이터베이스 파일 경로가 올바르지 않습니다.');
@@ -620,7 +632,7 @@ final class BackupManager
         $temporary = $this->archiveDir() . '/.verify-' . bin2hex(random_bytes(6)) . '.sqlite';
         try {
             $this->copyArchiveEntry($archive, $archivePath, $entry, $temporary);
-            $copy = Connection::create(['dsn' => 'sqlite:' . $temporary]);
+            $copy = Connection::create(['dsn' => 'sqlite:' . $temporary, 'prefix' => $prefix]);
             $integrity = $copy->pdo()->query('PRAGMA integrity_check')->fetchColumn();
             if ($integrity !== 'ok' || !(new Schema($copy))->exists()) {
                 throw new RuntimeException('SQLite 무결성 검사에 실패했습니다.');
@@ -664,7 +676,7 @@ final class BackupManager
                 foreach ($mediaRoots as $name => $target) {
                     $new = $this->siblingTemporary($target, 'new', $token);
                     $permissions = is_dir($target) ? @fileperms($target) : false;
-                    $mode = is_int($permissions) ? ($permissions & 0777) : 0775;
+                    $mode = $name === 'extensions' ? 0700 : (is_int($permissions) ? ($permissions & 0777) : 0775);
                     $this->ensureDirectory($new, $mode);
                     $prefix = 'files/' . $name . '/';
                     foreach ($files as $entry => $ignored) {
@@ -678,7 +690,7 @@ final class BackupManager
                         $destination = $new . '/' . $relative;
                         $this->ensureDirectory(dirname($destination));
                         $this->copyArchiveEntry($archiveHandle, $archive, $entry, $destination);
-                        @chmod($destination, 0644);
+                        @chmod($destination, $name === 'extensions' ? 0600 : 0644);
                     }
                     $prepared[] = ['target' => $target, 'new' => $new, 'type' => 'dir'];
                 }
@@ -1142,6 +1154,7 @@ final class BackupManager
             'uploads' => $this->absolutePath($uploads),
             'editor' => $this->absolutePath($editor),
             'avatars' => $this->storageDir . '/avatars',
+            'extensions' => $this->storageDir . '/extensions',
         ];
     }
 

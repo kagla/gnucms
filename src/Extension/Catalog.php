@@ -10,7 +10,7 @@ use RuntimeException;
 /** 목록 조회에서는 패키지 PHP를 실행하지 않는다. */
 final class Catalog
 {
-    public const API_VERSION = 1;
+    public const API_VERSION = 2;
 
     public function __construct(private string $root)
     {
@@ -55,7 +55,7 @@ final class Catalog
                         }
                         $package[$field] = $value;
                     }
-                    if (($manifest['api'] ?? null) !== self::API_VERSION) {
+                    if (!in_array($manifest['api'] ?? null, [1, self::API_VERSION], true)) {
                         throw new RuntimeException('지원하지 않는 확장 API 버전입니다.');
                     }
                     $entry = $manifest['entry_path'] ?? null;

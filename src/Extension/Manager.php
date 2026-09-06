@@ -130,6 +130,10 @@ final class Manager
                 foreach ($context->routes() as [$method, $url, $handler]) {
                     $slim->map([$method], $url, $handler);
                 }
+                if ($context->externalRoutes() !== []) {
+                    // 외부 요청만 본문 파싱·세션·HTML 미들웨어보다 먼저 처리한다.
+                    $slim->add(new ExternalRequests($context->externalRoutes(), $slim->getBasePath()));
+                }
             } catch (Throwable $e) {
                 // 업체 API 키 등이 포함될 수 있으므로 예외 원문을 화면이나 로그에 남기지 않는다.
                 $this->runtimeErrors[$key] = '확장 실행에 실패했습니다. 패키지를 점검하거나 사용을 꺼 주세요.';

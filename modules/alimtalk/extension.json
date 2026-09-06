@@ -1,0 +1,12 @@
+{
+  "id": "alimtalk",
+  "type": "module",
+  "name": "알림톡 운영",
+  "description": "승인 템플릿 설정, 계정 상태 확인, 관리자 웹발송과 발송 결과를 관리합니다.",
+  "version": "1.0.0",
+  "api": 2,
+  "entry_path": "/home",
+  "admin_test": false,
+  "requires": ["plugins/bizppurio"],
+  "optional": []
+}

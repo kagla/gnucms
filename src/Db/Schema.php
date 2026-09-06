@@ -17,6 +17,7 @@ final class Schema
         'boards', 'posts', 'comments', 'users', 'user_tokens', 'user_identities',
         'site_settings', 'contents', 'consent_uses', 'consents_given', 'notifications',
         'password_attempts', 'login_events', 'write_rate_limits',
+        'extension_schemas',
     ];
 
     private const INDEXES = [
@@ -57,7 +58,7 @@ final class Schema
      * 코드가 요구하는 스키마 판. 컬럼을 늘릴 때마다 하나씩 올린다.
      * DB 에 적힌 값이 이 값보다 낮으면 ensureCurrent() 가 마이그레이션을 돌린다.
      */
-    public const VERSION = '21';
+    public const VERSION = '22';
 
     /**
      * DB 에 적어 두는 도장. 판 번호 뒤에 이 파일의 내용 해시를 붙인다.
@@ -129,6 +130,7 @@ final class Schema
         $this->migrateLoginEvents();
         $this->migrateWriteRateLimits();
         $this->migrateProfileImages();
+        $this->migrateExtensionSchemas();
         $stamp = $this->stamp();
         $this->ensureSiteSetting('system.schema_version', $stamp);
         $this->db->execute(
@@ -153,6 +155,23 @@ final class Schema
 
         // 새로 만든 스키마는 이미 최신이다. 첫 요청에서 헛돌지 않게 표시해 둔다.
         $this->ensureSiteSetting('system.schema_version', $this->stamp());
+    }
+
+    public function migrateExtensionSchemas(): void
+    {
+        if (!$this->tableExists('extension_schemas')) {
+            foreach ($this->extensionSchemaStatements() as $sql) $this->db->execute($this->expand($sql));
+        }
+    }
+
+    private function extensionSchemaStatements(): array
+    {
+        return ['CREATE TABLE extension_schemas (
+            package_key VARCHAR(80) PRIMARY KEY,
+            schema_version INTEGER NOT NULL,
+            table_names {TEXT} NOT NULL,
+            state VARCHAR(16) NOT NULL
+        ){SUFFIX}'];
     }
 
     /** 기존 게시판 설치에 회원 테이블만 안전하게 추가한다. */
@@ -527,7 +546,7 @@ final class Schema
             $this->consentUseStatements(), $this->consentsGivenStatements(),
             $this->notificationStatements(),
             $this->passwordThrottleStatements(), $this->loginEventStatements(),
-            $this->writeRateLimitStatements());
+            $this->writeRateLimitStatements(), $this->extensionSchemaStatements());
     }
 
     private function accountStatements(): array

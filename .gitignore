@@ -18,6 +18,7 @@
 /storage/upgrade-failed.json
 /storage/backup.lock
 /storage/extensions/
+/storage/extensions-runtime/
 
 # 로그
 /storage/logs/*

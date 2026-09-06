@@ -16,6 +16,7 @@ final class Context
 
     private array $routes = [];
     private array $services = [];
+    private array $external = [];
 
     public function __construct(
         public readonly App $app,
@@ -45,7 +46,7 @@ final class Context
             throw new InvalidArgumentException('확장 라우트의 메서드 또는 경로가 올바르지 않습니다.');
         }
         $url = '/' . $this->key . $path;
-        if (isset($this->routes[$method . ' ' . $url])) {
+        if (isset($this->routes[$method . ' ' . $url]) || isset($this->external[$url])) {
             throw new InvalidArgumentException('확장 라우트가 중복됩니다.');
         }
         $app = $this->app;
@@ -68,6 +69,25 @@ final class Context
     public function services(): array
     {
         return $this->services;
+    }
+
+    /** API 2: 세션과 독립적인 JSON 콜백. 인증기는 반드시 true를 반환해야 한다. */
+    public function externalPost(string $path, callable $authenticate, callable $handler, int $maxBytes = 65536): void
+    {
+        if (!preg_match('~^/(?:[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)?$~D', $path)
+            || $maxBytes < 1 || $maxBytes > 1048576) {
+            throw new InvalidArgumentException('외부 콜백 경로나 크기 제한이 올바르지 않습니다.');
+        }
+        $url = '/' . $this->key . $path;
+        if (isset($this->external[$url]) || isset($this->routes['POST ' . $url]) || isset($this->routes['GET ' . $url])) {
+            throw new InvalidArgumentException('확장 라우트가 중복됩니다.');
+        }
+        $this->external[$url] = [$authenticate, $handler, $maxBytes];
+    }
+
+    public function externalRoutes(): array
+    {
+        return $this->external;
     }
 
     public static function assertCsrf(ServerRequestInterface $request): void
