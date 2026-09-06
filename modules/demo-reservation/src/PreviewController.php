@@ -1,0 +1,59 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GnuCmsDemo\Modules\Reservation;
+
+use GnuCms\Error\DomainError;
+use GnuCms\View\PhpView;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Slim\Routing\RouteContext;
+
+final class PreviewController
+{
+    public function __construct(private ReservationPreview $service)
+    {
+    }
+
+    public function show(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        return $this->render($request, $response, ['name' => '', 'date' => '', 'time' => '14:00', 'guests' => '2']);
+    }
+
+    public function preview(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $input = $request->getParsedBody();
+        $input = is_array($input) ? $input : [];
+        $values = [];
+        foreach (['name', 'date', 'time', 'guests'] as $field) {
+            $values[$field] = is_string($input[$field] ?? null) ? $input[$field] : '';
+        }
+        try {
+            return $this->render($request, $response, $values, [], $this->service->generate($input));
+        } catch (DomainError $e) {
+            if ($e->status() !== 422) {
+                throw $e;
+            }
+            return $this->render($request, $response->withStatus(422), $values, $e->details());
+        }
+    }
+
+    private function render(ServerRequestInterface $request, ResponseInterface $response, array $values, array $errors = [], ?string $result = null): ResponseInterface
+    {
+        $routes = RouteContext::fromRequest($request);
+        $view = new PhpView(
+            [dirname(__DIR__) . '/templates'],
+            $routes->getRouteParser(),
+            $routes->getBasePath(),
+            static fn (string $path): string => '',
+            static fn (string $text): string => htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+        );
+        return $view->render($response->withHeader('Cache-Control', 'no-store'), 'preview', [
+            'values' => $values, 'errors' => $errors, 'result' => $result,
+            'uses_plugin' => $this->service->usesPlugin(),
+            'csrf_token' => $_SESSION['csrf_token'],
+            'form_url' => $routes->getBasePath() . '/extensions/modules/demo-reservation/preview',
+        ]);
+    }
+}

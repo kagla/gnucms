@@ -4,6 +4,19 @@
 동작하거나 플러그인을 조합하는 업무 프로그램이다. 독립 동작은 GNUCMS 안에서
 다른 플러그인 없이 실행되는 것을 의미한다.
 
+## 실행 가능한 참고 데모
+
+기본 배포본에는 처음에 꺼져 있는 데모 패키지가 하나씩 포함된다.
+
+| 종류 | 패키지와 개발 안내 | 활성화 후 관리자 실행 주소 |
+| --- | --- | --- |
+| 플러그인 | [메시지 형식](../plugins/demo-message/README.md) | `/extensions/plugins/demo-message/preview` |
+| 모듈 | [예약 안내문](../modules/demo-reservation/README.md) | `/extensions/modules/demo-reservation/preview` |
+
+모듈만 켜서 독립 실행을 확인한 뒤 플러그인을 켜면 메시지 형식 연동을 비교할 수 있다.
+둘 다 관리자 전용 미리보기이며 실제 예약 저장·외부 발송은 하지 않는다.
+하위 경로에 설치했다면 실행 주소 앞에 설치 경로를 붙인다.
+
 ## 관리와 배포
 
 - 관리자 메뉴를 `/admin/plugins`, `/admin/modules`로 분리한다. 전체 관리자만 접근한다.
