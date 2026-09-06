@@ -722,6 +722,9 @@ select.select:-webkit-autofill:focus{
 
 /* --- 09 table · list · stats ------------------------------- */
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.extensions-table th:last-child,.extensions-table td:last-child{width:12rem;min-width:12rem}
+.extension-state-toggle{display:inline-flex;align-items:center;gap:.5rem;white-space:nowrap}
+.extension-state-toggle .toggle{flex-shrink:0}
 .table{border-collapse:collapse;font-size:13.5px}
 .table thead th{
   padding:.875rem 1.5rem;

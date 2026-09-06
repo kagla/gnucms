@@ -34,7 +34,7 @@
   </div>
   <?php else: ?>
   <div class="table-wrap">
-    <table class="table">
+    <table class="table extensions-table">
       <thead><tr><th scope="col">이름</th><th scope="col">버전</th><th scope="col">사용 상태</th></tr></thead>
       <tbody>
       <?php foreach ($packages as $package): ?>
@@ -49,7 +49,7 @@
           <td data-label="사용 상태">
             <input type="hidden" name="original[<?= $this->e($package['id']) ?>]" value="<?= $package['enabled'] ? '1' : '0' ?>">
             <input type="hidden" name="enabled[<?= $this->e($package['id']) ?>]" value="0">
-            <label>
+            <label class="extension-state-toggle">
               <input class="toggle toggle-primary" type="checkbox" role="switch" name="enabled[<?= $this->e($package['id']) ?>]" value="1"<?= $package['selected'] ? ' checked' : '' ?><?= !$package['enabled'] && $package['error'] !== null ? ' disabled' : '' ?> data-extension-id="<?= $this->e($package['id']) ?>" aria-label="<?= $this->e($package['name']) ?> 사용">
               <span data-enabled-label><?= $package['selected'] ? '사용' : '미사용' ?></span>
             </label>
