@@ -87,8 +87,8 @@ final class PostRepository
         foreach ($terms as $index => $term) {
             $titleKey = 'q' . $index . '_title';
             $bodyKey = 'q' . $index . '_body';
-            $where .= ' AND (title LIKE :' . $titleKey . ' ESCAPE \'' . self::LIKE_ESCAPE . '\''
-                . ' OR (is_secret = 0 AND content LIKE :' . $bodyKey . ' ESCAPE \'' . self::LIKE_ESCAPE . '\'))';
+            $where .= ' AND (LOWER(title) LIKE LOWER(:' . $titleKey . ') ESCAPE \'' . self::LIKE_ESCAPE . '\''
+                . ' OR (is_secret = 0 AND LOWER(content) LIKE LOWER(:' . $bodyKey . ') ESCAPE \'' . self::LIKE_ESCAPE . '\'))';
             $pattern = '%' . $this->escapeLike($term) . '%';
             $params[$titleKey] = $pattern;
             $params[$bodyKey] = $pattern;
@@ -146,8 +146,8 @@ final class PostRepository
         foreach ($this->searchTerms($q) as $index => $term) {
             $titleKey = 'q' . $index . '_title';
             $bodyKey = 'q' . $index . '_body';
-            $where .= ' AND (title LIKE :' . $titleKey . ' ESCAPE \'' . self::LIKE_ESCAPE . '\''
-                . ' OR (is_secret = 0 AND content LIKE :' . $bodyKey . ' ESCAPE \'' . self::LIKE_ESCAPE . '\'))';
+            $where .= ' AND (LOWER(title) LIKE LOWER(:' . $titleKey . ') ESCAPE \'' . self::LIKE_ESCAPE . '\''
+                . ' OR (is_secret = 0 AND LOWER(content) LIKE LOWER(:' . $bodyKey . ') ESCAPE \'' . self::LIKE_ESCAPE . '\'))';
             $pattern = '%' . $this->escapeLike($term) . '%';
             $params[$titleKey] = $pattern;
             $params[$bodyKey] = $pattern;
