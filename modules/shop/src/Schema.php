@@ -9,9 +9,9 @@ use GnuCms\Extension\PackageSchema;
 final class Schema
 {
     public const KEY = 'modules/shop';
-    public const VERSION = 2;
+    public const VERSION = 4;
     public const TABLES = ['shop_settings', 'shop_products', 'shop_variants', 'shop_orders', 'shop_items',
-        'shop_claims', 'shop_refunds', 'shop_money', 'shop_stock', 'shop_payouts', 'shop_events'];
+        'shop_claims', 'shop_refunds', 'shop_money', 'shop_stock', 'shop_payouts', 'shop_events', 'shop_product_images'];
 
     public static function install(PackageSchema $schema): void
     {
@@ -21,8 +21,9 @@ final class Schema
                 'shop_products' => 'id VARCHAR(32) PRIMARY KEY, name VARCHAR(150) NOT NULL, description {TEXT} NOT NULL,
                     image VARCHAR(100) NOT NULL, option1_name VARCHAR(60) NOT NULL, option2_name VARCHAR(60) NOT NULL,
                     active SMALLINT NOT NULL, version INTEGER NOT NULL, created_at BIGINT NOT NULL',
+                'shop_product_images' => 'id VARCHAR(32) PRIMARY KEY, product_id VARCHAR(32) NOT NULL, filename VARCHAR(100) NOT NULL, sort_order INTEGER NOT NULL',
                 'shop_variants' => 'id VARCHAR(32) PRIMARY KEY, product_id VARCHAR(32) NOT NULL, option1 VARCHAR(60){OPTION_COLLATION} NOT NULL,
-                    option2 VARCHAR(60){OPTION_COLLATION} NOT NULL, price BIGINT NOT NULL CHECK (price > 0), stock INTEGER NOT NULL CHECK (stock >= 0),
+                    option2 VARCHAR(60){OPTION_COLLATION} NOT NULL, price BIGINT NOT NULL CHECK (price > 0), cost_price BIGINT DEFAULT NULL CHECK (cost_price >= 0), stock INTEGER NOT NULL CHECK (stock >= 0),
                     active SMALLINT NOT NULL, version INTEGER NOT NULL, UNIQUE (product_id, option1, option2)',
                 'shop_orders' => 'id VARCHAR(32) PRIMARY KEY, user_id VARCHAR(100) NOT NULL, checkout_key VARCHAR(64) NOT NULL UNIQUE,
                     order_name VARCHAR(200) NOT NULL, customer {TEXT} NOT NULL, provider VARCHAR(10) NOT NULL,
@@ -35,7 +36,7 @@ final class Schema
                     late_cancel_at BIGINT NOT NULL DEFAULT 0, checked_at BIGINT NOT NULL DEFAULT 0',
                 'shop_items' => 'id VARCHAR(32) PRIMARY KEY, order_id VARCHAR(32) NOT NULL, variant_id VARCHAR(32) NOT NULL,
                     product_id VARCHAR(32) NOT NULL, name VARCHAR(150) NOT NULL, options VARCHAR(250) NOT NULL,
-                    price BIGINT NOT NULL, quantity INTEGER NOT NULL CHECK (quantity > 0), returned INTEGER NOT NULL,
+                    price BIGINT NOT NULL, cost_price BIGINT DEFAULT NULL CHECK (cost_price >= 0), quantity INTEGER NOT NULL CHECK (quantity > 0), returned INTEGER NOT NULL,
                     exchanged INTEGER NOT NULL, exchange_claim_id VARCHAR(32) NOT NULL DEFAULT \'\'',
                 'shop_claims' => 'id VARCHAR(32) PRIMARY KEY, order_id VARCHAR(32) NOT NULL, item_id VARCHAR(32) NOT NULL,
                     request_key VARCHAR(64) NOT NULL UNIQUE, kind VARCHAR(10) NOT NULL, quantity INTEGER NOT NULL,
@@ -63,6 +64,17 @@ final class Schema
             foreach ($definitions as $table => $definition) {
                 $db->execute('CREATE TABLE IF NOT EXISTS ' . $db->table($table) . ' (' . strtr($definition, $types) . ')' . $db->dialect()->tableSuffix());
             }
+            // 과거 상품·주문의 원가는 알 수 없으므로 NULL로 보존한다. 재실행 시 입력된 원가를 덮어쓰지 않는다.
+            foreach (['shop_variants', 'shop_items'] as $table) {
+                $exists = $db->dialect()->name() === 'sqlite'
+                    ? in_array('cost_price', array_column($db->select('PRAGMA table_info(' . $db->table($table) . ')'), 'name'), true)
+                    : $db->selectOne('SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?', [$db->tableName($table), 'cost_price']) !== null;
+                if (!$exists) $db->execute('ALTER TABLE ' . $db->table($table) . ' ADD COLUMN cost_price BIGINT DEFAULT NULL CHECK (cost_price >= 0)');
+            }
+            // 기존 대표 이미지를 첫 이미지로 보존한다. 중간 실패 후 재실행해도 중복하지 않는다.
+            $db->execute('INSERT INTO ' . $db->table('shop_product_images') . ' (id, product_id, filename, sort_order) SELECT p.id, p.id, p.image, 0 FROM '
+                . $db->table('shop_products') . " p WHERE p.image <> '' AND NOT EXISTS (SELECT 1 FROM "
+                . $db->table('shop_product_images') . ' i WHERE i.product_id = p.id)');
             // SQLite VARCHAR에는 길이 제한이 없다. MySQL의 기존 두 컬럼만 멱등 확장한다.
             if ($db->dialect()->name() === 'mysql') {
                 foreach (['shop_orders' => ['transaction_id', 'NULL'], 'shop_money' => ['reference', 'NOT NULL']] as $table => [$column, $nullable]) {
@@ -73,7 +85,7 @@ final class Schema
             foreach (['shop_order_user' => ['shop_orders', 'user_id'], 'shop_item_order' => ['shop_items', 'order_id'],
                 'shop_claim_order' => ['shop_claims', 'order_id'], 'shop_refund_order' => ['shop_refunds', 'order_id'],
                 'shop_money_date' => ['shop_money', 'occurred_at'], 'shop_stock_variant' => ['shop_stock', 'variant_id'],
-                'shop_event_order' => ['shop_events', 'order_id']] as $index => [$table, $column]) {
+                'shop_event_order' => ['shop_events', 'order_id'], 'shop_image_product' => ['shop_product_images', 'product_id']] as $index => [$table, $column]) {
                 $physical = $db->prefix() . $index;
                 $exists = match ($db->dialect()->name()) {
                     'sqlite' => $db->selectOne("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?", [$physical]),

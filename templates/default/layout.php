@@ -84,6 +84,7 @@
                 <li><a href="<?= $this->url('notifications.index') ?>"><?= $this->icon('bell', 17) ?> 알림</a></li>
                 <?php if ($current_user['is_admin']): ?><li><a href="<?= $this->url('admin.index') ?>"><?= $this->icon('cog', 17) ?> 관리 콘솔</a></li><?php endif ?>
                 <li><a href="<?= $this->url('account.edit') ?>"><?= $this->icon('user', 17) ?> 회원정보 수정</a></li>
+                <?php if (isset($public_extensions['modules/shop'])): ?><li><a href="<?= $this->e($public_extensions['modules/shop']['base_url']) ?>/orders"><?= $this->icon('gift', 17) ?> 내 주문</a></li><?php endif ?>
                 <?php if ($current_user['is_admin']): ?><li><a href="<?= $this->url('admin.login_history') ?>"><?= $this->icon('history', 17) ?> 로그인 기록</a></li><?php endif ?>
                 <li>
                   <form method="post" action="<?= $this->url('auth.logout') ?>">
@@ -119,6 +120,9 @@
           <nav class="tabs tabs-border" aria-label="주요 메뉴">
             <a class="tab<?php if (trim($this->block('nav_section')) === 'home'): ?> tab-active<?php endif ?>" href="<?= $this->url('boards.index') ?>"<?php if (trim($this->block('nav_section')) === 'home'): ?> aria-current="page"<?php endif ?>>홈</a>
             <a class="tab<?php if (trim($this->block('nav_section')) === 'all'): ?> tab-active<?php endif ?>" href="<?= $this->url('posts.all') ?>"<?php if (trim($this->block('nav_section')) === 'all'): ?> aria-current="page"<?php endif ?>>전체 글</a>
+            <?php foreach ($public_extensions ?? [] as $key => $extension): $selected = trim($this->block('nav_section')) === $key; ?>
+              <a class="tab<?= $selected ? ' tab-active' : '' ?>" href="<?= $this->e($extension['url']) ?>"<?= $selected ? ' aria-current="page"' : '' ?>><?= $this->e($extension['name']) ?></a>
+            <?php endforeach ?>
             <?php if (!$currentBoardInHeader): ?><?php $this->start('extra_tabs') ?><?php $this->stop() ?><?php endif ?>
             <?php foreach ($header_boards as $item): ?>
               <?php $isCurrentBoard = $currentBoardKey !== '' && $currentBoardKey === $item['board_key']; ?>
@@ -247,6 +251,7 @@
       <ul class="menu">
         <li class="menu-title">둘러보기</li>
         <li><a href="<?= $this->url('boards.index') ?>"><?= $this->icon('home', 18) ?> 홈</a></li>
+        <?php foreach ($public_extensions ?? [] as $extension): ?><li><a href="<?= $this->e($extension['url']) ?>"><?= $this->icon('gift', 18) ?> <?= $this->e($extension['name']) ?></a></li><?php endforeach ?>
         <?php foreach (($boards ?? []) as $navBoard): ?>
           <li><a href="<?= $this->url('posts.index', ['key' => $navBoard['board_key']]) ?>"><?= $this->icon('board', 18) ?> <?= $this->e($navBoard['name']) ?></a></li>
         <?php endforeach ?>
@@ -254,6 +259,7 @@
         <?php foreach ($site_menu as $item): ?><li><a href="<?= $this->url('content.show', ['slug' => $item['slug']]) ?>"><?= $this->icon('document', 18) ?> <?= $this->e($item['title']) ?></a></li><?php endforeach ?>
         <?php if (!$current_user['is_guest']): ?>
           <li class="menu-title">내 활동</li>
+          <?php if (isset($public_extensions['modules/shop'])): ?><li><a href="<?= $this->e($public_extensions['modules/shop']['base_url']) ?>/orders"><?= $this->icon('gift', 18) ?> 내 주문</a></li><?php endif ?>
           <li><a href="<?= $this->url('notifications.index') ?>"><?= $this->icon('bell', 18) ?> 알림<?php if ($unread_notifications > 0): ?> <span class="badge badge-primary badge-sm"><?= $this->e($unread_notifications) ?></span><?php endif ?></a></li>
           <li><a href="<?= $this->url('account.edit') ?>"><?= $this->icon('user', 18) ?> 회원정보 수정</a></li>
           <?php if ($current_user['is_admin']): ?><li><a href="<?= $this->url('admin.login_history') ?>"><?= $this->icon('history', 18) ?> 로그인 기록</a></li><?php endif ?>

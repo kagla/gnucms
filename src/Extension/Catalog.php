@@ -34,7 +34,7 @@ final class Catalog
                 $package = [
                     'key' => $key, 'id' => $id, 'section' => $section, 'name' => $id,
                     'description' => '', 'version' => '', 'requires' => [], 'optional' => [],
-                    'entry_path' => null, 'admin_test' => false,
+                    'entry_path' => null, 'public_path' => null, 'route_prefix' => null, 'admin_route_prefix' => null, 'admin_test' => false,
                     'directory' => $directory, 'error' => null,
                 ];
                 try {
@@ -67,6 +67,22 @@ final class Catalog
                     }
                     $package['entry_path'] = $entry;
                     $package['admin_test'] = $adminTest;
+                    $publicPath = $manifest['public_path'] ?? null;
+                    if ($publicPath !== null && (!is_string($publicPath)
+                        || !preg_match('~^/(?:[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)?$~D', $publicPath))) {
+                        throw new RuntimeException('사용자 화면 주소가 올바르지 않습니다.');
+                    }
+                    $package['public_path'] = $publicPath;
+                    $prefix = $manifest['route_prefix'] ?? null;
+                    if ($prefix !== null && !RoutePrefix::valid($prefix)) {
+                        throw new RuntimeException('기본 주소는 /shop 같은 영문 소문자 경로로 지정하고 시스템 경로는 피해야 합니다.');
+                    }
+                    $package['route_prefix'] = $prefix;
+                    $adminPrefix = $manifest['admin_route_prefix'] ?? null;
+                    if ($adminPrefix !== null && !RoutePrefix::validAdmin($adminPrefix)) {
+                        throw new RuntimeException('관리자 기본 주소는 /admin/shop 같은 경로로 지정해 주세요.');
+                    }
+                    $package['admin_route_prefix'] = $adminPrefix;
                     foreach (['requires', 'optional'] as $field) {
                         $dependencies = $manifest[$field] ?? [];
                         if (!is_array($dependencies) || !array_is_list($dependencies)) {

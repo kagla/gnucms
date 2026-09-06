@@ -19,7 +19,7 @@ const render = scenario => execFileSync('php', [path.join(__dirname, 'ShopFixtur
         if (request.url() === 'https://js.tosspayments.com/v2/standard') return request.respond({status: 200, contentType: 'text/javascript', body: `window.tossCalls=[];window.TossPayments=clientKey=>({payment:({customerKey})=>({requestPayment:async request=>{window.tossCalls.push({clientKey,customerKey,request});throw {code:'USER_CANCEL'};}})});`});
         return request.respond({status: 200, contentType: 'text/html', body: html});
       });
-      await page.goto('https://shop.example.test/cms/modules/shop/order');
+      await page.goto('https://shop.example.test/cms/shop/order');
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
       await page.click('#shop-pay-button');
       await page.waitForFunction(() => document.getElementById('shop-payment-message').textContent.includes('결제를 취소했습니다'));
@@ -27,7 +27,7 @@ const render = scenario => execFileSync('php', [path.join(__dirname, 'ShopFixtur
       assert.match(call.clientKey, /^live_ck_/);
       assert.match(call.customerKey, /^[a-f0-9]{50}$/);
       assert.equal(call.request.method, 'CARD'); assert.deepEqual(call.request.amount, {currency: 'KRW', value: 58000});
-      assert.equal(new URL(call.request.successUrl).pathname, '/cms/modules/shop/toss-return');
+      assert.equal(new URL(call.request.successUrl).pathname, '/cms/shop/toss-return');
       assert.equal(new URL(call.request.successUrl).searchParams.get('id'), call.request.orderId);
       assert.match(new URL(call.request.successUrl).searchParams.get('state'), /^[a-f0-9]{64}$/);
       await page.click('#shop-pay-button');
@@ -49,11 +49,11 @@ const render = scenario => execFileSync('php', [path.join(__dirname, 'ShopFixtur
         }
         return request.respond({status: 200, contentType: 'text/html', body: html});
       });
-      await page.goto('https://shop.example.test/cms/modules/shop/toss-return');
+      await page.goto('https://shop.example.test/cms/shop/toss-return');
       if (!javascript) await Promise.all([page.waitForNavigation(), page.click('button')]);
       await posted;
       assert.equal(posts.length, 1);
-      assert.equal(posts[0].url.pathname, '/cms/modules/shop/callback');
+      assert.equal(posts[0].url.pathname, '/cms/shop/callback');
       assert.equal(posts[0].fields.get('orderId'), posts[0].url.searchParams.get('id'));
       assert.equal(posts[0].fields.get('amount'), '58000');
       assert.equal(posts[0].fields.get('paymentKey').length, 200);

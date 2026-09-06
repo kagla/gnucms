@@ -9,7 +9,7 @@ use GnuCms\Support\Clock;
 
 final class Settlement
 {
-    public function __construct(private Store $store) {}
+    public function __construct(private Store $store, private Costing $costing) {}
 
     private function period(string $from, string $to): array
     {
@@ -62,7 +62,8 @@ final class Settlement
             'gross' => (int) $totals['gross'], 'refunds' => (int) $totals['refunds'], 'net' => (int) $totals['net'],
             'sold_quantity' => array_sum(array_column($products, 'sold_quantity')),
             'cancelled_quantity' => (int) $cancelled['n'], 'returned_quantity' => (int) $claims['returned_quantity'],
-            'exchanged_quantity' => (int) $claims['exchanged_quantity'], 'entries' => $daily, 'products' => $products, 'payouts' => $payouts];
+            'exchanged_quantity' => (int) $claims['exchanged_quantity'], 'entries' => $daily, 'products' => $products, 'payouts' => $payouts,
+            'profit' => $this->costing->ready() ? $this->costing->report($start, $end, $environment, $provider) : null];
     }
 
     public function savePayout(array $input, string $actor): string

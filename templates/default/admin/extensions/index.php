@@ -40,8 +40,17 @@
       <?php foreach ($packages as $package): ?>
         <tr>
           <td data-label="이름">
+            <div class="extension-details">
             <strong><?= $this->e($package['name']) ?></strong>
             <p><?= $this->e($package['description']) ?></p>
+            <?php if ($package['public_url'] !== null): ?>
+            <div class="extension-public-entry">
+              <p><strong>사용자 화면:</strong>
+                <a class="link link-hover" href="<?= $this->e($package['public_url']) ?>"><?= $this->e($package['public_url']) ?></a>
+                <a class="btn btn-ghost btn-square btn-xs" href="<?= $this->e($package['public_url']) ?>" target="_blank" rel="noopener noreferrer" title="사용자 화면을 새 창으로 열기" aria-label="<?= $this->e($package['name']) ?> 사용자 화면을 새 창으로 열기"><?= $this->icon('external', 14) ?></a>
+              </p>
+            </div>
+            <?php endif ?>
             <?php if ($package['entry_url'] !== null): ?>
             <p><small>실행 주소:
               <?php if ($package['enabled'] && $package['error'] === null): ?>
@@ -54,16 +63,19 @@
                 <span><?= $this->e($package['entry_url']) ?></span>
               <?php endif ?>
             </small></p>
-            <div class="row-actions">
-              <?php if ($package['enabled'] && $package['error'] === null): ?>
+            <?php if ($extension_section === 'plugins' && $package['enabled'] && $package['error'] === null): ?>
+              <div class="row-actions">
                 <a class="btn btn-outline btn-sm" href="<?= $this->e($package['entry_url']) ?>">바로가기</a>
-              <?php elseif ($package['admin_test'] && $package['error'] === null): ?>
+              </div>
+            <?php elseif (!$package['enabled'] && $package['admin_test'] && $package['error'] === null): ?>
+              <div class="row-actions">
                 <a class="btn btn-outline btn-sm" href="<?= $this->url('admin.' . $extension_section . '.test', ['id' => $package['id']]) ?>">관리자 테스트</a>
-              <?php endif ?>
-            </div>
+              </div>
+            <?php endif ?>
             <?php endif ?>
             <?php if ($package['requires'] !== []): ?><small>필수 확장: <?= $this->e(implode(', ', $package['requires'])) ?></small><?php endif ?>
             <?php if ($package['optional'] !== []): ?><p><small>선택 확장: <?= $this->e(implode(', ', $package['optional'])) ?></small></p><?php endif ?>
+            </div>
           </td>
           <td data-label="버전"><?= $this->e($package['version']) ?></td>
           <td data-label="사용 상태">

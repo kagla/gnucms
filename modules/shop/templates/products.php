@@ -1,12 +1,33 @@
-<?php $values = $product ?? ['id' => '', 'name' => '', 'description' => '', 'option1_name' => '', 'option2_name' => '', 'active' => 0, 'version' => 0, 'variants' => []]; ?>
-<div class="toolbar page-head"><div><h1>상품 관리</h1></div><a class="button secondary btn" href="<?= $this->e($url) ?>/products">새 상품</a></div>
-<section class="panel card card-body extension-panel"><h2 class="card-title"><?= $product === null ? '새 상품 등록' : '상품 수정' ?></h2><form method="post" action="<?= $this->e($url) ?>/products" class="stack"><?php $this->insert('_csrf') ?><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= $this->e($values['id']) ?>"><input type="hidden" name="version" value="<?= (int) $values['version'] ?>">
-<div class="form-grid"><label class="full extension-label">상품명<input class="input input-bordered input-block" name="name" maxlength="150" value="<?= $this->e($values['name']) ?>" required></label><label class="full extension-label">상품 설명<textarea class="textarea textarea-bordered textarea-block" name="description" rows="6" maxlength="15000"><?= $this->e($values['description']) ?></textarea></label>
-<?php foreach ([1, 2] as $n): ?><label class="extension-label">옵션 <?= $n ?> 이름<input class="input input-bordered input-block" name="option<?= $n ?>_name" maxlength="60" value="<?= $this->e($values['option' . $n . '_name']) ?>" placeholder="<?= $n === 1 ? '예: 색상' : '예: 크기' ?>"></label><label class="extension-label">옵션 <?= $n ?> 값 <small>쉼표로 구분</small><input class="input input-bordered input-block" name="option<?= $n ?>_values" maxlength="1000" value="<?= $this->e(implode(', ', array_unique(array_column(array_filter($values['variants'], static fn ($v) => (int) $v['active'] === 1), 'option' . $n)))) ?>" placeholder="<?= $n === 1 ? '화이트, 블랙' : 'S, M, L' ?>"></label><?php endforeach ?>
-<label class="extension-label">새 옵션 기본 가격<input class="input input-bordered input-block" name="price" type="number" min="1" max="100000000" value="<?= (int) ($values['variants'][0]['price'] ?? 10000) ?>" required></label><label class="extension-label">새 옵션 초기 재고<input class="input input-bordered input-block" name="stock" type="number" min="0" max="1000000" value="0" required></label></div>
-<p class="muted">옵션은 두 종류, 조합은 100개까지 가능합니다. 옵션을 쓰지 않으면 이름과 값을 비워 주세요. 기존 옵션의 가격과 재고는 아래 표에서 변경합니다. 제거한 옵션과 과거 주문은 보존됩니다.</p><label class="extension-label"><input class="checkbox checkbox-primary checkbox-sm" type="checkbox" name="active" value="1"<?= $values['active'] ? ' checked' : '' ?>>판매 목록에 공개</label><div class="card-actions form-actions"><button class="btn btn-primary">상품 저장</button></div></form></section>
-<?php if ($product !== null): ?>
-<section class="panel card card-body extension-panel"><h2 class="card-title">상품 이미지</h2><?php if ($product['image']): ?><img src="<?= $this->e($url) ?>/image?file=<?= $this->e($product['image']) ?>" alt="현재 상품 이미지" style="max-width:180px;max-height:140px"><?php endif ?><form method="post" enctype="multipart/form-data" action="<?= $this->e($url) ?>/products" class="row"><?php $this->insert('_csrf') ?><input type="hidden" name="id" value="<?= $this->e($product['id']) ?>"><input type="hidden" name="action" value="image"><label class="extension-label">JPG·PNG·WebP, 최대 5MB<input class="file-input file-input-bordered input-block" type="file" name="image" accept="image/jpeg,image/png,image/webp" required></label><button class="btn btn-primary">이미지 저장</button></form></section>
-<section class="panel table-wrap card card-body extension-panel"><h2 class="card-title">옵션별 가격과 재고</h2><p class="muted">재고는 현재 판매 가능한 수량입니다. 주문에서 확보한 수량은 제외됩니다.</p><table class="table"><thead><tr><th>옵션</th><th>판매 상태</th><th>가격 / 판매 가능 수량</th></tr></thead><tbody><?php foreach ($product['variants'] as $variant): ?><tr><td data-label="옵션"><?= $this->e(implode(' / ', array_filter([$variant['option1'], $variant['option2']])) ?: '기본 상품') ?></td><td data-label="판매 상태"><?= $variant['active'] ? '사용' : '미사용' ?></td><td data-label="가격 / 판매 가능 수량"><form method="post" action="<?= $this->e($url) ?>/products" class="row"><?php $this->insert('_csrf') ?><input type="hidden" name="action" value="variant"><input type="hidden" name="variant_id" value="<?= $this->e($variant['id']) ?>"><input type="hidden" name="version" value="<?= (int) $variant['version'] ?>"><label class="extension-label">가격<input class="input input-bordered input-block" name="price" type="number" min="1" max="100000000" value="<?= (int) $variant['price'] ?>" required></label><label class="extension-label">재고<input class="input input-bordered input-block" name="stock" type="number" min="0" max="1000000" value="<?= (int) $variant['stock'] ?>" required></label><button class="btn btn-primary">변경</button></form></td></tr><?php endforeach ?></tbody></table></section>
-<?php endif ?>
-<section class="panel table-wrap card card-body extension-panel"><h2 class="card-title">등록 상품</h2><form method="get" action="<?= $this->e($url) ?>/products" class="row"><input class="input input-bordered input-block" name="q" aria-label="상품명 검색" placeholder="상품명 검색" value="<?= $this->e($input['q'] ?? '') ?>"><button class="secondary btn">검색</button></form><table class="table"><thead><tr><th>상품</th><th>상태</th><th class="num">최저 가격</th><th class="num">판매 가능 재고</th><th></th></tr></thead><tbody><?php foreach ($products as $item): ?><tr><td data-label="상품"><?= $this->e($item['name']) ?></td><td data-label="상태"><?= $item['active'] ? '공개' : '비공개' ?></td><td data-label="최저 가격" class="num"><?= number_format((int) $item['min_price']) ?>원</td><td data-label="판매 가능 재고" class="num"><?= number_format((int) $item['available_stock']) ?>개</td><td data-label="관리"><a class="link" href="<?= $this->e($url) ?>/products?id=<?= $this->e($item['id']) ?>">수정</a></td></tr><?php endforeach ?></tbody></table><nav class="pagination"><?php if ($page_number > 1): ?><a class="link" href="<?= $this->e($url) ?>/products?p=<?= $page_number - 1 ?>">이전</a><?php endif ?><?php if (count($products) === 24): ?><a class="link" href="<?= $this->e($url) ?>/products?p=<?= $page_number + 1 ?>">다음</a><?php endif ?></nav></section>
+<link rel="stylesheet" href="<?= $this->asset('shop-admin.css') ?>">
+<div class="toolbar page-head">
+  <div><h1>상품 목록</h1><p>등록한 상품의 판매 상태와 옵션별 가격·재고를 관리합니다.</p></div>
+  <a class="btn btn-primary" href="<?= $this->e($admin_url) ?>/products/new">상품 등록</a>
+</div>
+<section class="panel table-wrap card card-body extension-panel">
+  <form method="get" action="<?= $this->e($admin_url) ?>/products" class="row">
+    <input class="input input-bordered input-block" name="q" aria-label="상품명 검색" placeholder="상품명 검색" value="<?= $this->e($input['q'] ?? '') ?>">
+    <button class="btn">검색</button>
+  </form>
+  <?php if ($products === []): ?><p class="empty"><?= ($input['q'] ?? '') === '' ? '등록된 상품이 없습니다. 상품 등록을 눌러 첫 상품을 추가해 주세요.' : '검색 결과가 없습니다.' ?></p>
+  <?php else: ?>
+  <table class="table"><thead><tr><th>상품</th><th>옵션</th><th>상태</th><th class="num">최저 판매가</th><th class="num">판매 가능 재고</th><th>관리</th></tr></thead><tbody>
+    <?php foreach ($products as $item): ?><tr>
+      <td data-label="상품"><a class="link" href="<?= $this->e($admin_url) ?>/products/edit?id=<?= $this->e($item['id']) ?>"><?= $this->e($item['name']) ?></a></td>
+      <td data-label="옵션"><div class="badge-row shop-product-options">
+        <?php foreach ($item['options'] ?? [] as $option): $optionTitle = $option['name'] . ': ' . (implode(', ', $option['values']) ?: '등록된 값 없음'); ?>
+          <span class="badge badge-outline" title="<?= $this->e($optionTitle) ?>" aria-label="<?= $this->e($optionTitle) ?>" tabindex="0"><?= $this->e($option['name']) ?></span>
+        <?php endforeach ?>
+        <?php if (($item['options'] ?? []) === []): ?><span class="muted">없음</span><?php endif ?>
+      </div></td>
+      <td data-label="상태"><?= $item['active'] ? '공개' : '비공개' ?></td>
+      <td data-label="최저 판매가" class="num"><?= number_format((int) $item['min_price']) ?>원</td>
+      <td data-label="판매 가능 재고" class="num"><?= number_format((int) $item['available_stock']) ?>개</td>
+      <td data-label="관리"><a class="btn btn-sm" href="<?= $this->e($admin_url) ?>/products/edit?id=<?= $this->e($item['id']) ?>">수정</a></td>
+    </tr><?php endforeach ?>
+  </tbody></table>
+  <?php endif ?>
+  <nav class="pagination" aria-label="상품 목록 페이지">
+    <?php if ($page_number > 1): ?><a class="link" href="<?= $this->e($admin_url) ?>/products?<?= $this->e(http_build_query(['q' => $input['q'] ?? '', 'p' => $page_number - 1])) ?>">이전</a><?php endif ?>
+    <?php if (count($products) === 24): ?><a class="link" href="<?= $this->e($admin_url) ?>/products?<?= $this->e(http_build_query(['q' => $input['q'] ?? '', 'p' => $page_number + 1])) ?>">다음</a><?php endif ?>
+  </nav>
+</section>

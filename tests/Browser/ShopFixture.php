@@ -36,14 +36,22 @@ $shop->saveSettings(['name' => '소소한 상점', 'seller' => '소소한 상점
     'shipping' => 3000, 'free_shipping' => 50000, 'environment' => 'live', 'open' => '1']);
 $p = null;
 foreach (['매일 입는 코튼 셔츠', '작은 캔버스 가방', '포근한 니트'] as $name) {
-    $id = $shop->catalog->save(['name' => $name, 'description' => '편안한 일상을 위한 제품입니다.', 'active' => '1', 'price' => 29000, 'stock' => 12,
+    $id = $shop->catalog->save(['name' => $name, 'description' => '편안한 일상을 위한 제품입니다.', 'active' => '1', 'price' => 29000, 'cost_price' => 17000, 'stock' => 12,
         'option1_name' => '색상', 'option1_values' => '크림,그린', 'option2_name' => '사이즈', 'option2_values' => 'M,L']);
     $p ??= $shop->catalog->product($id);
+}
+if (in_array($scenario, ['images', 'product'], true)) {
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aGZkAAAAASUVORK5CYII=');
+    $source = $root . '/source.png'; file_put_contents($source, $png);
+    $file = static fn () => new \Slim\Psr7\UploadedFile($source, 'photo.png', 'image/png', strlen($png));
+    $shop->images->append($p['id'], [$file(), $file(), $file()], (int) $p['version']);
+    $p = $shop->catalog->product($p['id']);
 }
 $cart = [$p['variants'][0]['id'] => 2];
 $order = $shop->createOrder('browser', $cart, ['name' => '구매자', 'phone' => '01000000000', 'email' => 'buyer@example.test', 'postcode' => '00000', 'address' => '테스트 주소', 'consent' => '1'], $provider, Store::id(), 58000);
 $pay = in_array($scenario, ['payment', 'toss-payment'], true);
-$page = $pay ? 'order' : $scenario;
+$page = $pay ? 'order' : ($scenario === 'images' ? 'products/edit' : $scenario);
+if ($page === 'settlement') { $gateway->paid($order); $shop->sync($order['id']); }
 if ($page === 'manage-order') {
     $gateway->paid($order); $shop->sync($order['id']);
     $shop->fulfill($order['id'], 'ship', ['carrier' => '테스트 택배', 'tracking' => '000000000'], 'browser');
@@ -55,14 +63,19 @@ if ($page === 'manage-order') {
 }
 $_SESSION = ['csrf_token' => bin2hex(random_bytes(16)), 'shop_cart' => $cart];
 $slim = \Slim\Factory\AppFactory::create(); $slim->setBasePath($base);
-$view = \GnuCms\Tests\Support\AdminViewFixture::view($base);
-$controller = new Controller($shop);
-if ($scenario === 'toss-return') $controller = new \GnuCms\Modules\Shop\TossReturnController($shop);
-$slim->map(['GET', 'POST'], '/modules/shop/' . $page, static fn ($request, $response) => $scenario === 'toss-return' ? $controller->handle($request, $response) : $controller->handle($page, $request, $response));
+$view = \GnuCms\Tests\Support\AdminViewFixture::view($base, $app->contentRenderer()->render(...));
+$isAdminScreen = in_array($page, ['admin', 'products', 'products/new', 'products/edit', 'manage-order', 'settings', 'inventory', 'settlement'], true);
+$app->setIdentity(Identity::user('browser', $isAdminScreen ? '운영자' : '구매자', $isAdminScreen));
+$view->addGlobal('current_user', ['is_guest' => false, 'id' => 'browser', 'is_admin' => $isAdminScreen, 'display_name' => $isAdminScreen ? '운영자' : '구매자', 'avatar_file' => null]);
+$view->addGlobal('public_extensions', ['modules/shop' => ['name' => '작은 쇼핑몰', 'url' => $base . '/shop', 'base_url' => $base . '/shop']]);
+$controller = new Controller($shop, '/shop', '/admin/shop');
+if ($scenario === 'toss-return') $controller = new \GnuCms\Modules\Shop\TossReturnController($shop, '/shop');
+$path = $isAdminScreen ? '/admin/shop' . ($page === 'admin' ? '' : '/' . $page) : '/shop/' . $page;
+$slim->map(['GET', 'POST'], $path, static fn ($request, $response) => $scenario === 'toss-return' ? $controller->handle($request, $response) : $controller->handle($page, $request, $response));
 $slim->addRoutingMiddleware(); $slim->add(new ViewMiddleware($view));
-$query = in_array($page, ['order', 'manage-order'], true) ? '?id=' . $order['id'] : ($page === 'product' || $page === 'products' ? '?id=' . $p['id'] : '');
+$query = in_array($page, ['order', 'manage-order'], true) ? '?id=' . $order['id'] : ($page === 'product' || $page === 'products/edit' ? '?id=' . $p['id'] : '');
 if ($scenario === 'toss-return') $query = '?' . http_build_query(['id' => $order['id'], 'state' => \GnuCms\Payment\CallbackToken::create($app, $order), 'paymentKey' => bin2hex(random_bytes(100)), 'orderId' => $order['id'], 'amount' => '58000']);
-$request = (new ServerRequestFactory())->createServerRequest($pay ? 'POST' : 'GET', $base . '/modules/shop/' . $page . $query);
+$request = (new ServerRequestFactory())->createServerRequest($pay ? 'POST' : 'GET', $base . $path . $query);
 if ($pay) $request = $request->withParsedBody(['id' => $order['id'], 'action' => 'pay', 'csrf_token' => $_SESSION['csrf_token']]);
 try { echo (string) $slim->handle($request)->getBody(); }
 finally {

@@ -6,7 +6,7 @@ const {execFileSync} = require('node:child_process');
 const puppeteer = require(process.env.PUPPETEER_MODULE || 'puppeteer-core');
 const root = path.resolve(__dirname, '../..');
 const render = (scenario, base) => execFileSync('php', [path.join(__dirname, 'ExtensionAdminFixture.php'), scenario, base], {cwd: root, encoding: 'utf8'});
-const route = scenario => scenario === 'toss-live' ? '/plugins/payment-toss/settings?environment=live'
+const route = scenario => scenario === 'core-modules' ? '/admin/modules' : scenario === 'toss-live' ? '/plugins/payment-toss/settings?environment=live'
   : ['inicis', 'kcp', 'kspay', 'toss'].includes(scenario) ? '/plugins/payment-' + scenario + '/settings'
   : scenario === 'bizppurio' ? '/plugins/bizppurio/settings'
   : scenario.startsWith('alimtalk-') ? '/modules/alimtalk/' + scenario.slice(9)
@@ -37,6 +37,33 @@ const route = scenario => scenario === 'toss-live' ? '/plugins/payment-toss/sett
       const button = await style('#main button[type=submit]', ['fontFamily', 'fontSize', 'fontWeight', 'height', 'borderRadius']);
       await open('core-list');
       const heading = await style('h1', ['fontSize', 'fontWeight']);
+      await open('core-modules');
+      assert.equal(await page.$$eval('.extensions-table .btn-outline', buttons => buttons.length), 0, 'enabled modules use address links without shortcut buttons');
+      for (const address of ['/admin/shop', '/modules/alimtalk/home']) {
+        assert.equal(await page.$$eval('.extensions-table a', (links, address) => links.filter(link => link.getAttribute('href') === address).length, base + address), 2, 'module address and new-window icon remain available');
+      }
+      for (const width of [1280, 390]) {
+        await page.setViewport({width, height: 960});
+        if (width < 768) await page.waitForFunction(() => document.querySelector('.admin-sidebar').getBoundingClientRect().right <= 1);
+        const entry = await page.$eval('.extension-public-entry', el => {
+          const address = el.querySelector('.link'), button = el.querySelector('.btn');
+          const linkBounds = address.getBoundingClientRect(), iconBounds = button.getBoundingClientRect();
+          return {text: el.textContent, address: address.getAttribute('href'), button: button.getAttribute('href'),
+            target: button.target, label: button.getAttribute('aria-label'), icon: !!button.querySelector('svg'),
+            adjacent: iconBounds.left >= linkBounds.right && iconBounds.top < linkBounds.bottom && iconBounds.bottom > linkBounds.top,
+            visible: el.getBoundingClientRect().width > 0};
+        });
+        assert.equal(entry.address, base + '/shop');
+        assert.equal(entry.button, base + '/shop');
+        assert.ok(entry.text.includes('사용자 화면:') && !entry.text.includes('사용자 화면 열기'));
+        assert.equal(entry.target, '_blank');
+        assert.ok(entry.label.includes('새 창으로 열기') && entry.icon && entry.adjacent, 'new-window icon must sit beside the public address');
+        assert.ok(entry.visible);
+        assert.ok(await page.$eval('.extension-details', el => el.getBoundingClientRect().width >= 180), 'module details must remain readable');
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+        if (base === '/cms') await page.screenshot({path: '/tmp/gnucms-module-links-' + width + '.png', fullPage: true});
+      }
+      assert.deepEqual(errors, [], 'module user link');
       for (const scenario of ['inicis', 'kcp', 'kspay', 'toss', 'toss-live', 'bizppurio', 'demo-message', 'demo-reservation', 'alimtalk-home', 'alimtalk-templates', 'alimtalk-send', 'alimtalk-history', 'alimtalk-detail']) {
         await page.setViewport({width: 1280, height: 960});
         await open(scenario);

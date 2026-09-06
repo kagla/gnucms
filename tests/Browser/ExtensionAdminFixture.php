@@ -14,6 +14,18 @@ if ($scenario === 'core') {
     echo $view->fetch('admin/settings', ['query' => [], 'errors' => [], 'values' => [], 'timezones' => ['Asia/Seoul']]);
 } elseif ($scenario === 'core-list') {
     echo $view->fetch('admin/extensions/index', ['extension_page' => ['title' => '플러그인', 'description' => '확장 기능 관리', 'icon' => 'sparkle'], 'extension_section' => 'plugins', 'extension_error' => null, 'saved' => false, 'packages' => [], 'changed_order' => '[]']);
+} elseif ($scenario === 'core-modules') {
+    $catalog = (new \GnuCms\Extension\Catalog(dirname(__DIR__, 2)))->all();
+    $packages = [];
+    foreach (['shop', 'alimtalk'] as $id) {
+        $package = $catalog['modules/' . $id];
+        $prefix = $package['route_prefix'] ?? '/modules/' . $id;
+        $package += ['enabled' => true, 'selected' => true,
+            'entry_url' => $base . \GnuCms\Extension\RoutePrefix::path($package['admin_route_prefix'] ?? $prefix, $package['entry_path']),
+            'public_url' => $package['public_path'] === null ? null : $base . \GnuCms\Extension\RoutePrefix::path($prefix, $package['public_path'])];
+        $packages[] = $package;
+    }
+    echo $view->fetch('admin/extensions/index', ['extension_page' => ['title' => '모듈', 'description' => '독립 기능 관리', 'icon' => 'grid'], 'extension_section' => 'modules', 'extension_error' => null, 'saved' => false, 'packages' => $packages, 'changed_order' => '[]']);
 } elseif (in_array($scenario, ['inicis', 'kcp', 'kspay', 'toss', 'toss-live'], true)) {
     $provider = $scenario === 'toss-live' ? 'toss' : $scenario;
     if ($scenario === 'toss-live') $common['environment'] = 'live';

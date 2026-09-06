@@ -2,7 +2,7 @@
 <?php $this->start('title') ?><?= $this->e($label) ?> 결제 설정 · <?= $this->e($site['site_name']) ?><?php $this->stop() ?>
 <?php $this->start('admin_section') ?>plugins<?php $this->stop() ?>
 <?php $this->start('extension_body') ?>
-<?php $this->insert('admin/_extension_header', ['section' => 'plugins', 'heading' => $label . ' 결제 설정', 'description' => '상점 코드와 인증 정보를 등록하고 환경별 결제 실행을 관리합니다.', 'actions' => [['url' => $this->base . '/modules/shop/admin', 'label' => '쇼핑몰 관리']]]) ?>
+<?php $this->insert('admin/_extension_header', ['section' => 'plugins', 'heading' => $label . ' 결제 설정', 'description' => '상점 코드와 인증 정보를 등록하고 환경별 결제 실행을 관리합니다.', 'actions' => [['url' => ($public_extensions['modules/shop']['admin_url'] ?? $this->base . '/admin/shop'), 'label' => '쇼핑몰 관리']]]) ?>
 <nav class="tabs tabs-border settings-tabs" aria-label="결제 환경">
 <?php foreach (['test' => '테스트 환경', 'live' => '운영 환경'] as $env => $envLabel): ?><a class="tab<?= $environment === $env ? ' tab-active' : '' ?>" href="<?= $this->e($this->base . '/' . $key) ?>/settings?environment=<?= $env ?>"<?= $environment === $env ? ' aria-current="page"' : '' ?>><?= $this->e($envLabel) ?></a><?php endforeach ?>
 </nav>

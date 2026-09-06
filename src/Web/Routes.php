@@ -31,8 +31,6 @@ final class Routes
 {
     public static function register(SlimApp $slim, App $app): void
     {
-        \GnuCms\Extension\AdminRoutes::register($slim, $app);
-
         $seo = new SeoController($app);
         $slim->get('/sitemap.xml', [$seo, 'sitemap'])->setName('seo.sitemap');
         $slim->get('/robots.txt', [$seo, 'robots'])->setName('seo.robots');
@@ -297,5 +295,7 @@ final class Routes
             ]);
             return $response->withHeader('Location', $url)->withStatus(301);
         });
+        // 코어 경로가 등록된 뒤 확장 기본 주소의 충돌을 검사한다.
+        \GnuCms\Extension\AdminRoutes::register($slim, $app);
     }
 }

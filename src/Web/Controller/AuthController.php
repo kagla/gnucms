@@ -75,7 +75,7 @@ final class AuthController
         $this->recordLogin($request, (int) $user['id'], $identifier, 'success');
         $this->storeSession($user);
 
-        return $this->homeRedirect($request, $response);
+        return $response->withStatus(303)->withHeader('Location', \GnuCms\Web\LoginDestination::consume($request));
     }
 
     public function registerForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -246,6 +246,7 @@ final class AuthController
     {
         $input = $this->input($request);
         $this->assertCsrf($input);
+        unset($_SESSION['login_destination']);
         unset($_SESSION['user_id'], $_SESSION['session_epoch']);
         session_regenerate_id(true);
 

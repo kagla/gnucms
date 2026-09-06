@@ -94,11 +94,12 @@ final class Claims
                 if ((int) $claim['restock']) $this->store->stock($this->store->get('shop_items', $claim['item_id'])['variant_id'], (int) $claim['quantity'], 'exchange_return', $claimId);
                 $this->store->stock($claim['replacement_id'], -(int) $claim['quantity'], 'exchange_ship', $claimId);
                 $this->store->db->execute('UPDATE ' . $this->store->db->table('shop_items') . ' SET exchanged = exchanged + ? WHERE id = ?', [(int) $claim['quantity'], $claim['item_id']]);
+                $cost = $this->service->costing->ready() ? ['cost_price' => $this->store->get('shop_variants', $target['id'])['cost_price']] : [];
                 $this->store->insert('shop_items', ['id' => Store::id(), 'order_id' => $order['id'], 'variant_id' => $target['id'],
                     'product_id' => $target['product_id'], 'name' => $original['name'],
                     'options' => implode(' / ', array_filter([$target['option1'], $target['option2']])) . ' (교환 출고)',
                     'price' => (int) $original['price'], 'quantity' => (int) $claim['quantity'], 'returned' => 0, 'exchanged' => 0,
-                    'exchange_claim_id' => $claimId]);
+                    'exchange_claim_id' => $claimId] + $cost);
             }
             if ($data === []) throw DomainError::validation(['claim' => '현재 신청 상태에서 처리할 수 없습니다.']);
             $this->store->update('shop_claims', $claimId, $data + ['updated_at' => Clock::timestamp()]);

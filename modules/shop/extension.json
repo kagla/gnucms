@@ -5,7 +5,10 @@
   "description": "1인 운영을 위한 상품·주문·배송·반품·교환·환불·정산 관리입니다. 상품 옵션은 두 종류까지 지원합니다.",
   "version": "2.0.0",
   "api": 2,
-  "entry_path": "/admin",
+  "entry_path": "/",
+  "public_path": "/",
+  "route_prefix": "/shop",
+  "admin_route_prefix": "/admin/shop",
   "admin_test": false,
   "requires": [],
   "optional": [

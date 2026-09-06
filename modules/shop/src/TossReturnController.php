@@ -13,7 +13,7 @@ use Slim\Routing\RouteContext;
 /** 토스의 GET 인증 결과를 기존 HMAC 인증 POST 승인 경로로 전달한다. GET은 결제를 승인하지 않는다. */
 final class TossReturnController
 {
-    public function __construct(private Service $shop) {}
+    public function __construct(private Service $shop, private string $routePrefix = '/modules/shop') {}
 
     public function handle($request, $response)
     {
@@ -25,7 +25,7 @@ final class TossReturnController
         $route = RouteContext::fromRequest($request);
         $view = new PhpView([dirname(__DIR__) . '/templates'], $route->getRouteParser(), $route->getBasePath(), static fn ($p) => '', static fn ($p) => '');
         $nonce = base64_encode(random_bytes(24));
-        $url = $route->getBasePath() . '/modules/shop/callback?' . http_build_query(['id' => $order['id'], 'state' => $query['state']], '', '&', PHP_QUERY_RFC3986);
+        $url = $route->getBasePath() . $this->routePrefix . '/callback?' . http_build_query(['id' => $order['id'], 'state' => $query['state']], '', '&', PHP_QUERY_RFC3986);
         return $view->render($response->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer')
             ->withHeader('Content-Security-Policy', "default-src 'none'; script-src 'nonce-" . $nonce . "'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"),
             'toss-return', ['fields' => $fields, 'action' => $url, 'nonce' => $nonce]);

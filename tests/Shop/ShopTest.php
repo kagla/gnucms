@@ -101,6 +101,69 @@ final class ShopTest extends DatabaseTestCase
     }
 
     #[DataProvider('connectionProvider')]
+    public function testVariantPricesAndStocksAreSavedTogetherAndUsedForOrders(array $config): void
+    {
+        $this->setupShop($config);
+        $input = ['name' => '옵션별 상품', 'active' => '1', 'option1_name' => '색상', 'option1_values' => '검정,흰색',
+            'variants' => [
+                ['option1' => '검정', 'option2' => '', 'price' => '12000', 'stock' => '3'],
+                ['option1' => '흰색', 'option2' => '', 'price' => '18000', 'stock' => '7'],
+            ]];
+        $id = $this->shop->catalog->save($input);
+        $product = $this->shop->catalog->product($id);
+        [$black, $white] = $product['variants'];
+        self::assertSame([12000, 18000], array_map('intval', array_column($product['variants'], 'price')));
+        self::assertSame([3, 7], array_map('intval', array_column($product['variants'], 'stock')));
+        $cart = [$black['id'] => 2, $white['id'] => 1];
+        self::assertSame(42000, $this->shop->quote($cart)['subtotal']);
+        $order = $this->shop->createOrder('member', $cart, $this->customer(), 'inicis', Store::id(), 45000);
+        self::assertSame(1, (int) $this->shop->store->get('shop_variants', $black['id'])['stock']);
+        self::assertSame(6, (int) $this->shop->store->get('shop_variants', $white['id'])['stock']);
+        $fresh = $this->shop->catalog->product($id);
+        $edit = $input + ['id' => $id, 'version' => $fresh['version']];
+        $edit['variants'] = array_map(static fn ($row) => array_intersect_key($row, array_flip(['id', 'version', 'option1', 'option2', 'price', 'stock'])), $fresh['variants']);
+        $edit['variants'][0]['price'] = 15000;
+        $edit['variants'][0]['stock'] = 9;
+        $this->shop->catalog->save($edit);
+        self::assertSame(48000, $this->shop->quote($cart)['subtotal']);
+        self::assertSame(42000, array_sum(array_map(static fn ($item) => (int) $item['price'] * (int) $item['quantity'], $this->shop->store->items($order['id']))));
+        self::assertSame(9, (int) $this->shop->store->get('shop_variants', $black['id'])['stock']);
+        self::assertSame(1, (int) $this->app->db()->selectOne('SELECT COUNT(*) AS n FROM ' . $this->app->db()->table('shop_stock') . " WHERE variant_id = ? AND kind = 'adjustment'", [$black['id']])['n']);
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testVariantBatchRejectsTamperingAndRollsBackOnConcurrentStockChange(array $config): void
+    {
+        $this->setupShop($config); $product = $this->product(5, true);
+        $input = ['id' => $product['id'], 'version' => $product['version'], 'name' => '덮어쓰면 안 됨', 'active' => '1',
+            'option1_name' => '색상', 'option1_values' => '검정,흰색', 'option2_name' => '크기', 'option2_values' => 'L,M',
+            'variants' => array_map(static fn ($row) => array_intersect_key($row, array_flip(['id', 'version', 'option1', 'option2', 'price', 'stock'])), $product['variants'])];
+        foreach (['missing', 'duplicate', 'foreign', 'negative', 'zero-price', 'nested', 'extra'] as $case) {
+            $bad = $input;
+            if ($case === 'missing') array_pop($bad['variants']);
+            if ($case === 'duplicate') $bad['variants'][1] = $bad['variants'][0];
+            if ($case === 'foreign') $bad['variants'][0]['id'] = Store::id();
+            if ($case === 'negative') $bad['variants'][0]['stock'] = '-1';
+            if ($case === 'zero-price') $bad['variants'][0]['price'] = '0';
+            if ($case === 'nested') $bad['variants'][0]['price'] = ['bad'];
+            if ($case === 'extra') $bad['variants'][0]['option1'] = '미등록 색상';
+            $this->rejected(fn () => $this->shop->catalog->save($bad));
+            self::assertSame($product['name'], $this->shop->catalog->product($product['id'])['name'], $case);
+        }
+        $input['variants'][0]['price'] = 9999; $input['variants'][0]['stock'] = 100;
+        $last = $product['variants'][3]['id'];
+        $this->shop->store->stock($last, -1, 'reserve', 'test');
+        $this->rejected(fn () => $this->shop->catalog->save($input));
+        $after = $this->shop->catalog->product($product['id']);
+        self::assertSame($product['name'], $after['name']);
+        self::assertSame((int) $product['version'], (int) $after['version']);
+        self::assertSame(10000, (int) $after['variants'][0]['price']);
+        self::assertSame(5, (int) $after['variants'][0]['stock']);
+        self::assertSame(4, (int) $after['variants'][3]['stock']);
+        self::assertSame(0, (int) $this->app->db()->selectOne('SELECT COUNT(*) AS n FROM ' . $this->app->db()->table('shop_stock') . " WHERE kind = 'adjustment'")['n']);
+    }
+
+    #[DataProvider('connectionProvider')]
     public function testInstallationIsIdempotentAndBackupOwnsEveryTable(array $config): void
     {
         $this->setupShop($config); $p = $this->product(); $this->shop->install();
@@ -367,6 +430,122 @@ final class ShopTest extends DatabaseTestCase
         self::assertSame('refunded', $this->shop->store->get('shop_orders', $fourth['id'])['status']);
     }
 
+    #[DataProvider('connectionProvider')]
+    public function testCostInputsValidateAndOrderSnapshotsStayPrivateAndUnchanged(array $config): void
+    {
+        $this->setupShop($config);
+        $input = ['name' => '원가 상품', 'price' => '10000', 'cost_price' => '4500', 'stock' => '5', 'active' => '1',
+            'option1_name' => '색상', 'option1_values' => '검정,흰색', 'variants' => [
+                ['option1' => '검정', 'price' => '10000', 'stock' => '5', 'cost_price' => '6000'],
+                ['option1' => '흰색', 'price' => '10000', 'stock' => '5', 'cost_price' => '0']]];
+        $id = $this->shop->catalog->save($input); $p = $this->shop->catalog->product($id, true);
+        self::assertSame([6000, 0], array_map('intval', array_column($p['variants'], 'cost_price')));
+        foreach (['-1', '1.5', '100000001', 'abc', ['2']] as $bad) {
+            $this->rejected(fn () => $this->shop->catalog->save(array_replace($input, ['cost_price' => $bad])));
+            $rows = $input['variants']; $rows[1]['cost_price'] = $bad;
+            $this->rejected(fn () => $this->shop->catalog->save(array_replace($input, ['variants' => $rows])));
+        }
+        self::assertCount(1, $this->shop->catalog->listing(true));
+        $order = $this->order($p);
+        $v = $this->shop->store->get('shop_variants', $p['variants'][0]['id']);
+        $this->shop->catalog->saveVariant(['variant_id' => $v['id'], 'version' => $v['version'], 'price' => '10000', 'stock' => $v['stock'], 'cost_price' => '8000']);
+        self::assertSame(6000, (int) $this->shop->store->items($order['id'])[0]['cost_price']);
+        self::assertArrayNotHasKey('cost_price', $this->shop->detail($order['id'], 'member')['items'][0]);
+        self::assertArrayNotHasKey('cost_price', $this->shop->catalog->product($id)['variants'][0]);
+        self::assertArrayNotHasKey('cost_price', $this->shop->quote([$v['id'] => 1])['items'][0]);
+        self::assertSame(6000, (int) $this->shop->detail($order['id'], null, true)['items'][0]['cost_price']);
+        $v = $this->shop->store->get('shop_variants', $v['id']);
+        $this->shop->catalog->saveVariant(['variant_id' => $v['id'], 'version' => $v['version'], 'price' => '11000', 'stock' => $v['stock']]);
+        $v = $this->shop->store->get('shop_variants', $v['id']);
+        self::assertSame(8000, (int) $v['cost_price'], 'older forms preserve stored costs');
+        $this->shop->catalog->saveVariant(['variant_id' => $v['id'], 'version' => $v['version'], 'price' => '11000', 'stock' => $v['stock'], 'cost_price' => '']);
+        self::assertNull($this->shop->store->get('shop_variants', $v['id'])['cost_price']);
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testProfitUsesPaymentPeriodAndHandlesReturnExchangeAndDamagedGoods(array $config): void
+    {
+        $this->setupShop($config); Clock::freeze('2026-09-05 01:00:00');
+        $id = $this->shop->catalog->save(['name' => '손익 상품', 'price' => '10000', 'stock' => '5', 'active' => '1',
+            'option1_name' => '색상', 'option1_values' => '검정,흰색', 'variants' => [
+                ['option1' => '검정', 'price' => '10000', 'stock' => '5', 'cost_price' => '4000'],
+                ['option1' => '흰색', 'price' => '10000', 'stock' => '5', 'cost_price' => '7000']]]);
+        $p = $this->shop->catalog->product($id, true); $order = $this->order($p, 2); $this->ship($order);
+        $profit = fn () => $this->shop->settlement->report('2026-09-05', '2026-09-05', 'live', 'inicis')['profit'];
+        self::assertSame(12000, $profit()['gross_profit']);
+        self::assertSame(60.0, $profit()['margin_rate']);
+        $this->shop->store->update('shop_variants', $p['variants'][0]['id'], ['cost_price' => 9000]);
+        self::assertSame(8000, $profit()['cost_amount']);
+        Clock::freeze('2026-09-06 01:00:00');
+        $later = $this->order($p); $this->gateway->paid($later); $this->shop->sync($later['id']);
+        self::assertSame(20000, $profit()['product_amount']);
+        Clock::freeze('2026-09-07 01:00:00');
+        $claim = $this->claim($order, 'return'); $this->receive($claim);
+        $this->shop->claims->refund($order['id'], ['claim_id' => $claim, 'request_key' => Store::id(), 'deduction' => 1000], 'admin');
+        self::assertSame(11000, $profit()['net_product_amount']);
+        self::assertSame(4000, $profit()['cost_amount']);
+        self::assertSame(7000, $profit()['gross_profit']);
+        $exchange = $this->claim($order, 'exchange', 1, $p['variants'][1]['id']); $this->receive($exchange);
+        $this->shop->claims->handle($exchange, 'exchange', ['carrier' => '택배', 'tracking' => '2'], 'admin');
+        self::assertSame(7000, $profit()['cost_amount']);
+        self::assertSame(4000, $profit()['gross_profit']);
+        self::assertSame(2, $profit()['products'][0]['sold_quantity'], 'exchange is not a second sale');
+        $replacement = array_values(array_filter($this->shop->store->items($order['id']), static fn ($i) => $i['exchange_claim_id'] !== ''))[0];
+        self::assertSame(7000, (int) $replacement['cost_price']);
+        $this->shop->store->update('shop_variants', $p['variants'][1]['id'], ['cost_price' => 9500]);
+        $return = $this->shop->claims->request($order['id'], ['kind' => 'return', 'item_id' => $replacement['id'], 'quantity' => '1', 'reason' => '불량 반품', 'request_key' => Store::id()], 'member');
+        $this->receive($return, false);
+        $this->shop->claims->refund($order['id'], ['claim_id' => $return, 'request_key' => Store::id()], 'admin');
+        self::assertSame(7000, $profit()['cost_amount'], 'damaged goods remain a cost');
+        self::assertSame(-6000, $profit()['gross_profit']);
+        $this->shop->claims->refund($later['id'], ['request_key' => Store::id()], 'admin');
+        $cancelled = $this->shop->settlement->report('2026-09-06', '2026-09-06')['profit'];
+        self::assertSame(0, $cancelled['net_product_amount']); self::assertSame(0, $cancelled['cost_amount']);
+        self::assertSame(0, $cancelled['gross_profit']); self::assertNull($cancelled['margin_rate']);
+        self::assertSame([], $this->shop->settlement->report('2026-09-05', '2026-09-05', 'test')['profit']['products']);
+        self::assertSame([], $this->shop->settlement->report('2026-09-05', '2026-09-05', 'live', 'toss')['profit']['products']);
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testMissingCostsAndUnallocatedRefundsNeverProduceMisleadingProfit(array $config): void
+    {
+        $this->setupShop($config); Clock::freeze('2026-09-05 01:00:00');
+        $p = $this->product(); $order = $this->order($p); $this->ship($order);
+        $profit = fn () => $this->shop->settlement->report('2026-09-05', '2026-09-05')['profit'];
+        self::assertSame(1, $profit()['missing_cost_quantity']); self::assertNull($profit()['cost_amount']); self::assertNull($profit()['gross_profit']);
+        $this->shop->store->update('shop_variants', $p['variants'][0]['id'], ['cost_price' => 0]);
+        $free = $this->order($p); $this->ship($free);
+        self::assertSame(0, (int) $this->shop->store->items($free['id'])[0]['cost_price']);
+        self::assertSame(1, $profit()['missing_cost_quantity']);
+        $this->gateway->cancel($order, 3000, 13000, '외부 부분 환불', Store::id()); $this->shop->sync($order['id']);
+        self::assertSame(1, $profit()['unallocated_refund_orders']); self::assertNull($profit()['net_product_amount']);
+        $this->gateway->cancel($order, 10000, 10000, '외부 잔액 환불', Store::id()); $this->shop->sync($order['id']);
+        self::assertSame(0, $profit()['unallocated_refund_orders']); self::assertSame(10000, $profit()['net_product_amount']);
+        self::assertNull($profit()['gross_profit'], 'unrecovered legacy goods still have unknown cost');
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testCostMigrationKeepsLegacyDataAndResumesPartialUpgrade(array $config): void
+    {
+        $this->setupShop($config); $p = $this->product(); $order = $this->order($p);
+        $db = $this->app->db();
+        foreach (['shop_variants', 'shop_items'] as $table) $db->execute('ALTER TABLE ' . $db->table($table) . ' DROP COLUMN cost_price');
+        $db->update('extension_schemas', ['schema_version' => 3], 'package_key = :key', ['key' => Schema::KEY]);
+        self::assertTrue($this->shop->ready()); self::assertTrue($this->shop->images->ready()); self::assertFalse($this->shop->costing->ready());
+        $this->rejected(fn () => $this->shop->catalog->save(['name' => '갱신 전 원가', 'cost_price' => '1']));
+        $this->shop->install();
+        self::assertNull($this->shop->store->get('shop_variants', $p['variants'][0]['id'])['cost_price']);
+        self::assertNull($this->shop->store->items($order['id'])[0]['cost_price']);
+        self::assertSame(4, (int) $this->shop->store->get('shop_variants', $p['variants'][0]['id'])['stock']);
+        $this->shop->store->update('shop_variants', $p['variants'][0]['id'], ['cost_price' => 4500]);
+        $db->execute('ALTER TABLE ' . $db->table('shop_items') . ' DROP COLUMN cost_price');
+        $db->update('extension_schemas', ['schema_version' => 3, 'state' => 'failed'], 'package_key = :key', ['key' => Schema::KEY]);
+        $this->shop->install(); $this->shop->install();
+        self::assertTrue($this->shop->costing->ready());
+        self::assertSame(4500, (int) $this->shop->store->get('shop_variants', $p['variants'][0]['id'])['cost_price']);
+        self::assertNull($this->shop->store->items($order['id'])[0]['cost_price']);
+    }
+
     public function testBackupRestoresOrderImageAndPaymentConfigurationButRevokesExecution(): void
     {
         $this->setupShop(['dsn' => 'sqlite::memory:']); $p = $this->product(); $order = $this->order($p);
@@ -381,9 +560,12 @@ final class ShopTest extends DatabaseTestCase
         $source = $this->root . '/source.png';
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aGZkAAAAASUVORK5CYII=');
         file_put_contents($source, $png);
-        $images = new \GnuCms\Modules\Shop\Images($this->app);
-        $image = $images->save(new \Slim\Psr7\UploadedFile($source, 'input.png', 'image/png', strlen($png)));
-        $this->shop->store->update('shop_products', $p['id'], ['image' => $image]);
+        $file = static fn () => new \Slim\Psr7\UploadedFile($source, 'input.png', 'image/png', strlen($png));
+        $this->shop->images->append($p['id'], [$file(), $file()], (int) $p['version']);
+        $productImages = $this->shop->catalog->product($p['id']);
+        $this->shop->images->reorder($p['id'], array_reverse(array_column($productImages['images'], 'id')), (int) $productImages['version']);
+        $imageSnapshot = $this->shop->catalog->product($p['id']);
+        $image = $imageSnapshot['image'];
         $saved = $this->app->backups()->create('shop-test', 'tar');
         $this->shop->claims->refund($order['id'], ['request_key' => Store::id()], 'admin');
         unlink($this->root . '/uploads/shop/' . $image);
@@ -395,6 +577,8 @@ final class ShopTest extends DatabaseTestCase
         self::assertSame('buyer@example.test', $restored->detail($order['id'], 'member')['customer_data']['email']);
         self::assertSame(4, (int) $restored->store->get('shop_variants', $p['variants'][0]['id'])['stock']);
         self::assertSame($png, file_get_contents($this->root . '/uploads/shop/' . $image));
+        self::assertSame($imageSnapshot['images'], $restored->catalog->product($p['id'])['images']);
+        self::assertSame($image, $restored->catalog->product($p['id'])['image']);
         self::assertSame(['modules/shop', 'plugins/payment-inicis'], $state->read());
         $settings = new \GnuCms\Payment\Settings($this->app, 'inicis');
         self::assertSame($revision, $settings->summary('live')['revision']);

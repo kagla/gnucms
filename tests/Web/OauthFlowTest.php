@@ -199,6 +199,23 @@ final class OauthFlowTest extends WebTestCase
         return (string) $query['state'];
     }
 
+    #[DataProvider('connectionProvider')]
+    public function testSocialLoginResumesTheSavedShoppingDestination(array $dbConfig): void
+    {
+        $app = $this->makeApp($dbConfig);
+        $app->users()->create('owner@example.test', '', '관리자', true);
+        $app->setProviderRegistry(new ProviderRegistry([], [$this->fakeGoogle()]));
+        $state = $this->stateFrom($this->get($app, '/auth/google'));
+        session_start();
+        \GnuCms\Web\LoginDestination::remember('/modules/shop/checkout');
+        $_SESSION['shop_cart'] = ['selected-variant' => 2];
+        session_write_close();
+        $response = $this->get($app, '/auth/google/callback', ['state' => $state, 'code' => 'verified']);
+        self::assertSame('/modules/shop/checkout', $response->getHeaderLine('Location'));
+        self::assertSame(['selected-variant' => 2], $_SESSION['shop_cart']);
+        self::assertArrayNotHasKey('login_destination', $_SESSION);
+    }
+
     private function fakeGoogle(): ProviderInterface
     {
         return new class implements ProviderInterface {

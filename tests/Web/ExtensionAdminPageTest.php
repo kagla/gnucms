@@ -151,6 +151,37 @@ PHP);
     }
 
     #[DataProvider('connectionProvider')]
+    public function testPublicAddressIsVisibleWithAndWithoutAnAdminEntry(array $dbConfig): void
+    {
+        $bootstrap = <<<'PHP'
+<?php return static function ($context): void {
+    $context->route('GET', '/', static fn ($request, $response) => $response);
+    $context->route('GET', '/admin', static fn ($request, $response) => $response, admin: true);
+};
+PHP;
+        $this->package('modules/shop', ['route_prefix' => '/shop', 'public_path' => '/', 'entry_path' => '/admin'], $bootstrap);
+        $this->package('modules/public', ['route_prefix' => '/public', 'public_path' => '/'], $bootstrap);
+        $app = $this->makeApp($dbConfig, [], 'default');
+        $adminId = $app->users()->create('public-links@example.test', '', '관리자', true);
+        $this->get($app, '/login');
+        $this->sessionUser($adminId);
+        $manager = new Manager(new Catalog($this->extensionRoot), new StateStore($app->storageDir() . '/extensions'));
+        $manager->setEnabledMany(['modules/shop' => true, 'modules/public' => true]);
+        $body = $this->body($this->get($app, '/admin/modules'));
+        self::assertSame(2, substr_count($body, 'class="extension-public-entry"'));
+        foreach (['/shop', '/public'] as $url) {
+            self::assertStringContainsString('href="' . $url . '">' . $url . '</a>', $body);
+            self::assertStringContainsString('class="btn btn-ghost btn-square btn-xs" href="' . $url . '" target="_blank" rel="noopener noreferrer" title="사용자 화면을 새 창으로 열기"', $body);
+        }
+        self::assertStringNotContainsString('사용자 화면 열기', $body);
+        self::assertStringContainsString('href="/shop/admin"', $body);
+        $manager->setEnabled('modules/shop', false);
+        $body = $this->body($this->get($app, '/admin/modules'));
+        self::assertSame(1, substr_count($body, 'class="extension-public-entry"'));
+        self::assertStringNotContainsString('href="/shop"', $body);
+    }
+
+    #[DataProvider('connectionProvider')]
     public function testBulkFormHasTwoSaveButtonsAndSortsByActualToggleOrder(array $dbConfig): void
     {
         $this->package('plugins/alpha');

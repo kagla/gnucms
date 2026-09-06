@@ -197,7 +197,7 @@ final class DemoExtensionsTest extends WebTestCase
     }
 
     #[DataProvider('connectionProvider')]
-    public function testModuleShortcutAndAdminTestWithoutChangingUsageState(array $dbConfig): void
+    public function testModuleEntryLinksAndAdminTestWithoutChangingUsageState(array $dbConfig): void
     {
         $app = $this->makeApp($dbConfig, [], 'default');
         $url = '/admin/modules/demo-reservation/test';
@@ -238,7 +238,7 @@ final class DemoExtensionsTest extends WebTestCase
         $this->manager($app)->setEnabled('modules/demo-reservation', true);
         $body = $this->body($this->get($app, '/admin/modules'));
         self::assertStringContainsString('href="' . self::MODULE . '"', $body);
-        self::assertStringContainsString('>바로가기</a>', $body);
+        self::assertStringNotContainsString('>바로가기</a>', $body);
         self::assertStringContainsString('href="' . self::MODULE . '" target="_blank" rel="noopener noreferrer" title="새 창으로 열기"', $body);
         self::assertStringNotContainsString('>관리자 테스트</a>', $body);
         self::assertSame(200, $this->get($app, self::MODULE)->getStatusCode());

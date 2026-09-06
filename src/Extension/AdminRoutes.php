@@ -21,6 +21,9 @@ final class AdminRoutes
             new Catalog((string) $app->config('extensions.root', dirname(__DIR__, 2))),
             new StateStore($app->storageDir() . '/extensions')
         );
+        $slim->add(static function ($request, $handler) use ($manager) {
+            return $handler->handle($request->withAttribute('gnucms.public_extensions', $manager->navigation()));
+        });
         $pages = [
             'plugins' => [
                 'title' => '플러그인',
@@ -149,7 +152,9 @@ final class AdminRoutes
         foreach ($packages as &$package) {
             $package['selected'] = isset($selection[$package['id']]) ? $selection[$package['id']] === '1' : $package['enabled'];
             $package['entry_url'] = $package['entry_path'] === null ? null
-                : RouteContext::fromRequest($request)->getBasePath() . '/' . $package['key'] . $package['entry_path'];
+                : RouteContext::fromRequest($request)->getBasePath()
+                    . RoutePrefix::path($package['admin_route_prefix'] ?? $package['route_prefix'] ?? '/' . $package['key'], $package['entry_path']);
+            $package['public_url'] = $manager->navigation()[$package['key']]['url'] ?? null;
         }
         unset($package);
         return View::fromRequest($request)->render($response, 'admin/extensions/index', [

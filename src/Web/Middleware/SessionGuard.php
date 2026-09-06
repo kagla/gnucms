@@ -65,6 +65,7 @@ final class SessionGuard implements MiddlewareInterface
         $this->view->addGlobal('csrf_token', $_SESSION['csrf_token']);
         $this->view->addGlobal('unread_notifications', $this->unreadCount());
         $this->view->addGlobal('header_boards', $this->headerBoards());
+        $this->view->addGlobal('public_extensions', $request->getAttribute('gnucms.public_extensions', []));
 
         try {
             return $handler->handle($request);

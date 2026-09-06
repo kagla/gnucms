@@ -31,8 +31,17 @@ final class Images
         }
         if (!is_dir($this->directory) && !mkdir($this->directory, 0755, true) && !is_dir($this->directory)) throw DomainError::serviceUnavailable('이미지 폴더를 만들지 못했습니다.');
         $name = Store::id() . '.' . $extensions[$info[2]];
-        if (file_put_contents($this->directory . '/' . $name, $bytes, LOCK_EX) !== strlen($bytes)) throw DomainError::serviceUnavailable('이미지를 저장하지 못했습니다.');
+        if (file_put_contents($this->directory . '/' . $name, $bytes, LOCK_EX) !== strlen($bytes)) {
+            $this->discard($name);
+            throw DomainError::serviceUnavailable('이미지를 저장하지 못했습니다.');
+        }
         return $name;
+    }
+
+    /** 실패한 일괄 업로드에서 새로 만든 파일만 정리한다. */
+    public function discard(string $name): void
+    {
+        if (preg_match('/^[a-f0-9]{32}\.(jpg|png|webp)$/D', $name)) @unlink($this->directory . '/' . $name);
     }
 
     public function response(string $name, $response)

@@ -11,7 +11,7 @@ use Slim\Routing\RouteContext;
 
 final class Controller
 {
-    public function __construct(private Service $service) {}
+    public function __construct(private Service $service, private string $routePrefix = '/modules/shop', private ?string $adminRoutePrefix = null) {}
 
     public function handle(string $page, $request, $response)
     {
@@ -28,12 +28,33 @@ final class Controller
         $admin = $identity->isAdmin();
         $route = RouteContext::fromRequest($request);
         $base = $route->getBasePath();
-        $url = $base . '/modules/shop';
+        $publicUrl = $base . $this->routePrefix;
+        $adminUrl = $base . ($this->adminRoutePrefix ?? '/admin/shop');
+        $adminPage = in_array($page, ['admin', 'products', 'products/new', 'products/edit', 'settings', 'manage-order', 'settlement', 'inventory', 'export'], true);
+        $url = $adminPage ? $adminUrl : $publicUrl;
         $input = $request->getMethod() === 'POST' ? $request->getParsedBody() : $request->getQueryParams();
         $input = is_array($input) ? $input : [];
-        foreach ($input as $value) if (!is_string($value) && !is_int($value)) throw DomainError::validation(['input' => '단일 입력값을 사용해 주세요.']);
+        foreach ($input as $key => $value) {
+            if ($key === 'variants' && in_array($page, ['products', 'products/new', 'products/edit'], true)) $input[$key] = Catalog::rows($value);
+            elseif ($key === 'image_ids' && in_array($page, ['products', 'products/edit'], true)) $input[$key] = ProductImages::ids($value);
+            elseif ($key === 'image_order' && in_array($page, ['products', 'products/new', 'products/edit'], true)) $input[$key] = ProductImages::order($value);
+            elseif (!is_string($value) && !is_int($value)) throw DomainError::validation(['input' => '단일 입력값을 사용해 주세요.']);
+        }
+        if ($adminPage) {
+            $this->service->app->guestAcl()->assertGlobalAdmin();
+            if ($page === 'products' && ($input['id'] ?? '') !== '') $page = 'products/edit';
+            if ($page === 'products' && $request->getMethod() === 'POST') $page = 'products/new';
+            $canonical = $adminUrl . ($page === 'admin' ? '' : '/' . $page);
+            if ($request->getMethod() === 'GET' && $request->getUri()->getPath() !== $canonical) {
+                return $this->redirect($response, $canonical . ($input === [] ? '' : '?' . http_build_query($input)));
+            }
+        }
         $publicPages = ['catalog', 'product', 'cart', 'return'];
+        if ($page === 'login' && $user !== null) return $this->redirect($response, $url . '/catalog');
         if (!in_array($page, $publicPages, true) && $user === null) {
+            $destination = $url . '/' . ($page === 'login' ? 'catalog' : $page);
+            if ($page === 'order') $destination .= '?id=' . Input::id($input['id'] ?? null);
+            \GnuCms\Web\LoginDestination::remember($destination);
             return $response->withStatus(303)->withHeader('Location', $base . '/login');
         }
         if ($page === 'return') {
@@ -41,13 +62,14 @@ final class Controller
             return $response->withStatus(303)->withHeader('Location', $url . '/order?id=' . $id);
         }
         $ready = $this->service->ready();
-        $data = ['page' => $page, 'url' => $url, 'base' => $base, 'ready' => $ready, 'admin' => $admin,
+        $data = ['page' => $page, 'url' => $url, 'public_url' => $publicUrl, 'admin_url' => $adminUrl, 'base' => $base, 'ready' => $ready, 'admin' => $admin,
             'user' => $user, 'settings' => $this->service->settings(), 'errors' => [], 'notice' => '', 'input' => $input,
-            'products' => [], 'product' => null, 'orders' => [], 'order' => null, 'quote' => null, 'payment' => null,
+            'images_ready' => $this->service->images->ready(), 'costs_ready' => $this->service->costing->ready(), 'products' => [], 'product' => null, 'orders' => [], 'order' => null, 'quote' => null, 'payment' => null,
             'report' => null, 'inventory' => [], 'payout' => null, 'stock_events' => [], 'money' => [],
             'csrf_token' => $_SESSION['csrf_token'] ?? '', 'request_key' => Store::id(),
             'providers' => \GnuCms\Payment\Settings::PROVIDERS, 'gateways' => [], 'cart' => $this->cart(),
             'now' => Clock::timestamp(), 'page_number' => Input::integer($input['p'] ?? '1', '페이지', 100000, 1)];
+        $data['can_order'] = $ready && $data['settings']['open'] && ($admin || $data['settings']['environment'] === 'live');
         foreach ($this->service->gateways as $gateway) {
             if ($gateway->available($data['settings']['environment'])) $data['gateways'][$gateway->id()] = $gateway->label();
         }
@@ -57,7 +79,7 @@ final class Controller
                 $action = $input['action'] ?? '';
                 if ($page === 'admin' && $action === 'install') {
                     $this->service->install();
-                    return $this->redirect($response, $url . '/admin');
+                    return $this->redirect($response, $adminUrl);
                 }
                 $this->service->requireReady();
                 if ($page === 'cart') {
@@ -98,20 +120,29 @@ final class Controller
                 } elseif ($page === 'settings') {
                     $this->service->saveSettings($input);
                     return $this->redirect($response, $url . '/settings');
-                } elseif ($page === 'products') {
-                    if ($action === 'save') $id = $this->service->catalog->save($input);
-                    elseif ($action === 'variant') {
+                } elseif (in_array($page, ['products/new', 'products/edit'], true)) {
+                    if ($action === 'build') {
+                        $data['form_variants'] = $this->service->catalog->draft($input, ($input['id'] ?? '') === '' ? [] : $this->service->catalog->product(Input::id($input['id']), true)['variants']);
+                    } elseif ($action === 'save') {
+                        $files = $request->getUploadedFiles()['images'] ?? [];
+                        if (!is_array($files)) throw DomainError::validation(['images' => '이미지 파일을 다시 선택해 주세요.']);
+                        $id = $this->service->catalog->save($input, $files);
+                    } elseif ($action === 'variant') {
                         $this->service->catalog->saveVariant($input);
                         $id = $this->service->store->get('shop_variants', Input::id($input['variant_id']))['product_id'];
                     } elseif ($action === 'image') {
                         $id = Input::id($input['id'] ?? null);
-                        $this->service->store->get('shop_products', $id);
-                        $file = $request->getUploadedFiles()['image'] ?? null;
-                        if (!$file instanceof \Psr\Http\Message\UploadedFileInterface) throw DomainError::validation(['image' => '상품 이미지를 선택해 주세요.']);
-                        $name = (new Images($this->service->app))->save($file);
-                        $this->service->store->update('shop_products', $id, ['image' => $name]);
+                        $product = $this->service->store->get('shop_products', $id);
+                        $uploaded = $request->getUploadedFiles();
+                        $files = $uploaded['images'] ?? (isset($uploaded['image']) ? [$uploaded['image']] : []);
+                        if (!is_array($files)) throw DomainError::validation(['images' => '상품 이미지를 선택해 주세요.']);
+                        $version = Input::integer($input['version'] ?? (isset($uploaded['image']) ? $product['version'] : null), '상품 판');
+                        $this->service->images->append($id, $files, $version);
+                    } elseif ($action === 'image-order') {
+                        $id = Input::id($input['id'] ?? null);
+                        $this->service->images->reorder($id, $input['image_ids'] ?? null, Input::integer($input['version'] ?? null, '상품 판'));
                     } else throw DomainError::validation(['action' => '상품 작업을 확인해 주세요.']);
-                    return $this->redirect($response, $url . '/products?id=' . $id);
+                    if ($action !== 'build') return $this->redirect($response, $adminUrl . '/products/edit?id=' . $id . (in_array($action, ['image', 'image-order'], true) ? '&images_saved=1#product-images' : '&saved=1'));
                 } elseif ($page === 'admin' && $action === 'expire') {
                     $data['notice'] = $this->service->expire() . '건의 미결제 주문을 만료 처리했습니다.';
                 } elseif ($orderPage) {
@@ -124,8 +155,8 @@ final class Controller
                         if ($order['environment'] === 'test' && !$admin) throw DomainError::validation(['payment' => '테스트 주문은 운영자만 결제할 수 있습니다.']);
                         $root = rtrim((string) $this->service->app->config('app.url', ''), '/');
                         $device = preg_match('/Android|iPhone|iPad|iPod/i', $request->getHeaderLine('User-Agent')) ? 'mobile' : 'web';
-                        $data['payment'] = $this->service->checkout($id, $root . '/modules/shop/return?id=' . $id,
-                            $root . '/modules/shop/callback?id=' . $id . '&state=' . \GnuCms\Payment\CallbackToken::create($this->service->app, $order), $device);
+                        $data['payment'] = $this->service->checkout($id, $root . $this->routePrefix . '/return?id=' . $id,
+                            $root . $this->routePrefix . '/callback?id=' . $id . '&state=' . \GnuCms\Payment\CallbackToken::create($this->service->app, $order), $device);
                     } elseif ($page === 'manage-order') {
                         if (in_array($action, ['pack', 'ship', 'deliver'], true)) $this->service->fulfill($id, $action, $input, $user);
                         elseif ($action === 'review') $this->service->acknowledgeReview($id, Input::text($input['note'] ?? '', '확인 메모', 1000), $user);
@@ -156,8 +187,8 @@ final class Controller
             try {
                 if (in_array($page, ['catalog', 'products'], true)) {
                     $data['products'] = $this->service->catalog->listing($page === 'products', $data['page_number'], Input::text($input['q'] ?? '', '검색어', 100, true));
-                    if (($input['id'] ?? '') !== '') $data['product'] = $this->service->catalog->product(Input::id($input['id']), $page === 'products');
                 }
+                if ($page === 'products/edit') $data['product'] = $this->service->catalog->product(Input::id($input['id'] ?? null), true);
                 if ($page === 'product') $data['product'] = $this->service->catalog->product(Input::id($input['id'] ?? null));
                 if (in_array($page, ['cart', 'checkout'], true) && $this->cart() !== []) $data['quote'] = $this->service->quote($this->cart());
                 if ($page === 'checkout' && $data['quote'] !== null) {
@@ -197,6 +228,35 @@ final class Controller
                 $response = $response->withStatus($e->status());
                 $data['errors'][] = $e->status() >= 500 ? '자료를 읽지 못했습니다. 설치와 연결 설정을 확인해 주세요.' : $e->getMessage();
             }
+        }
+        if (in_array($page, ['products/new', 'products/edit'], true)) {
+            $product = $data['product'];
+            $values = $product ?? ['id' => '', 'version' => 0, 'name' => '', 'description' => '', 'option1_name' => '', 'option2_name' => '', 'active' => 0];
+            unset($values['variants'], $values['images']);
+            foreach ([1, 2] as $n) $values['option' . $n . '_values'] = implode(', ', array_unique(array_column(array_filter($product['variants'] ?? [], static fn ($v) => (int) $v['active'] === 1), 'option' . $n)));
+            $values['price'] = $product['variants'][0]['price'] ?? 10000;
+            $values['cost_price'] = '';
+            $values['stock'] = 0;
+            $editing = $request->getMethod() === 'POST' && in_array($input['action'] ?? '', ['save', 'build'], true);
+            $data['form_images'] = $product['images'] ?? [];
+            if ($editing) {
+                $images = array_column($data['form_images'], null, 'id');
+                $order = array_values(array_filter($input['image_order'] ?? [], static fn ($id) => isset($images[$id])));
+                if (count($order) === count($images)) $data['form_images'] = array_map(static fn ($id) => $images[$id], $order);
+                $pendingFiles = $request->getUploadedFiles()['images'] ?? [];
+                foreach (is_array($pendingFiles) ? $pendingFiles : [$pendingFiles] as $file) if ($file instanceof \Psr\Http\Message\UploadedFileInterface && $file->getError() !== UPLOAD_ERR_NO_FILE) {
+                    $data['notice'] = '선택한 새 이미지는 아직 저장되지 않았습니다. 이미지 파일을 다시 선택한 뒤 상품 저장을 눌러 주세요.';
+                    break;
+                }
+            }
+            $data['form_values'] = $editing ? array_replace($values, $input, ['active' => ($input['active'] ?? '') === '1' ? 1 : 0]) : $values;
+            // 업로드 묶음은 편집 창마다 분리하고, 검증 오류·서버 조합 적용 때는 그대로 이어 쓴다.
+            if (!preg_match('/^[a-f0-9]{32}$/D', (string) ($data['form_values']['image_key'] ?? ''))) $data['form_values']['image_key'] = Store::id();
+            $data['form_values']['description'] = $this->service->app->htmlSanitizer()->clean((string) $data['form_values']['description']);
+            if (!isset($data['form_variants'])) {
+                $data['form_variants'] = $editing && isset($input['variants']) ? $input['variants'] : $this->service->catalog->draft($values, $product['variants'] ?? []);
+            }
+            if (($input['saved'] ?? '') === '1') $data['notice'] = '상품을 저장했습니다.';
         }
         $data['status_labels'] = ['attention' => '확인 필요한 주문', 'pending' => '결제 대기', 'paid' => '결제 완료', 'packing' => '상품 준비', 'shipped' => '배송 중', 'delivered' => '배송 완료',
             'cancelled' => '주문 취소', 'refunded' => '전액 환불', 'requested' => '접수', 'approved' => '승인·회수 대기', 'received' => '회수·검수 완료',

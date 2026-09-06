@@ -251,7 +251,7 @@ final class OauthController
 
     private function homeRedirect(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $url = RouteContext::fromRequest($request)->getRouteParser()->urlFor('boards.index');
+        $url = \GnuCms\Web\LoginDestination::consume($request);
         return $response->withHeader('Location', $url)->withStatus(303);
     }
 }

@@ -60,6 +60,24 @@ final class ManagerTest extends TestCase
         self::assertFileExists($this->extensionRoot . '/plugins/one/bootstrap.php');
     }
 
+    public function testPublicNavigationIncludesOnlyEnabledBootedRoutes(): void
+    {
+        $route = '<?php return static function ($context): void { $context->route("GET", "/catalog", static fn ($request, $response) => $response); };';
+        $this->package('modules/shop', ['public_path' => '/catalog'], $route);
+        $this->package('modules/disabled', ['public_path' => '/catalog'], $route);
+        $this->package('modules/missing', ['public_path' => '/catalog']);
+        $this->package('modules/broken', ['public_path' => '/catalog'], '<?php throw new RuntimeException("broken");');
+        $this->package('modules/invalid', ['public_path' => '//outside.example']);
+        self::assertNotNull($this->manager->packages()['modules/invalid']['error']);
+        $this->manager->setEnabledMany(['modules/shop' => true, 'modules/missing' => true, 'modules/broken' => true]);
+        $slim = AppFactory::create(); $slim->setBasePath('/cms');
+        $this->manager->boot(new App([]), $slim);
+        self::assertSame(['modules/shop' => ['name' => 'shop', 'url' => '/cms/modules/shop/catalog', 'base_url' => '/cms/modules/shop']], $this->manager->navigation());
+        $this->manager->setEnabled('modules/shop', false);
+        $this->manager->boot(new App([]), AppFactory::create());
+        self::assertSame([], $this->manager->navigation());
+    }
+
     public function testDependencyMustBeEnabledAndCannotBeDisabledWhileInUse(): void
     {
         $this->package('plugins/message');
@@ -83,6 +101,97 @@ final class ManagerTest extends TestCase
         $this->manager->setEnabled('modules/booking', false);
         $this->manager->setEnabled('plugins/message', false);
         self::assertSame([], $this->state->read());
+    }
+
+    public function testCustomPrefixAndLegacyPathsShareHandlersIncludingExternalCallbacks(): void
+    {
+        $this->package('modules/store', ['route_prefix' => '/store', 'public_path' => '/'], <<<'PHP'
+<?php
+return static function ($context): void {
+    $context->route('GET', '/', static function ($request, $response) use ($context) {
+        $response->getBody()->write($context->path('/cart'));
+        return $response;
+    });
+    $context->externalPost('/callback', static fn ($request) => ($request->getQueryParams()['state'] ?? '') === 'valid',
+        static fn ($request, $response) => $response->withStatus(303)->withHeader('Location', $context->path('/orders')));
+};
+PHP);
+        $this->manager->setEnabled('modules/store', true);
+        $slim = AppFactory::create(); $slim->setBasePath('/cms');
+        $this->manager->boot(new App([]), $slim);
+        self::assertSame(['name' => 'store', 'url' => '/cms/store', 'base_url' => '/cms/store'], $this->manager->navigation()['modules/store']);
+        $factory = new ServerRequestFactory();
+        foreach (['/cms/store', '/cms/store/', '/cms/modules/store/'] as $path) {
+            self::assertSame('/store/cart', (string) $slim->handle($factory->createServerRequest('GET', $path))->getBody());
+        }
+        foreach (['/cms/store/callback', '/cms/modules/store/callback'] as $path) {
+            $request = $factory->createServerRequest('POST', $path . '?state=valid')->withHeader('Content-Type', 'application/json');
+            $request->getBody()->write('{"accepted":true}');
+            self::assertSame('/store/orders', $slim->handle($request)->getHeaderLine('Location'));
+            self::assertSame(403, $slim->handle($factory->createServerRequest('POST', $path))->getStatusCode());
+            self::assertSame(405, $slim->handle($request->withMethod('GET'))->getStatusCode());
+        }
+    }
+
+    public function testInvalidPrefixesCannotActivate(): void
+    {
+        foreach (['/', '//store', '/store/cart', '/Store', '/store?query=1', '/store#hash', '/%73tore', '/admin', '/modules', '/plugins', '/themes', '/vendor', '/assets', '/uploads', '/..', ['bad']] as $prefix) {
+            $this->package('modules/store', ['route_prefix' => $prefix]);
+            self::assertNotNull($this->manager->packages()['modules/store']['error']);
+            try {
+                $this->manager->setEnabled('modules/store', true);
+                self::fail('Invalid prefix must not activate');
+            } catch (DomainError $error) {
+                self::assertSame(422, $error->status());
+            }
+        }
+        self::assertSame([], $this->state->read());
+    }
+
+    public function testAdminPrefixValidationAndCollisionsProtectCoreRoutes(): void
+    {
+        foreach (['/shop', '/admin', '/admin/shop/edit', '/admin/Shop', '//admin/shop', '/admin/shop?x=1', ['bad']] as $prefix) {
+            $this->package('modules/store', ['admin_route_prefix' => $prefix]);
+            self::assertNotNull($this->manager->packages()['modules/store']['error']);
+        }
+        $this->package('modules/store', ['admin_route_prefix' => '/admin/shop'], '<?php file_put_contents(__DIR__ . "/ran", "unexpected");');
+        $this->manager->setEnabled('modules/store', true);
+        foreach (['/admin/shop', '/admin/shop/products', '/admin/{section}/products'] as $path) {
+            $slim = AppFactory::create();
+            $slim->get($path, static fn ($request, $response) => $response);
+            $this->manager->boot(new App([]), $slim);
+            self::assertStringContainsString('겹칩니다', $this->manager->packages()['modules/store']['error']);
+            self::assertFileDoesNotExist($this->extensionRoot . '/modules/store/ran');
+            self::assertCount(1, $slim->getRouteCollector()->getRoutes());
+        }
+    }
+
+    public function testPrefixCollisionDoesNotReplaceCoreRoutesOrRunPackageCode(): void
+    {
+        $this->package('modules/conflict', ['route_prefix' => '/login'], '<?php file_put_contents(__DIR__ . "/ran", "unexpected");');
+        $this->manager->setEnabled('modules/conflict', true);
+        $slim = AppFactory::create();
+        $slim->get('/login', static fn ($request, $response) => $response->withStatus(204));
+        $this->manager->boot(new App([]), $slim);
+        self::assertStringContainsString('겹칩니다', $this->manager->packages()['modules/conflict']['error']);
+        self::assertFileDoesNotExist($this->extensionRoot . '/modules/conflict/ran');
+        self::assertSame([], $this->manager->navigation());
+        self::assertCount(1, $slim->getRouteCollector()->getRoutes());
+        self::assertSame(204, $slim->handle((new ServerRequestFactory())->createServerRequest('GET', '/login'))->getStatusCode());
+    }
+
+    public function testPrefixCollisionWithAnotherPackagesCallbackIsRejected(): void
+    {
+        $this->package('modules/first', ['route_prefix' => '/store'], <<<'PHP'
+<?php return static function ($context): void {
+    $context->externalPost('/callback', static fn ($request) => false, static fn ($request, $response) => $response);
+};
+PHP);
+        $this->package('modules/second', ['route_prefix' => '/store', 'requires' => ['modules/first']], '<?php throw new RuntimeException("must not run");');
+        $this->manager->setEnabledMany(['modules/first' => true, 'modules/second' => true]);
+        $this->manager->boot(new App([]), AppFactory::create());
+        self::assertNull($this->manager->packages()['modules/first']['error']);
+        self::assertStringContainsString('겹칩니다', $this->manager->packages()['modules/second']['error']);
     }
 
     public function testEnabledPackagesRegisterRoutesAndShareServicesInDependencyOrder(): void

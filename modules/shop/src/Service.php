@@ -15,6 +15,8 @@ final class Service
 {
     public readonly Store $store;
     public readonly Catalog $catalog;
+    public readonly ProductImages $images;
+    public readonly Costing $costing;
     public readonly Claims $claims;
     public readonly Settlement $settlement;
     private SecretCipher $cipher;
@@ -23,13 +25,19 @@ final class Service
     public function __construct(public readonly App $app, public readonly array $gateways = [])
     {
         $this->store = new Store($app->db());
-        $this->catalog = new Catalog($this->store);
+        $this->images = new ProductImages($app);
+        $this->costing = new Costing($app);
+        $this->catalog = new Catalog($this->store, $this->images, $app->htmlSanitizer(), $app->contentImages(), $this->costing);
         $this->cipher = new SecretCipher((string) $app->config('auth.secret'));
         $this->claims = new Claims($this);
-        $this->settlement = new Settlement($this->store);
+        $this->settlement = new Settlement($this->store, $this->costing);
     }
 
-    public function ready(): bool { return $this->schema()->current(Schema::KEY, Schema::VERSION); }
+    public function ready(): bool
+    {
+        // 이미지 갤러리 갱신 전에도 기존 상품·주문과 단일 이미지 조회는 유지한다.
+        return $this->schema()->current(Schema::KEY, Schema::VERSION) || $this->schema()->current(Schema::KEY, 3) || $this->schema()->current(Schema::KEY, 2);
+    }
     public function install(): void { Schema::install($this->schema()); }
     private function schema(): PackageSchema { return new PackageSchema($this->app->db(), $this->app->storageDir()); }
     public function requireReady(): void { if (!$this->ready()) throw DomainError::serviceUnavailable('쇼핑몰 데이터를 먼저 설치해 주세요.'); }
@@ -123,6 +131,7 @@ final class Service
                 $this->store->insert('shop_orders', $row);
                 foreach ($quote['items'] as $item) {
                     unset($item['variant_version'], $item['image']);
+                    if ($this->costing->ready()) $item['cost_price'] = $this->store->get('shop_variants', $item['variant_id'])['cost_price'];
                     $this->store->insert('shop_items', ['id' => Store::id(), 'order_id' => $row['id'], 'returned' => 0, 'exchanged' => 0] + $item);
                 }
                 $this->store->event($row['id'], $user, 'created', '배송·반품 정책 동의 기록 저장');
@@ -142,6 +151,8 @@ final class Service
         if (!$admin && ($user === null || $order['user_id'] !== $user)) throw DomainError::notFound('주문을 찾을 수 없습니다.');
         $order['customer_data'] = $this->customer($order);
         $order['items'] = $this->store->items($id);
+        if (!$admin) foreach ($order['items'] as &$item) unset($item['cost_price']);
+        unset($item);
         foreach (['claims', 'refunds', 'events'] as $kind) $order[$kind] = $this->app->db()->select('SELECT * FROM ' . $this->app->db()->table('shop_' . $kind)
             . ' WHERE order_id = ? ORDER BY created_at, id', [$id]);
         return $order;

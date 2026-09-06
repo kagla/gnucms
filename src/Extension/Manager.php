@@ -15,6 +15,10 @@ final class Manager
 {
     private array $runtimeErrors = [];
     private array $services = [];
+    private array $navigation = [];
+
+    /** 성공적으로 등록한 확장만 공개 메뉴에 표시한다. */
+    public function navigation(): array { return $this->navigation; }
 
     public function __construct(private Catalog $catalog, private StateStore $state)
     {
@@ -31,7 +35,7 @@ final class Manager
                 $packages[$key] = [
                     'key' => $key, 'id' => $id, 'section' => $section, 'name' => $id,
                     'description' => '', 'version' => '', 'requires' => [], 'optional' => [],
-                    'entry_path' => null, 'admin_test' => false,
+                    'entry_path' => null, 'public_path' => null, 'route_prefix' => null, 'admin_route_prefix' => null, 'admin_test' => false,
                     'error' => '활성화된 패키지의 파일을 찾을 수 없습니다.',
                 ];
             }
@@ -99,6 +103,7 @@ final class Manager
     {
         $this->runtimeErrors = [];
         $this->services = [];
+        $this->navigation = [];
         $packages = $this->catalog->all();
         $active = $this->state->read();
         $order = [];
@@ -110,6 +115,8 @@ final class Manager
             }
         }
         $services = [];
+        $reservedPaths = [];
+        foreach ($slim->getRouteCollector()->getRoutes() as $route) $reservedPaths[] = $route->getPattern();
         foreach ($order as $key) {
             $package = $packages[$key];
             foreach ($package['requires'] as $dependency) {
@@ -118,8 +125,16 @@ final class Manager
                     continue 2;
                 }
             }
+            if ($package['route_prefix'] !== null && $this->prefixConflicts($package['route_prefix'], $reservedPaths)) {
+                $this->runtimeErrors[$key] = '기본 주소가 다른 경로와 겹칩니다: ' . $package['route_prefix'];
+                continue;
+            }
+            if ($package['admin_route_prefix'] !== null && $this->prefixConflicts($package['admin_route_prefix'], $reservedPaths)) {
+                $this->runtimeErrors[$key] = '관리자 주소가 다른 경로와 겹칩니다: ' . $package['admin_route_prefix'];
+                continue;
+            }
             try {
-                $context = new Context($app, $key, $services);
+                $context = new Context($app, $key, $services, $package['route_prefix'], $package['admin_route_prefix']);
                 $register = (static fn (string $file) => require $file)($package['directory'] . '/bootstrap.php');
                 if (!is_callable($register)) {
                     throw new \RuntimeException('Invalid extension entry point');
@@ -129,10 +144,19 @@ final class Manager
                 $services[$key] = $context->services();
                 foreach ($context->routes() as [$method, $url, $handler]) {
                     $slim->map([$method], $url, $handler);
+                    $reservedPaths[] = $url;
                 }
                 if ($context->externalRoutes() !== []) {
                     // 외부 요청만 본문 파싱·세션·HTML 미들웨어보다 먼저 처리한다.
                     $slim->add(new ExternalRequests($context->externalRoutes(), $slim->getBasePath()));
+                    array_push($reservedPaths, ...array_keys($context->externalRoutes()));
+                }
+                foreach ($context->routes() as [$method, $url]) {
+                    if ($package['public_path'] !== null && $method === 'GET' && $url === $context->path($package['public_path'])) {
+                        $this->navigation[$key] = ['name' => $package['name'], 'url' => $slim->getBasePath() . $url,
+                            'base_url' => $slim->getBasePath() . $context->routePrefix];
+                        if ($package['entry_path'] !== null) $this->navigation[$key]['admin_url'] = $slim->getBasePath() . RoutePrefix::path($context->adminRoutePrefix ?? $context->routePrefix, $package['entry_path']);
+                    }
                 }
             } catch (Throwable $e) {
                 // 업체 API 키 등이 포함될 수 있으므로 예외 원문을 화면이나 로그에 남기지 않는다.
@@ -163,7 +187,7 @@ final class Manager
             }
         }
         try {
-            $context = new Context($app, $key, $this->services);
+            $context = new Context($app, $key, $this->services, $package['route_prefix'], $package['admin_route_prefix']);
             $register = (static fn (string $file) => require $file)($package['directory'] . '/bootstrap.php');
             if (!is_callable($register)) {
                 throw new \RuntimeException('Invalid extension entry point');
@@ -173,13 +197,27 @@ final class Manager
             throw DomainError::serviceUnavailable('확장 테스트를 준비하지 못했습니다. 패키지를 확인해 주세요.');
         }
         foreach ($context->routes() as [$method, $url, $handler]) {
-            if ($method === $request->getMethod() && $url === '/' . $key . $package['entry_path']) {
+            if ($method === $request->getMethod() && $url === RoutePrefix::path($package['admin_route_prefix'] ?? $context->routePrefix, $package['entry_path'])) {
                 return $handler($request->withAttribute(Context::TEST_ATTRIBUTE, true), $response, [])
                     ->withHeader('Cache-Control', 'no-store')
                     ->withHeader('X-Robots-Tag', 'noindex, nofollow');
             }
         }
         throw DomainError::notFound('패키지에 테스트할 실행 경로가 등록되어 있지 않습니다.');
+    }
+
+    private function prefixConflicts(string $prefix, array $paths): bool
+    {
+        foreach ($paths as $path) {
+            if ($path === $prefix || str_starts_with($path, $prefix . '/')) return true;
+            $parts = explode('/', trim($path, '/'));
+            foreach (explode('/', ltrim($prefix, '/')) as $index => $part) {
+                if (!isset($parts[$index])) break;
+                if (str_contains($parts[$index], '{')) return true;
+                if ($part !== $parts[$index]) break;
+            }
+        }
+        return false;
     }
 
     private function order(string $key, array $packages, array $active, array $visiting, array $ordered): array

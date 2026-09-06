@@ -17,12 +17,32 @@ final class Context
     private array $routes = [];
     private array $services = [];
     private array $external = [];
+    public readonly string $routePrefix;
 
     public function __construct(
         public readonly App $app,
         public readonly string $key,
-        private array $availableServices
+        private array $availableServices,
+        ?string $routePrefix = null,
+        public readonly ?string $adminRoutePrefix = null
     ) {
+        if ($routePrefix !== null && !RoutePrefix::valid($routePrefix)) {
+            throw new InvalidArgumentException('확장 기본 주소가 올바르지 않습니다.');
+        }
+        $this->routePrefix = $routePrefix ?? '/' . $key;
+        if ($adminRoutePrefix !== null && !RoutePrefix::validAdmin($adminRoutePrefix)) {
+            throw new InvalidArgumentException('확장 관리자 주소가 올바르지 않습니다.');
+        }
+    }
+
+    public function path(string $path): string { return RoutePrefix::path($this->routePrefix, $path); }
+
+    /** 기존 폼·북마크·외부 콜백도 동일한 권한·인증 검사를 거친다. */
+    private function paths(string $path): array
+    {
+        $paths = [$this->path($path), '/' . $this->key . $path];
+        if ($path === '/') $paths[] = $this->routePrefix . '/';
+        return array_values(array_unique($paths));
     }
 
     public function provide(string $name, object $service): void
@@ -39,18 +59,27 @@ final class Context
     }
 
     /** 초기 API는 고정 경로의 GET/POST를 제공한다. POST에는 CSRF 검사가 적용된다. */
-    public function route(string $method, string $path, callable $handler, bool $admin = false): void
+    public function route(string $method, string $path, callable $handler, bool $admin = false, ?string $legacyPath = null): void
     {
         if (!in_array($method, ['GET', 'POST'], true)
-            || !preg_match('~^/(?:[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)?$~D', $path)) {
+            || !preg_match('~^/(?:[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)?$~D', $path)
+            || ($legacyPath !== null && (!$admin || $this->adminRoutePrefix === null
+                || !preg_match('~^/(?:[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)?$~D', $legacyPath)))) {
             throw new InvalidArgumentException('확장 라우트의 메서드 또는 경로가 올바르지 않습니다.');
         }
-        $url = '/' . $this->key . $path;
-        if (isset($this->routes[$method . ' ' . $url]) || isset($this->external[$url])) {
-            throw new InvalidArgumentException('확장 라우트가 중복됩니다.');
+        $paths = $this->paths($legacyPath ?? $path);
+        if ($admin && $this->adminRoutePrefix !== null) {
+            array_unshift($paths, RoutePrefix::path($this->adminRoutePrefix, $path));
+            if ($path === '/') $paths[] = $this->adminRoutePrefix . '/';
+        }
+        $paths = array_values(array_unique($paths));
+        foreach ($paths as $url) {
+            if (isset($this->routes[$method . ' ' . $url]) || isset($this->external[$url])) {
+                throw new InvalidArgumentException('확장 라우트가 중복됩니다.');
+            }
         }
         $app = $this->app;
-        $this->routes[$method . ' ' . $url] = [$method, $url, static function ($request, $response, $args) use ($handler, $admin, $method, $app) {
+        $wrapped = static function ($request, $response, $args) use ($handler, $admin, $method, $app) {
             if ($admin) {
                 $app->guestAcl()->assertGlobalAdmin();
             }
@@ -58,7 +87,8 @@ final class Context
                 self::assertCsrf($request);
             }
             return $handler($request, $response, $args);
-        }];
+        };
+        foreach ($paths as $url) $this->routes[$method . ' ' . $url] = [$method, $url, $wrapped];
     }
 
     public function routes(): array
@@ -78,11 +108,12 @@ final class Context
             || $maxBytes < 1 || $maxBytes > 1048576 || !in_array($contentType, ['application/json', 'application/x-www-form-urlencoded'], true)) {
             throw new InvalidArgumentException('외부 콜백 경로나 크기 제한이 올바르지 않습니다.');
         }
-        $url = '/' . $this->key . $path;
-        if (isset($this->external[$url]) || isset($this->routes['POST ' . $url]) || isset($this->routes['GET ' . $url])) {
-            throw new InvalidArgumentException('확장 라우트가 중복됩니다.');
+        foreach ($this->paths($path) as $url) {
+            if (isset($this->external[$url]) || isset($this->routes['POST ' . $url]) || isset($this->routes['GET ' . $url])) {
+                throw new InvalidArgumentException('확장 라우트가 중복됩니다.');
+            }
         }
-        $this->external[$url] = [$authenticate, $handler, $maxBytes, $contentType];
+        foreach ($this->paths($path) as $url) $this->external[$url] = [$authenticate, $handler, $maxBytes, $contentType];
     }
 
     public function externalRoutes(): array
