@@ -3,10 +3,14 @@
   "type": "module",
   "name": "작은 쇼핑몰",
   "description": "1인 운영을 위한 상품·주문·배송·반품·교환·환불·정산 관리입니다. 상품 옵션은 두 종류까지 지원합니다.",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "api": 2,
   "entry_path": "/admin",
   "admin_test": false,
   "requires": [],
-  "optional": ["plugins/payment-inicis", "plugins/payment-kcp", "plugins/payment-kspay"]
+  "optional": [
+    "plugins/payment-inicis",
+    "plugins/payment-kcp",
+    "plugins/payment-kspay"
+  ]
 }

@@ -14,7 +14,7 @@ require_once __DIR__ . '/autoload.php';
 return static function (Context $context): void {
     $gateways = [];
     foreach (['inicis', 'kcp', 'kspay'] as $id) {
-        $gateway = $context->service('plugins/payment-' . $id, 'gateway.v1');
+        $gateway = $context->service('plugins/payment-' . $id, 'gateway.v2');
         if ($gateway instanceof Gateway) $gateways[$id] = $gateway;
     }
     $service = new Service($context->app, $gateways);
@@ -30,22 +30,28 @@ return static function (Context $context): void {
     $context->route('GET', '/image', static function ($request, $response) use ($context) {
         return (new Images($context->app))->response(Input::text($request->getQueryParams()['file'] ?? '', '이미지', 100), $response);
     });
-    $context->externalPost('/webhook', static function ($request) use ($service): bool {
+    $context->externalPost('/callback', static function ($request) use ($service): bool {
         $query = $request->getQueryParams();
-        if (!is_string($query['provider'] ?? null) || !is_string($query['revision'] ?? null)) return false;
-        $gateway = $service->gateways[$query['provider']] ?? null;
-        return $gateway !== null && $gateway->authenticateWebhook($request, $query['revision']);
+        if (!is_string($query['id'] ?? null) || !preg_match('/^[a-f0-9]{32}$/D', $query['id']) || !$service->ready()) return false;
+        try {
+            $order = $service->store->get('shop_orders', $query['id']);
+            return \GnuCms\Payment\CallbackToken::verify($service->app, $order, $query['state'] ?? null);
+        } catch (\Throwable) { return false; }
     }, static function ($request, $response) use ($service) {
         return \GnuCms\Payment\ExecutionLock::run($service->app->storageDir(), static function () use ($service, $request, $response) {
-        $service->requireReady();
-        $body = $request->getParsedBody();
-        $id = Input::id($body['data']['paymentId'] ?? null);
-        $order = $service->store->get('shop_orders', $id);
-        $query = $request->getQueryParams();
-        if ($order['provider'] !== $query['provider'] || $order['config_revision'] !== $query['revision']) throw \GnuCms\Error\DomainError::forbidden('주문 결제 설정이 다릅니다.');
-        $service->sync($id);
-        $response->getBody()->write('{"accepted":true}');
-        return $response;
+            $id = $request->getQueryParams()['id'];
+            $order = $service->store->get('shop_orders', $id);
+            try {
+                $service->gateway($order['provider'])->complete($order, $request->getParsedBody());
+                $service->sync($id);
+            } catch (\GnuCms\Error\DomainError $error) {
+                if ($error->status() >= 500) {
+                    $service->store->update('shop_orders', $id, ['needs_review' => 1]);
+                    $service->store->event($id, 'payment', 'approval_review', 'PG 승인·조회 결과를 확인해 주세요.');
+                }
+            }
+            $base = rtrim((string) parse_url((string) $service->app->config('app.url', ''), PHP_URL_PATH), '/');
+            return $response->withStatus(303)->withHeader('Location', $base . '/modules/shop/order?id=' . $id);
         });
-    });
+    }, contentType: 'application/x-www-form-urlencoded');
 };

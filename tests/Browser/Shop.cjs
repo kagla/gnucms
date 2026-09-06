@@ -14,7 +14,7 @@ const render = scenario => execFileSync('php', [path.join(__dirname, 'ShopFixtur
       page.on('pageerror', error => errors.push(error.message));
       await page.setRequestInterception(true);
       page.on('request', request => {
-        if (request.url() === 'https://cdn.portone.io/v2/browser-sdk.js') return request.respond({status: 200, contentType: 'text/javascript', body: 'window.PortOne={requestPayment:async function(options){window.testPayment=options;return {paymentId:options.paymentId};}};'});
+        if (request.url() === 'https://stgstdpay.inicis.com/stdjs/INIStdPay.js') return request.respond({status: 200, contentType: 'text/javascript', body: 'window.INIStdPay={pay:function(id){window.testPayment=Object.fromEntries(new FormData(document.getElementById(id)));}};'});
         if (request.method() === 'POST') { posts.push({url: request.url(), data: new URLSearchParams(request.postData())}); return request.respond({status: 200, body: 'submitted'}); }
         return request.respond({status: 200, contentType: 'text/html', body: html});
       });
@@ -29,13 +29,13 @@ const render = scenario => execFileSync('php', [path.join(__dirname, 'ShopFixtur
         assert.ok(claims.some(row => row.includes('교환받을 옵션')));
       }
       if (scenario === 'payment') {
-        const expected = await page.$eval('#shop-payment-options', el => JSON.parse(el.textContent));
-        await Promise.all([page.waitForNavigation(), page.click('#shop-pay-button')]);
-        assert.equal(posts.length, 1);
-        assert.equal(posts[0].url, 'https://shop.example.test/cms/modules/shop/order');
-        assert.equal(posts[0].data.get('id'), expected.paymentId);
-        assert.equal(posts[0].data.get('action'), 'sync');
-        assert.ok(posts[0].data.get('csrf_token'));
+        const expected = await page.$eval('#shop-payment-form', el => Object.fromEntries(new FormData(el)));
+        await page.click('#shop-pay-button');
+        const actual = await page.evaluate(() => window.testPayment);
+        assert.equal(actual.oid, expected.oid);
+        assert.equal(actual.price, expected.price);
+        assert.ok(actual.returnUrl.includes('/cms/modules/shop/callback?id='));
+        assert.equal(posts.length, 0);
       } else {
         if (scenario === 'catalog') await page.screenshot({path: '/tmp/gnucms-shop-desktop.png', fullPage: true});
         await page.setViewport({width: 390, height: 844});
@@ -60,6 +60,6 @@ const render = scenario => execFileSync('php', [path.join(__dirname, 'ShopFixtur
       }
       await page.close();
     }
-    console.log('Shop browser checks passed: 11 pages, mobile width, cart submission, payment completion and CSRF.');
+    console.log('Shop browser checks passed: 11 pages, mobile width, cart submission, PG popup handoff and CSRF.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

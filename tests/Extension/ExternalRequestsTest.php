@@ -62,4 +62,23 @@ final class ExternalRequestsTest extends TestCase
             self::assertSame('{"accepted":false}', (string) $response->getBody());
         }
     }
+
+    public function testOnlyExplicitlyRegisteredFormCallbacksAcceptScalarUnduplicatedFields(): void
+    {
+        $received = null;
+        $middleware = new ExternalRequests(['/modules/shop/callback' => [static fn ($r): bool => $r->getQueryParams()['state'] === 'valid',
+            static function ($r, $response) use (&$received) { $received = $r->getParsedBody(); return $response->withStatus(303)->withHeader('Location', '/cms/modules/shop/order'); }, 100,
+            'application/x-www-form-urlencoded']], '/cms');
+        $fallback = new class implements RequestHandlerInterface {
+            public function handle(ServerRequestInterface $request): ResponseInterface { return new Response(418); }
+        };
+        foreach (['P_STATUS=00&authToken=a%2Bb%3Dc' => 303, 'a=1&a=2' => 400, 'a%5B%5D=1' => 400, 'a=1&%61=2' => 400, 'x=' . str_repeat('a', 101) => 413] as $body => $expected) {
+            $request = (new ServerRequestFactory())->createServerRequest('POST', '/cms/modules/shop/callback?state=valid')->withHeader('Content-Type', 'application/x-www-form-urlencoded');
+            $request->getBody()->write($body);
+            $response = $middleware->process($request, $fallback);
+            self::assertSame($expected, $response->getStatusCode());
+            self::assertSame('', $response->getHeaderLine('Set-Cookie'));
+            if ($expected === 303) self::assertSame(['P_STATUS' => '00', 'authToken' => 'a+b=c'], $received);
+        }
+    }
 }

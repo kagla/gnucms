@@ -38,7 +38,7 @@ final class Controller
             return $response->withStatus(303)->withHeader('Location', $base . '/login');
         }
         if ($page === 'return') {
-            $id = Input::id($input['paymentId'] ?? null);
+            $id = Input::id($input['id'] ?? null);
             return $response->withStatus(303)->withHeader('Location', $url . '/order?id=' . $id);
         }
         $ready = $this->service->ready();
@@ -124,8 +124,9 @@ final class Controller
                     elseif ($action === 'pay' && $page === 'order') {
                         if ($order['environment'] === 'test' && !$admin) throw DomainError::validation(['payment' => '테스트 주문은 운영자만 결제할 수 있습니다.']);
                         $root = rtrim((string) $this->service->app->config('app.url', ''), '/');
-                        $data['payment'] = $this->service->checkout($id, $root . '/modules/shop/return', $root . '/modules/shop/webhook?provider='
-                            . $order['provider'] . '&revision=' . $order['config_revision']);
+                        $device = preg_match('/Android|iPhone|iPad|iPod/i', $request->getHeaderLine('User-Agent')) ? 'mobile' : 'web';
+                        $data['payment'] = $this->service->checkout($id, $root . '/modules/shop/return?id=' . $id,
+                            $root . '/modules/shop/callback?id=' . $id . '&state=' . \GnuCms\Payment\CallbackToken::create($this->service->app, $order), $device);
                     } elseif ($page === 'manage-order') {
                         if (in_array($action, ['pack', 'ship', 'deliver'], true)) $this->service->fulfill($id, $action, $input, $user);
                         elseif ($action === 'review') $this->service->acknowledgeReview($id, Input::text($input['note'] ?? '', '확인 메모', 1000), $user);

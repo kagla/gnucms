@@ -40,7 +40,8 @@ final class ExternalRequests implements MiddlewareInterface
             if ($authenticate($request) !== true) {
                 return $this->error(403);
             }
-            if (strtolower(trim(explode(';', $request->getHeaderLine('Content-Type'))[0])) !== 'application/json') {
+            $contentType = $route[3] ?? 'application/json';
+            if (strtolower(trim(explode(';', $request->getHeaderLine('Content-Type'))[0])) !== $contentType) {
                 return $this->error(415);
             }
             $declared = $request->getHeaderLine('Content-Length');
@@ -59,9 +60,19 @@ final class ExternalRequests implements MiddlewareInterface
                 $raw .= $part;
             }
             if (strlen($raw) > $limit) return $this->error(413);
-            $input = json_decode($raw, true, 32);
-            if (!is_array($input) || array_is_list($input) || json_last_error() !== JSON_ERROR_NONE) {
-                return $this->error(400);
+            if ($contentType === 'application/json') {
+                $input = json_decode($raw, true, 32);
+                if (!is_array($input) || array_is_list($input) || json_last_error() !== JSON_ERROR_NONE) return $this->error(400);
+            } else {
+                $input = [];
+                foreach (explode('&', $raw) as $pair) {
+                    if ($pair === '') continue;
+                    [$key, $value] = array_pad(explode('=', $pair, 2), 2, '');
+                    $key = urldecode($key); $value = urldecode($value);
+                    if (!preg_match('/^[A-Za-z][A-Za-z0-9_]{0,79}$/D', $key) || array_key_exists($key, $input) || strlen($value) > 16384) return $this->error(400);
+                    $input[$key] = $value;
+                }
+                if ($input === []) return $this->error(400);
             }
             return $this->headers($receive($request->withParsedBody($input), new Response(), []));
         } catch (DomainError $e) {

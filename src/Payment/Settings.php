@@ -17,7 +17,7 @@ final class Settings
     private SecretCipher $cipher;
     private string $table;
 
-    public function __construct(private App $app, public readonly string $provider)
+    public function __construct(public readonly App $app, public readonly string $provider)
     {
         if (!isset(self::PROVIDERS[$provider])) throw DomainError::internal('결제 플러그인을 확인해 주세요.');
         $this->table = 'pay_' . $provider . '_settings';
@@ -25,13 +25,16 @@ final class Settings
     }
 
     public function key(): string { return 'plugins/payment-' . $this->provider; }
-    public function ready(): bool { return $this->schema()->current($this->key(), 1); }
+    public function ready(): bool { return $this->schema()->current($this->key(), 2); }
     private function schema(): PackageSchema { return new PackageSchema($this->app->db(), $this->app->storageDir()); }
 
     public function install(): void
     {
-        $this->schema()->install($this->key(), 1, [$this->table], function ($db): void {
+        $this->schema()->install($this->key(), 2, [$this->table, 'pay_' . $this->provider . '_transactions'], function ($db): void {
             $db->execute('CREATE TABLE IF NOT EXISTS ' . $db->table($this->table)
+                . ' (id VARCHAR(32) PRIMARY KEY, payload ' . $db->dialect()->typeMap()['{TEXT}'] . ' NOT NULL)'
+                . $db->dialect()->tableSuffix());
+            $db->execute('CREATE TABLE IF NOT EXISTS ' . $db->table('pay_' . $this->provider . '_transactions')
                 . ' (id VARCHAR(32) PRIMARY KEY, payload ' . $db->dialect()->typeMap()['{TEXT}'] . ' NOT NULL)'
                 . $db->dialect()->tableSuffix());
         });
@@ -52,23 +55,27 @@ final class Settings
 
     public function current(string $environment): ?array
     {
-        return $this->row(self::environment($environment));
+        $row = $this->row(self::environment($environment));
+        return ($row['integration'] ?? '') === 'direct-v1' ? $row : null;
     }
 
     public function revision(string $revision): array
     {
         if (!preg_match('/^[a-f0-9]{32}$/D', $revision)) throw DomainError::validation(['revision' => '결제 설정 판을 확인해 주세요.']);
-        return $this->row($revision) ?? throw DomainError::serviceUnavailable('주문 당시 결제 설정이 없습니다.');
+        $row = $this->row($revision);
+        if (($row['integration'] ?? '') !== 'direct-v1') throw DomainError::serviceUnavailable('직접 연동 설정으로 생성한 주문이 아닙니다.');
+        return $row;
     }
 
-    /** 주문의 상점·채널은 보존하고 같은 상점의 인증키 교체는 과거 주문에도 적용한다. */
+    /** 주문의 상점은 보존하고 같은 상점의 인증키·서버 주소 변경을 과거 주문에 적용한다. */
     public function credentials(string $revision): array
     {
         $row = $this->revision($revision);
         $current = $this->current($row['environment']);
-        if ($current !== null && $current['store_id'] === $row['store_id']) {
-            $row['api_secret'] = $current['api_secret'];
-            $row['webhook_secret'] = $current['webhook_secret'];
+        if ($current !== null && $current['merchant_id'] === $row['merchant_id']) {
+            foreach (ProviderConfig::fields($this->provider) as $key => $field) {
+                if ($field['secret'] || $key === 'client_ip') $row[$key] = $current[$key];
+            }
         }
         return $row;
     }
@@ -88,7 +95,7 @@ final class Settings
     {
         $row = $this->current($environment);
         return ['configured' => $row !== null, 'enabled' => $this->available($environment),
-            'store_id' => $row['store_id'] ?? '', 'channel_key' => $row['channel_key'] ?? '',
+            'merchant_id' => $row['merchant_id'] ?? '', 'client_ip' => $row['client_ip'] ?? '',
             'revision' => $row['revision'] ?? '', 'environment' => $environment];
     }
 
@@ -101,25 +108,9 @@ final class Settings
     {
         self::environment($environment);
         if (!$this->ready()) throw DomainError::serviceUnavailable('결제 플러그인 데이터를 먼저 설치해 주세요.');
-        $before = $this->current($environment);
-        $data = ['environment' => $environment, 'revision' => bin2hex(random_bytes(16))];
-        foreach (['store_id', 'channel_key', 'api_secret', 'webhook_secret'] as $key) {
-            $value = $input[$key] ?? '';
-            if (!is_string($value) || strlen($value) > 4096 || preg_match('/[\x00-\x20\x7f]/', $value)) {
-                throw DomainError::validation([$key => '공백 없는 결제 연동 값을 입력해 주세요.']);
-            }
-            if ($value === '' && in_array($key, ['api_secret', 'webhook_secret'], true)) $value = $before[$key] ?? '';
-            if ($value === '') throw DomainError::validation([$key => '결제 연동 값을 입력해 주세요.']);
-            $data[$key] = $value;
-        }
-        foreach (['store_id' => 'store-', 'channel_key' => 'channel-key-'] as $key => $prefix) {
-            if (!str_starts_with($data[$key], $prefix) || !preg_match('/^[A-Za-z0-9_-]{10,150}$/D', $data[$key])) {
-                throw DomainError::validation([$key => 'PortOne V2 상점 ID와 채널 키를 확인해 주세요.']);
-            }
-        }
-        $secret = $data['webhook_secret'];
-        $decoded = base64_decode(str_starts_with($secret, 'whsec_') ? substr($secret, 6) : $secret, true);
-        if ($decoded === false || strlen($decoded) < 16) throw DomainError::validation(['webhook_secret' => '웹훅 서명 시크릿을 확인해 주세요.']);
+        $before = $this->row($environment);
+        $data = ProviderConfig::validate($this->provider, $input, $this->current($environment) ?? [])
+            + ['integration' => 'direct-v1', 'environment' => $environment, 'revision' => bin2hex(random_bytes(16))];
         (new RuntimePermit($this->app->storageDir()))->set($this->key() . '/' . $environment, null);
         $payload = $this->cipher->encrypt(json_encode($data, JSON_THROW_ON_ERROR));
         $db = $this->app->db();

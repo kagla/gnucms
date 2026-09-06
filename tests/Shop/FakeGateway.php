@@ -20,8 +20,8 @@ final class FakeGateway implements Gateway
     public function label(): string { return '테스트 결제'; }
     public function available(string $environment): bool { return true; }
     public function configuration(string $environment): array { return ['revision' => $this->revision]; }
-    public function checkout(array $order, array $customer, string $returnUrl, string $webhookUrl): array { return ['paymentId' => $order['id'], 'totalAmount' => (int) $order['total']]; }
-    public function authenticateWebhook(\Psr\Http\Message\ServerRequestInterface $request, string $revision): bool { return false; }
+    public function checkout(array $order, array $customer, string $returnUrl, string $callbackUrl, string $device = 'web'): array { return ['kind' => 'inicis', 'script' => 'https://stgstdpay.inicis.com/stdjs/INIStdPay.js', 'fields' => ['oid' => $order['id'], 'price' => (string) $order['total'], 'returnUrl' => $callbackUrl]]; }
+    public function complete(array $order, array $callback): void {}
     public function paid(array $order): void
     {
         $this->payments[$order['id']] = ['status' => 'PAID', 'valid' => true, 'transaction_id' => bin2hex(random_bytes(16)),

@@ -1,12 +1,13 @@
 # KG이니시스 결제 플러그인
 
-PortOne V2의 KG이니시스 채널로 KRW 일반 과세 카드결제와 전체·부분 취소를 제공한다.
+웹표준 PC·모바일 카드결제와 INIAPI v2 조회·전체/부분 취소 코드를 제공한다. 운영 전 가맹점 테스트 계정에서 실제 승인·취소 검증이 필요하다.
 
 - 설정: `/plugins/payment-inicis/settings`
-- 서버 계약: `gateway.v1` (`GnuCms\Payment\Gateway`)
-- PortOne 상점 ID, 해당 PG의 테스트/운영 채널 키, V2 API Secret, 웹훅 서명 시크릿이 필요하다.
-- 관리자에서 데이터 설치 → 설정 저장 → API 실행 허용 순으로 진행한다.
-- 설정은 암호화하며 과거 주문의 조회·환불에 필요한 설정 판을 보관한다.
-- 복원 후에는 API 실행이 정지된다. 거래를 대조한 뒤 다시 허용한다.
+- 서버 계약: `gateway.v2` (`GnuCms\Payment\Gateway`)
+- 결제 설정: MID, 웹표준 SignKey, 모바일 Hash Key, INIAPI Key, 서버 IPv4 주소
+- 리셀러 코드는 가맹점 등록용이다. 결제 요청에는 PG가 발급한 상점 코드를 사용한다.
+- 인증 정보와 요청 처리 기록은 암호화한다. 카드번호·인증 토큰·PG 응답 원문은 저장하지 않는다.
+- 패키지 스키마 2에서 거래 요청 기록 테이블을 추가한다. 관리자에서 데이터 설치/갱신이 필요하다.
+- 복원 후 API 실행은 정지된다. 결제사와 거래를 대조한 뒤 다시 허용한다.
 
-[쇼핑몰 운영 문서](../../docs/shop.md) · [공식 채널 문서](https://developers.portone.io/opi/ko/integration/pg/v2/inicis-v2)
+[쇼핑몰 운영 문서](../../docs/shop.md) · [공식 연동 문서](https://manual.inicis.com/pay/)

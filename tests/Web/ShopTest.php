@@ -57,7 +57,10 @@ final class ShopTest extends WebTestCase
     {
         if (isset($this->app)) {
             foreach (array_reverse(\GnuCms\Modules\Shop\Schema::TABLES) as $table) $this->app->db()->execute('DROP TABLE IF EXISTS ' . $this->app->db()->table($table));
-            foreach (array_keys(Settings::PROVIDERS) as $id) $this->app->db()->execute('DROP TABLE IF EXISTS ' . $this->app->db()->table('pay_' . $id . '_settings'));
+            foreach (array_keys(Settings::PROVIDERS) as $id) {
+                $this->app->db()->execute('DROP TABLE IF EXISTS ' . $this->app->db()->table('pay_' . $id . '_transactions'));
+                $this->app->db()->execute('DROP TABLE IF EXISTS ' . $this->app->db()->table('pay_' . $id . '_settings'));
+            }
             (new Schema($this->app->db()))->drop();
         }
         if (isset($this->root) && is_dir($this->root)) {
@@ -102,7 +105,7 @@ final class ShopTest extends WebTestCase
         $this->shop->saveSettings(['name' => '상점', 'seller' => '상호', 'owner' => '대표', 'business_number' => '000', 'phone' => '01000000000', 'email' => 'shop@example.test',
             'address' => '주소', 'return_address' => '반품 주소', 'policy' => '정책', 'shipping' => 3000, 'free_shipping' => 50000, 'environment' => 'live', 'open' => '1']);
         $settings = new Settings($this->app, 'inicis'); $settings->install();
-        $settings->save('live', ['store_id' => 'store-' . Store::id(), 'channel_key' => 'channel-key-' . Store::id(), 'api_secret' => bin2hex(random_bytes(32)), 'webhook_secret' => base64_encode(random_bytes(32))]);
+        $settings->save('live', \GnuCms\Tests\Payment\Fixtures::config('inicis'));
         $settings->enable('live', true);
         self::assertSame(303, $this->post($this->app, '/modules/shop/cart', $this->csrf(['action' => 'add', 'variant_id' => $p['variants'][0]['id'], 'quantity' => '2']))->getStatusCode());
         $response = $this->get($this->app, '/modules/shop/checkout');
@@ -125,7 +128,7 @@ final class ShopTest extends WebTestCase
     public function testForgedCallbacksAndMalformedInputsCannotMutateState(array $config): void
     {
         $this->setupShop($config); $this->signIn(true);
-        $request = (new ServerRequestFactory())->createServerRequest('POST', '/modules/shop/webhook?provider=inicis&revision=' . Store::id())->withHeader('Content-Type', 'application/json');
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/modules/shop/callback?id=' . Store::id())->withHeader('Content-Type', 'application/json');
         $request->getBody()->write('{"type":"Transaction.Paid","data":{"paymentId":"' . Store::id() . '"}}');
         self::assertSame(403, Kernel::create($this->app, dirname(__DIR__, 2) . '/templates', '')->handle($request)->getStatusCode());
         self::assertSame(422, $this->get($this->app, '/modules/shop/catalog', ['q' => ['bad']])->getStatusCode());

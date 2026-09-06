@@ -164,7 +164,7 @@ final class Claims
         $refund = $this->store->get('shop_refunds', $refundId);
         if ($refund['status'] === 'succeeded') return;
         if (Clock::timestamp() - (int) $refund['created_at'] > 7200) {
-            throw DomainError::validation(['refund' => '재요청 시간이 지났습니다. 결제사 관리자에서 결과를 확인하고 결제 상태 조회 또는 외부 환불 연결을 사용해 주세요.']);
+            throw DomainError::validation(['refund' => '결제사 관리자에서 결과를 확인하고 결제 상태 조회 또는 외부 환불 연결을 사용해 주세요.']);
         }
         $order = $this->store->get('shop_orders', $refund['order_id']);
         if ((int) $order['needs_review'] || (int) $order['total'] - (int) $order['refunded'] !== (int) $refund['remaining']) {
@@ -208,6 +208,9 @@ final class Claims
         $reference = Input::text($reference, '외부 취소 ID', 100);
         $note = Input::text($note, '결제사 확인 메모', 1000);
         $initial = $this->store->get('shop_refunds', $refundId);
+        $order = $this->store->get('shop_orders', $initial['order_id']);
+        $gateway = $this->service->gateway($order['provider']);
+        if ($gateway instanceof \GnuCms\Payment\DirectGateway) $gateway->confirmRefund($order, 'refund-' . $refundId, $reference);
         $this->service->sync($initial['order_id']);
         $this->store->db->transaction(function () use ($refundId, $initial, $reference, $note, $actor): void {
             $order = $this->store->lockOrder($initial['order_id']);
@@ -227,8 +230,10 @@ final class Claims
     {
         $note = Input::text($note, '결제사 미처리 확인 메모', 1000);
         $refund = $this->store->get('shop_refunds', $refundId);
-        if (Clock::timestamp() - (int) $refund['created_at'] <= 7200) throw DomainError::validation(['refund' => '2시간 이내에는 기존 환불 재확인·재요청을 사용해 주세요.']);
+        if (Clock::timestamp() - (int) $refund['created_at'] <= 7200) throw DomainError::validation(['refund' => '2시간 이내에는 기존 환불의 상태를 확인해 주세요.']);
         $order = $this->store->get('shop_orders', $refund['order_id']);
+        $gateway = $this->service->gateway($order['provider']);
+        if ($gateway instanceof \GnuCms\Payment\DirectGateway) $gateway->confirmUnprocessedRefund($order, 'refund-' . $refundId);
         $payment = $this->service->gateway($order['provider'])->fetch($order);
         if (!($payment['valid'] ?? false) || ($payment['open_cancellations'] ?? 0) > 0
             || (int) $order['total'] - (int) ($payment['cancelled'] ?? -1) !== (int) $refund['remaining']) {

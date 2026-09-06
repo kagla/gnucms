@@ -372,10 +372,10 @@ final class ShopTest extends DatabaseTestCase
         $this->setupShop(['dsn' => 'sqlite::memory:']); $p = $this->product(); $order = $this->order($p);
         $this->gateway->paid($order); $this->shop->sync($order['id']);
         $settings = new \GnuCms\Payment\Settings($this->app, 'inicis'); $settings->install();
-        $settings->save('live', ['store_id' => 'store-' . Store::id(), 'channel_key' => 'channel-key-' . Store::id(),
-            'api_secret' => bin2hex(random_bytes(32)), 'webhook_secret' => base64_encode(random_bytes(32))]);
+        $settings->save('live', \GnuCms\Tests\Payment\Fixtures::config('inicis'));
         $settings->enable('live', true);
         $revision = $settings->summary('live')['revision'];
+        (new \GnuCms\Payment\Journal($settings))->change($order['id'], static fn () => ['approval' => 'pending', 'refunds' => []]);
         $state = new \GnuCms\Extension\StateStore($this->root . '/extensions');
         $state->update(static fn () => ['modules/shop', 'plugins/payment-inicis']);
         $source = $this->root . '/source.png';
@@ -398,6 +398,7 @@ final class ShopTest extends DatabaseTestCase
         self::assertSame(['modules/shop', 'plugins/payment-inicis'], $state->read());
         $settings = new \GnuCms\Payment\Settings($this->app, 'inicis');
         self::assertSame($revision, $settings->summary('live')['revision']);
+        self::assertSame('pending', (new \GnuCms\Payment\Journal($settings))->read($order['id'])['approval']);
         self::assertFalse($settings->available('live'));
     }
 

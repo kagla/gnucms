@@ -11,8 +11,10 @@ interface Gateway
     public function label(): string;
     public function available(string $environment): bool;
     public function configuration(string $environment): array;
-    public function checkout(array $order, array $customer, string $returnUrl, string $webhookUrl): array;
+    public function checkout(array $order, array $customer, string $returnUrl, string $callbackUrl, string $device = 'web'): array;
+
+    /** 브라우저 인증 결과로 PG 서버에 승인을 요청한다. */
+    public function complete(array $order, array $callback): void;
     public function fetch(array $order): array;
     public function cancel(array $order, int $amount, int $remaining, string $reason, string $key): array;
-    public function authenticateWebhook(\Psr\Http\Message\ServerRequestInterface $request, string $revision): bool;
 }

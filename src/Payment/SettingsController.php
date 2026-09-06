@@ -25,9 +25,12 @@ final class SettingsController
                 $action = $input['action'] ?? '';
                 if ($action === 'install') $this->settings->install();
                 elseif ($action === 'save') $this->settings->save($environment, $input);
-                elseif (in_array($action, ['enable', 'disable'], true)) $this->settings->enable($environment, $action === 'enable');
+                elseif (in_array($action, ['enable', 'disable'], true)) {
+                    if ($action === 'enable' && $this->settings->provider !== 'inicis') throw DomainError::validation(['payment' => '직접 연동 규격 확인이 완료되지 않아 결제 실행을 허용할 수 없습니다.']);
+                    $this->settings->enable($environment, $action === 'enable');
+                }
                 else throw DomainError::validation(['action' => '작업을 확인해 주세요.']);
-                $notice = $action === 'save' ? '설정을 저장했습니다. 채널 환경을 확인한 뒤 API 실행을 허용해 주세요.' : '처리했습니다.';
+                $notice = $action === 'save' ? '설정을 저장했습니다. 상점 코드와 환경을 확인한 뒤 API 실행을 허용해 주세요.' : '처리했습니다.';
             }
         } catch (DomainError $e) {
             $response = $response->withStatus($e->status());
@@ -41,6 +44,8 @@ final class SettingsController
         }
         $view = new PhpView($paths, $route->getRouteParser(), $route->getBasePath(), static fn ($p) => '', static fn ($p) => '');
         return $view->render($response->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer'), 'settings', [
+            'fields' => ProviderConfig::fields($this->settings->provider), 'manual' => ProviderConfig::manual($this->settings->provider),
+            'integration_ready' => $this->settings->provider === 'inicis',
             'label' => Settings::PROVIDERS[$this->settings->provider], 'key' => $this->settings->key(), 'environment' => $environment,
             'ready' => $this->settings->ready(), 'settings' => $this->settings->summary($environment), 'notice' => $notice,
             'errors' => $errors, 'csrf_token' => $_SESSION['csrf_token'] ?? '',

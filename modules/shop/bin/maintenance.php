@@ -7,7 +7,9 @@ use GnuCms\Extension\StateStore;
 use GnuCms\Modules\Shop\Input;
 use GnuCms\Modules\Shop\Service;
 use GnuCms\Payment\ExecutionLock;
-use GnuCms\Payment\PortOneGateway;
+use GnuCms\Payment\InicisGateway;
+use GnuCms\Payment\KcpGateway;
+use GnuCms\Payment\KspayGateway;
 use GnuCms\Payment\Settings;
 
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit; }
@@ -40,7 +42,10 @@ try {
     $status = ExecutionLock::run($app->storageDir(), static function () use ($app, $enabled, $action, $orderId, $limit): int {
         $gateways = [];
         foreach (array_keys(Settings::PROVIDERS) as $provider) {
-            if (in_array('plugins/payment-' . $provider, $enabled, true)) $gateways[$provider] = new PortOneGateway(new Settings($app, $provider));
+            if (in_array('plugins/payment-' . $provider, $enabled, true)) {
+                $class = match ($provider) { 'inicis' => InicisGateway::class, 'kcp' => KcpGateway::class, 'kspay' => KspayGateway::class };
+                $gateways[$provider] = new $class(new Settings($app, $provider));
+            }
         }
         $service = new Service($app, $gateways);
         $service->requireReady();

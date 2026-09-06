@@ -191,10 +191,12 @@ return static function (Context $context): void {
 
 ## API 2: 외부 콜백과 패키지 데이터
 
-`Context::externalPost($path, $authenticate, $handler, $maxBytes = 65536)`는 고정 JSON POST
-콜백을 등록한다. 인증기는 `ServerRequestInterface`를 받아 반드시 `true`를 반환해야 한다.
+`Context::externalPost($path, $authenticate, $handler, $maxBytes = 65536, $contentType = 'application/json')`는 고정 POST
+콜백을 등록한다. 기본 본문은 JSON 객체다. PG 인증 결과에는 `contentType: 'application/x-www-form-urlencoded'`를 명시할 수 있다.
+폼 콜백은 단일 문자열 항목만 허용하며 중복 키·배열·과도하게 긴 값을 거절한다.
+인증기는 `ServerRequestInterface`를 받아 반드시 `true`를 반환해야 한다.
 실제로 등록된 경로만 세션·기존 본문 파서·HTML 오류 처리를 거치지 않는다. 본문 크기 제한과
-인증 검사를 먼저 수행하고 JSON 객체를 파싱해 처리기에 전달한다. 다른 관리 POST의 CSRF는
+인증 검사를 먼저 수행하고 지정 형식의 본문을 파싱해 처리기에 전달한다. 다른 관리 POST의 CSRF는
 유지된다. 비활성화하면 콜백도 사라진다. 이 API가 업체 인증을 자동 제공하지는 않는다.
 
 `Extension\PackageSchema`는 명시적인 관리자 POST에서 `install($key, $version, $tables,

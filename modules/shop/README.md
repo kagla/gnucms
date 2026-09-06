@@ -4,6 +4,6 @@
 
 관리: `/modules/shop/admin` · 상점: `/modules/shop/catalog`
 
-결제는 `payment-inicis`, `payment-kcp`, `payment-kspay` 중 활성화한 PortOne V2 플러그인을 선택한다. API 실행 전 관리자에서 각 패키지 데이터를 설치하고 테스트/운영 설정을 저장해야 한다.
+결제는 PG 상점 코드로 직접 연동한다. 현재 이니시스 어댑터를 연결하며 KCP·KSPay는 미확인 규격으로 결제 선택을 차단한 준비 단계다. API 실행 전 관리자에서 각 패키지 데이터를 설치하고 테스트/운영 설정을 저장해야 한다.
 
 [설치·운영·오류 복구·정산 기준](../../docs/shop.md)을 참고한다.

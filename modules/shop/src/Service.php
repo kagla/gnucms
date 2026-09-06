@@ -162,7 +162,7 @@ final class Service
             . ' ORDER BY created_at DESC, id LIMIT 30 OFFSET ' . ((max(1, min(100000, $page)) - 1) * 30), $params);
     }
 
-    public function checkout(string $id, string $returnUrl, string $webhookUrl): array
+    public function checkout(string $id, string $returnUrl, string $callbackUrl, string $device = 'web'): array
     {
         $order = $this->app->db()->transaction(function () use ($id): array {
             $order = $this->store->lockOrder($id);
@@ -170,7 +170,7 @@ final class Service
             $this->store->update('shop_orders', $id, ['checkout_started' => Clock::timestamp()]);
             return $order;
         });
-        return $this->gateway($order['provider'])->checkout($order, $this->customer($order), $returnUrl, $webhookUrl);
+        return $this->gateway($order['provider'])->checkout($order, $this->customer($order), $returnUrl, $callbackUrl, $device);
     }
 
     public function cancelPending(string $id, string $actor): void
@@ -202,7 +202,7 @@ final class Service
         $this->store->update('shop_orders', $order['id'], ['stock_released' => 1]);
     }
 
-    /** 브라우저·웹훅은 계기일 뿐이며, 상태는 인증된 결제 조회 응답만으로 반영한다. */
+    /** 브라우저 인증 결과는 계기일 뿐이며, 상태는 인증된 결제 조회 응답만으로 반영한다. */
     public function sync(string $id): array
     {
         $order = $this->store->get('shop_orders', $id);
@@ -214,7 +214,7 @@ final class Service
             if (!in_array($payment['status'], ['PAID', 'PARTIAL_CANCELLED', 'CANCELLED'], true)) return false;
             if (!($payment['valid'] ?? false)) {
                 $this->store->update('shop_orders', $id, ['needs_review' => 1]);
-                $this->store->event($id, 'payment', 'mismatch', '주문번호·상점·채널·환경·통화·금액을 확인해 주세요.');
+                $this->store->event($id, 'payment', 'mismatch', '주문번호·상점·환경·통화·금액을 확인해 주세요.');
                 return false;
             }
             if ($order['transaction_id'] !== null && $order['transaction_id'] !== $payment['transaction_id']) {
@@ -261,7 +261,7 @@ final class Service
                 return (int) $locked['late_cancel_at'] === 0 || $now - (int) $locked['late_cancel_at'] < 7200;
             });
             if ($canCancel) $this->gateway($current['provider'])->cancel($current, $remaining, $remaining, '만료·취소된 주문의 지연 결제', 'late-' . $id);
-            // 재귀 재시도로 중복 취소하지 않는다. 웹훅 또는 다음 조회에서 확정한다.
+            // 재귀 재시도로 중복 취소하지 않는다. 다음 조회에서 확정한다.
         }
         return $this->store->get('shop_orders', $id);
     }

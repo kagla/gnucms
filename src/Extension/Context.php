@@ -71,18 +71,18 @@ final class Context
         return $this->services;
     }
 
-    /** API 2: 세션과 독립적인 JSON 콜백. 인증기는 반드시 true를 반환해야 한다. */
-    public function externalPost(string $path, callable $authenticate, callable $handler, int $maxBytes = 65536): void
+    /** API 2: 세션과 독립적인 콜백. 기본 JSON, PG 인증 결과는 폼 형식을 명시한다. */
+    public function externalPost(string $path, callable $authenticate, callable $handler, int $maxBytes = 65536, string $contentType = 'application/json'): void
     {
         if (!preg_match('~^/(?:[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)?$~D', $path)
-            || $maxBytes < 1 || $maxBytes > 1048576) {
+            || $maxBytes < 1 || $maxBytes > 1048576 || !in_array($contentType, ['application/json', 'application/x-www-form-urlencoded'], true)) {
             throw new InvalidArgumentException('외부 콜백 경로나 크기 제한이 올바르지 않습니다.');
         }
         $url = '/' . $this->key . $path;
         if (isset($this->external[$url]) || isset($this->routes['POST ' . $url]) || isset($this->routes['GET ' . $url])) {
             throw new InvalidArgumentException('확장 라우트가 중복됩니다.');
         }
-        $this->external[$url] = [$authenticate, $handler, $maxBytes];
+        $this->external[$url] = [$authenticate, $handler, $maxBytes, $contentType];
     }
 
     public function externalRoutes(): array
