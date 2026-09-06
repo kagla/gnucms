@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/kagla/gnucms/compare/v0.3.0...v0.4.0) (2026-09-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* limit database support to SQLite and MySQL/MariaDB
+
+### Code Refactoring
+
+* limit database support to SQLite and MySQL/MariaDB ([4ed49f3](https://github.com/kagla/gnucms/commit/4ed49f30ebdb61dea242643f3d9ec284a5753544))
+
 ## [0.3.0](https://github.com/kagla/gnucms/compare/v0.2.0...v0.3.0) (2026-09-04)
 
 
