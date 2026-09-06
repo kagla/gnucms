@@ -209,6 +209,7 @@ final class DemoExtensionsTest extends WebTestCase
         $this->signIn($app);
         $body = $this->body($this->get($app, '/admin/modules'));
         self::assertStringContainsString('실행 주소:', $body);
+        self::assertStringContainsString('href="' . $url . '" title="관리자 테스트로 열기">' . self::MODULE . '</a>', $body);
         self::assertStringContainsString(self::MODULE, $body);
         self::assertStringContainsString('href="' . $url . '"', $body);
         self::assertStringContainsString('>관리자 테스트</a>', $body);

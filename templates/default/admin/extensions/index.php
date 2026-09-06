@@ -43,7 +43,15 @@
             <strong><?= $this->e($package['name']) ?></strong>
             <p><?= $this->e($package['description']) ?></p>
             <?php if ($package['entry_url'] !== null): ?>
-            <p><small>실행 주소: <?php if ($package['enabled'] && $package['error'] === null): ?><a class="link link-hover" href="<?= $this->e($package['entry_url']) ?>"><?= $this->e($package['entry_url']) ?></a><?php else: ?><span><?= $this->e($package['entry_url']) ?></span><?php endif ?></small></p>
+            <p><small>실행 주소:
+              <?php if ($package['enabled'] && $package['error'] === null): ?>
+                <a class="link link-hover" href="<?= $this->e($package['entry_url']) ?>"><?= $this->e($package['entry_url']) ?></a>
+              <?php elseif ($package['admin_test'] && $package['error'] === null): ?>
+                <a class="link link-hover" href="<?= $this->url('admin.' . $extension_section . '.test', ['id' => $package['id']]) ?>" title="관리자 테스트로 열기"><?= $this->e($package['entry_url']) ?></a>
+              <?php else: ?>
+                <span><?= $this->e($package['entry_url']) ?></span>
+              <?php endif ?>
+            </small></p>
             <div class="row-actions">
               <?php if ($package['enabled'] && $package['error'] === null): ?>
                 <a class="btn btn-outline btn-sm" href="<?= $this->e($package['entry_url']) ?>">바로가기</a>
