@@ -28,7 +28,11 @@ final class DbSetupTest extends TestCase
 
     public function testAvailableTypesFollowLoadedDrivers(): void
     {
-        self::assertSame(['sqlite', 'pgsql'], DbSetup::availableTypes(['pdo', 'pdo_sqlite', 'pdo_pgsql']));
+        self::assertSame(['sqlite', 'mysql'], array_keys(DbSetup::TYPES));
+        self::assertSame(['sqlite', 'mysql'], DbSetup::availableTypes(['pdo', 'pdo_sqlite', 'pdo_mysql', 'pdo_unsupported']));
+        self::assertSame(['sqlite'], DbSetup::availableTypes(['pdo', 'pdo_sqlite']));
+        self::assertSame(['mysql'], DbSetup::availableTypes(['pdo', 'pdo_mysql']));
+        self::assertSame([], DbSetup::availableTypes(['pdo', 'pdo_unsupported']));
         self::assertSame([], DbSetup::availableTypes(['pdo']));
     }
 
@@ -62,11 +66,11 @@ final class DbSetupTest extends TestCase
         self::assertSame('p', $db['password']);
     }
 
-    public function testPgsqlDsnUsesDefaultPort(): void
+    public function testMysqlDsnUsesDefaultPort(): void
     {
-        $db = DbSetup::dsnFrom(['type' => 'pgsql', 'host' => 'localhost', 'name' => 'site', 'user' => 'u']);
+        $db = DbSetup::dsnFrom(['type' => 'mysql', 'host' => 'localhost', 'name' => 'site', 'user' => 'u']);
 
-        self::assertSame('pgsql:host=localhost;port=5432;dbname=site', $db['dsn']);
+        self::assertSame('mysql:host=localhost;port=3306;dbname=site;charset=utf8mb4', $db['dsn']);
         self::assertSame('', $db['password']);
     }
 

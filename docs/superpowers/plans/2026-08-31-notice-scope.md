@@ -6,7 +6,7 @@
 
 **Architecture:** `posts.is_notice`(있음)는 그대로 두고 `notice_scope`(`board`|`global`) 한 칸을 더한다. 목록 위 공지 줄은 그 게시판 공지와 전체 공지를 함께 뽑되, 전체 공지는 그 글이 사는 게시판을 읽을 수 있는 사람에게만 보인다. 지정은 글쓰기·수정 폼의 라디오 하나로 하고 서버가 관리자 권한을 확인한다.
 
-**Tech Stack:** PHP 8.4 / Slim 4 / PDO(SQLite·MySQL·PostgreSQL), PHPUnit 10, PHP 파일 템플릿(`PhpTemplate`), daisyUI 5 CDN.
+**Tech Stack:** PHP 8.4 / Slim 4 / PDO(SQLite·MySQL/MariaDB), PHPUnit 10, PHP 파일 템플릿(`PhpTemplate`), daisyUI 5 CDN.
 
 스펙: `docs/superpowers/specs/2026-08-31-notice-scope-design.md`
 
@@ -15,7 +15,7 @@
 - 저장: `posts.notice_scope VARCHAR(10) NOT NULL DEFAULT 'board'` — `board` | `global`. `is_notice = 1` 일 때만 뜻이 있다. Schema `VERSION` 을 `12` 로 올리고 멱등 마이그레이션 + 새 설치 DDL 둘 다 손본다.
 - 폼 이름은 `notice`, 값은 `none` | `board` | `global`. 그 밖의 값은 `none` 으로 본다. 옛 `is_notice` 입력도 계속 받아들이되 **`notice` 가 없을 때만** 본다.
 - 공지 지정은 그 게시판의 관리자만(`Acl::isAdminFor($board)`). 권한 없이 보내면 기존처럼 `assertAdminFor()` 가 막는다.
-- **전체 공지는 그 글이 사는 게시판을 읽을 수 있는 사람에게만 보인다.** 목록 정렬은 전체 공지 먼저, 그다음 게시판 공지, 각각 최신순. 정렬식은 세 DB 공통 문법(`CASE WHEN … THEN 0 ELSE 1 END`)으로 적는다. 방언별 SQL 금지, 한 문장에서 이름·위치 파라미터 혼용 금지(이 프로젝트는 `ATTR_EMULATE_PREPARES=false`).
+- **전체 공지는 그 글이 사는 게시판을 읽을 수 있는 사람에게만 보인다.** 목록 정렬은 전체 공지 먼저, 그다음 게시판 공지, 각각 최신순. 정렬식은 지원 DB 공통 문법(`CASE WHEN … THEN 0 ELSE 1 END`)으로 적는다. 방언별 SQL 금지, 한 문장에서 이름·위치 파라미터 혼용 금지(이 프로젝트는 `ATTR_EMULATE_PREPARES=false`).
 - 홈, 전체 글(`/posts`), 관리 콘솔은 손대지 않는다. 이름이 "공지사항"인 게시판은 이 기능과 무관하다.
 - 템플릿 출력은 전부 `$this->e()`(예외: `url/asset/html/icon/json/insert/block`). 문구는 한국어.
 - 기존 445개 테스트는 그대로 통과해야 한다. `./vendor/bin/phpunit`.

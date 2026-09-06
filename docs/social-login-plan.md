@@ -313,7 +313,7 @@ PKCE는 세 공급자의 지원 범위와 사용 중인 OAuth 클라이언트 �
 - 신뢰할 수 없는 이메일은 자체 확인 없이는 계정에 연결되지 않는다.
 - 비밀번호 로그인과 기존 회원 데이터에 회귀가 없다.
 - 외부 토큰과 평문 Client Secret이 DB, 세션 영속 데이터, 화면, 로그에 남지 않는다.
-- SQLite, MySQL, PostgreSQL 테스트와 전체 PHPUnit 테스트가 통과한다.
+- SQLite, MySQL/MariaDB 테스트와 전체 PHPUnit 테스트가 통과한다.
 
 ## 이번 문서에서 정한 결정
 

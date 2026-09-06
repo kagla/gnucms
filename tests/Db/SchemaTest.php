@@ -362,7 +362,8 @@ final class SchemaTest extends WebTestCase
     {
         $app = $this->makeApp($dbConfig);
         $db = $app->db();
-        $db->execute('DROP INDEX IF EXISTS ' . $db->q('ux_users_display_name'));
+        $db->execute('DROP INDEX ' . $db->index('ux_users_display_name')
+            . ($db->dialect()->name() === 'mysql' ? ' ON ' . $db->table('users') : ''));
         foreach (['a@example.com', 'b@example.com', 'c@example.com'] as $email) {
             $db->insert('users', [
                 'email' => $email, 'email_verified' => 1, 'password_hash' => 'x', 'display_name' => '홍길동',

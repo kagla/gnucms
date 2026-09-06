@@ -101,13 +101,13 @@ final class Routes
         $backups = new BackupController($app);
         $slim->post('/admin/backups', [$backups, 'create'])->setName('admin.backups.create');
         $slim->post('/admin/backups/upload', [$backups, 'upload'])->setName('admin.backups.upload');
-        $slim->get('/admin/backups/{name:gnucms-(?:sqlite|mysql|pgsql)-[0-9-]+\\.(?:zip|tar)}', [$backups, 'download'])
+        $slim->get('/admin/backups/{name:gnucms-(?:sqlite|mysql)-[0-9-]+\\.(?:zip|tar)}', [$backups, 'download'])
             ->setName('admin.backups.download');
-        $slim->post('/admin/backups/{name:gnucms-(?:sqlite|mysql|pgsql)-[0-9-]+\\.(?:zip|tar)}/verify', [$backups, 'verify'])
+        $slim->post('/admin/backups/{name:gnucms-(?:sqlite|mysql)-[0-9-]+\\.(?:zip|tar)}/verify', [$backups, 'verify'])
             ->setName('admin.backups.verify');
-        $slim->post('/admin/backups/{name:gnucms-(?:sqlite|mysql|pgsql)-[0-9-]+\\.(?:zip|tar)}/restore', [$backups, 'restore'])
+        $slim->post('/admin/backups/{name:gnucms-(?:sqlite|mysql)-[0-9-]+\\.(?:zip|tar)}/restore', [$backups, 'restore'])
             ->setName('admin.backups.restore');
-        $slim->post('/admin/backups/{name:gnucms-(?:sqlite|mysql|pgsql)-[0-9-]+\\.(?:zip|tar)}/delete', [$backups, 'delete'])
+        $slim->post('/admin/backups/{name:gnucms-(?:sqlite|mysql)-[0-9-]+\\.(?:zip|tar)}/delete', [$backups, 'delete'])
             ->setName('admin.backups.delete');
         $slim->post('/admin/schema-backups/{name:board-v[0-9A-Za-z]+-[0-9-]+\\.sqlite}/delete', [$backups, 'deleteAutomatic'])
             ->setName('admin.schema-backups.delete');

@@ -71,6 +71,15 @@ final class ServerCheckTest extends TestCase
         self::assertSame('있음: pdo_sqlite, pdo_mysql', $this->item($result, 'PDO 드라이버')['note']);
     }
 
+    public function testUnsupportedPdoDriverDoesNotSatisfyRequirements(): void
+    {
+        $extensions = array_merge(array_diff(self::ALL, ['pdo_sqlite']), ['pdo_unsupported']);
+        $result = $this->check($extensions)->run();
+
+        self::assertFalse($result['ok']);
+        self::assertFalse($this->item($result, 'PDO 드라이버')['ok']);
+    }
+
     public function testOldPhpFails(): void
     {
         $result = $this->check(self::ALL, '8.1.99')->run();

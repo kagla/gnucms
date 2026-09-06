@@ -9,7 +9,7 @@ use GnuCms\Support\Clock;
 
 /**
  * DDL 은 치환자 3개({AUTO_PK}, {DATETIME}, {TEXT})만 방언별로 바뀌고
- * 나머지는 세 DB 공통 문법이다.
+ * 나머지는 지원 DB 공통 문법이다.
  */
 final class Schema
 {
@@ -1027,8 +1027,6 @@ final class Schema
             }
         } elseif ($name === 'mysql') {
             $this->db->execute('ALTER TABLE ' . $this->db->table('users') . ' MODIFY password_hash VARCHAR(255) NULL');
-        } elseif ($name === 'pgsql') {
-            $this->db->execute('ALTER TABLE ' . $this->db->table('users') . ' ALTER COLUMN password_hash DROP NOT NULL');
         }
     }
 

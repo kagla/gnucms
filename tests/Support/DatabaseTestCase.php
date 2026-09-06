@@ -10,7 +10,7 @@ use GnuCms\Db\Schema;
 
 /**
  * 데이터 제공자로 사용 가능한 DB 를 모두 돌린다. SQLite 는 항상 돌고,
- * MySQL/PostgreSQL 은 환경변수가 있을 때만 추가된다.
+ * MySQL/MariaDB는 환경변수가 있을 때만 추가된다.
  */
 abstract class DatabaseTestCase extends TestCase
 {
@@ -26,15 +26,6 @@ abstract class DatabaseTestCase extends TestCase
                 'dsn'      => $mysql,
                 'username' => getenv('TEST_MYSQL_USER') ?: null,
                 'password' => getenv('TEST_MYSQL_PASS') ?: null,
-            ]];
-        }
-
-        $pgsql = getenv('TEST_PGSQL_DSN');
-        if (is_string($pgsql) && $pgsql !== '') {
-            $cases['pgsql'] = [[
-                'dsn'      => $pgsql,
-                'username' => getenv('TEST_PGSQL_USER') ?: null,
-                'password' => getenv('TEST_PGSQL_PASS') ?: null,
             ]];
         }
 

@@ -67,7 +67,7 @@ ORDER BY (notice_scope = 'global') DESC, id DESC
   에서 온다.
 - 지금 게시판의 전체 공지는 두 조건에 모두 맞지만 한 행이므로 중복되지 않는다.
 - `ORDER BY` 의 불리언 식은 방언마다 다르므로 `CASE WHEN notice_scope = 'global' THEN 0 ELSE 1 END`
-  로 적는다(세 DB 공통).
+  로 적는다(지원 DB 공통).
 - 요약(`summary()`)에 `notice_scope` 를 실어 화면이 뱃지를 가른다.
 
 `posts/index.php` 의 공지 줄: 전체 공지면 **“전체 공지”** 뱃지, 아니면 지금의 “공지” 뱃지.

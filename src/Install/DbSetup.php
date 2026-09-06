@@ -17,10 +17,9 @@ final class DbSetup
     public const TYPES = [
         'sqlite' => 'SQLite',
         'mysql'  => 'MySQL / MariaDB',
-        'pgsql'  => 'PostgreSQL',
     ];
 
-    private const DEFAULT_PORT = ['mysql' => 3306, 'pgsql' => 5432];
+    private const MYSQL_PORT = 3306;
 
     /**
      * 이 서버에서 쓸 수 있는 종류. pdo_{종류} 확장이 있어야 한다.
@@ -76,7 +75,7 @@ final class DbSetup
         $errors = [];
         $host = trim((string) ($input['host'] ?? ''));
         $portRaw = trim((string) ($input['port'] ?? ''));
-        $port = $portRaw === '' ? self::DEFAULT_PORT[$type] : (int) $portRaw;
+        $port = $portRaw === '' ? self::MYSQL_PORT : (int) $portRaw;
         $name = trim((string) ($input['name'] ?? ''));
         $user = trim((string) ($input['user'] ?? ''));
 
@@ -96,9 +95,7 @@ final class DbSetup
             throw DomainError::validation($errors);
         }
 
-        $dsn = $type === 'mysql'
-            ? 'mysql:host=' . $host . ';port=' . $port . ';dbname=' . $name . ';charset=utf8mb4'
-            : 'pgsql:host=' . $host . ';port=' . $port . ';dbname=' . $name;
+        $dsn = 'mysql:host=' . $host . ';port=' . $port . ';dbname=' . $name . ';charset=utf8mb4';
 
         return ['dsn' => $dsn, 'username' => $user, 'password' => (string) ($input['password'] ?? ''), 'prefix' => $prefix];
     }
