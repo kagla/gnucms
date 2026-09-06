@@ -238,4 +238,55 @@ PHP);
         self::assertStringNotContainsString('name="enabled[provider]" value="1" checked', $this->body($response));
         self::assertStringContainsString('name="enabled[consumer]" value="1" checked', $this->body($response));
     }
+
+    #[DataProvider('connectionProvider')]
+    public function testDisabledBootstrapIsNeverReadBeforeAdminAndCsrfValidation(array $dbConfig): void
+    {
+        $this->package('modules/testable', ['entry_path' => '/preview', 'admin_test' => true], <<<'PHP'
+<?php
+file_put_contents(__DIR__ . '/executed.marker', 'loaded');
+return static function ($context): void {
+    // 공개 라우트라도 관리자 테스트 진입점이 먼저 권한을 검사한다.
+    $context->route('GET', '/preview', static fn ($request, $response) => $response);
+    $context->route('POST', '/preview', static fn ($request, $response) => $response);
+};
+PHP);
+        $marker = $this->extensionRoot . '/modules/testable/executed.marker';
+        $app = $this->makeApp($dbConfig);
+        $url = '/admin/modules/testable/test';
+        self::assertSame(401, $this->get($app, $url)->getStatusCode());
+        self::assertFileDoesNotExist($marker);
+        $id = $app->users()->create('test-member@example.com', '', '테스트 회원');
+        $this->sessionUser($id);
+        self::assertSame(403, $this->get($app, $url)->getStatusCode());
+        self::assertFileDoesNotExist($marker);
+        $id = $app->users()->create('test-admin@example.com', '', '테스트 관리자', true);
+        $this->sessionUser($id);
+        self::assertSame(403, $this->post($app, $url, [])->getStatusCode());
+        self::assertFileDoesNotExist($marker);
+        self::assertSame(200, $this->get($app, $url)->getStatusCode());
+        self::assertFileExists($marker);
+        self::assertSame(404, $this->get($app, '/extensions/modules/testable/preview')->getStatusCode());
+        self::assertFileDoesNotExist($app->storageDir() . '/extensions/enabled.json');
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testAdminTestRequiresOptInValidMetadataAndActiveRequiredDependencies(array $dbConfig): void
+    {
+        $this->package('modules/no-test');
+        $this->package('modules/unsafe-link', ['entry_path' => '//example.com', 'admin_test' => true]);
+        $this->package('modules/dependent', ['entry_path' => '/preview', 'admin_test' => true, 'requires' => ['plugins/missing']]);
+        $this->package('modules/no-route', ['entry_path' => '/preview', 'admin_test' => true]);
+        $app = $this->makeApp($dbConfig);
+        $id = $app->users()->create('test-admin@example.com', '', '테스트 관리자', true);
+        $this->get($app, '/login');
+        $this->sessionUser($id);
+        self::assertSame(404, $this->get($app, '/admin/modules/no-test/test')->getStatusCode());
+        self::assertSame(404, $this->get($app, '/admin/modules/unsafe-link/test')->getStatusCode());
+        self::assertSame(422, $this->get($app, '/admin/modules/dependent/test')->getStatusCode());
+        self::assertSame(404, $this->get($app, '/admin/modules/no-route/test')->getStatusCode());
+        $body = $this->body($this->get($app, '/admin/modules'));
+        self::assertStringNotContainsString('href="//example.com', $body);
+        self::assertFileDoesNotExist($app->storageDir() . '/extensions/enabled.json');
+    }
 }

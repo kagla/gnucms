@@ -195,4 +195,68 @@ final class DemoExtensionsTest extends WebTestCase
             self::assertStringContainsString('href="/cms/admin/modules"', $this->body($response));
         }
     }
+
+    #[DataProvider('connectionProvider')]
+    public function testModuleShortcutAndAdminTestWithoutChangingUsageState(array $dbConfig): void
+    {
+        $app = $this->makeApp($dbConfig, [], 'default');
+        $url = '/admin/modules/demo-reservation/test';
+        self::assertSame(401, $this->get($app, $url)->getStatusCode());
+        self::assertSame(401, $this->post($app, $url, [])->getStatusCode());
+        $this->signIn($app, false);
+        self::assertSame(403, $this->get($app, $url)->getStatusCode());
+        self::assertSame(403, $this->post($app, $url, $this->reservationInput())->getStatusCode());
+        $this->signIn($app);
+        $body = $this->body($this->get($app, '/admin/modules'));
+        self::assertStringContainsString('실행 주소:', $body);
+        self::assertStringContainsString(self::MODULE, $body);
+        self::assertStringContainsString('href="' . $url . '"', $body);
+        self::assertStringContainsString('>관리자 테스트</a>', $body);
+        self::assertStringNotContainsString('>바로가기</a>', $body);
+
+        $response = $this->get($app, $url);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('no-store', $response->getHeaderLine('Cache-Control'));
+        self::assertStringContainsString('사용 설정은 변경되지 않습니다.', $this->body($response));
+        self::assertStringContainsString('action="' . $url . '"', $this->body($response));
+        self::assertSame(403, $this->post($app, $url, [])->getStatusCode());
+        $response = $this->post($app, $url, $this->reservationInput());
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('2028-02-29 14:30', $this->body($response));
+        self::assertSame(422, $this->post($app, $url, $this->reservationInput(['guests' => '99']))->getStatusCode());
+        self::assertSame(404, $this->get($app, self::MODULE)->getStatusCode());
+        self::assertFileDoesNotExist($app->storageDir() . '/extensions/enabled.json');
+
+        $this->manager($app)->setEnabled('plugins/demo-message', true);
+        $store = new StateStore($app->storageDir() . '/extensions');
+        $before = $store->snapshot();
+        $response = $this->post($app, $url, $this->reservationInput());
+        self::assertStringContainsString('[데모 알림 · 예약 안내]', $this->body($response));
+        self::assertSame($before, $store->snapshot());
+        $this->manager($app)->setEnabled('modules/demo-reservation', true);
+        $body = $this->body($this->get($app, '/admin/modules'));
+        self::assertStringContainsString('href="' . self::MODULE . '"', $body);
+        self::assertStringContainsString('>바로가기</a>', $body);
+        self::assertStringNotContainsString('>관리자 테스트</a>', $body);
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testAdminTestLinksAndFormRespectSubdirectoryInstallation(array $dbConfig): void
+    {
+        $app = $this->makeApp($dbConfig, [], 'default');
+        $this->signIn($app);
+        $testUrl = '/cms/admin/modules/demo-reservation/test';
+        $request = (new ServerRequestFactory())->createServerRequest('GET', '/cms/admin/modules');
+        $response = Kernel::create($app, dirname(__DIR__, 2) . '/templates', '/cms')->handle($request);
+        self::assertStringContainsString('/cms' . self::MODULE, $this->body($response));
+        self::assertStringContainsString('href="' . $testUrl . '"', $this->body($response));
+        $request = (new ServerRequestFactory())->createServerRequest('GET', $testUrl);
+        $response = Kernel::create($app, dirname(__DIR__, 2) . '/templates', '/cms')->handle($request);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('action="' . $testUrl . '"', $this->body($response));
+        $request = (new ServerRequestFactory())->createServerRequest('POST', $testUrl)->withParsedBody($this->reservationInput());
+        $response = Kernel::create($app, dirname(__DIR__, 2) . '/templates', '/cms')->handle($request);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertFileDoesNotExist($app->storageDir() . '/extensions/enabled.json');
+    }
 }

@@ -34,6 +34,7 @@ final class Catalog
                 $package = [
                     'key' => $key, 'id' => $id, 'section' => $section, 'name' => $id,
                     'description' => '', 'version' => '', 'requires' => [], 'optional' => [],
+                    'entry_path' => null, 'admin_test' => false,
                     'directory' => $directory, 'error' => null,
                 ];
                 try {
@@ -57,6 +58,15 @@ final class Catalog
                     if (($manifest['api'] ?? null) !== self::API_VERSION) {
                         throw new RuntimeException('지원하지 않는 확장 API 버전입니다.');
                     }
+                    $entry = $manifest['entry_path'] ?? null;
+                    $adminTest = $manifest['admin_test'] ?? false;
+                    if (($entry !== null && (!is_string($entry)
+                        || !preg_match('~^/(?:[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)?$~D', $entry)))
+                        || !is_bool($adminTest) || ($adminTest && $entry === null)) {
+                        throw new RuntimeException('실행 주소 또는 관리자 테스트 설정이 올바르지 않습니다.');
+                    }
+                    $package['entry_path'] = $entry;
+                    $package['admin_test'] = $adminTest;
                     foreach (['requires', 'optional'] as $field) {
                         $dependencies = $manifest[$field] ?? [];
                         if (!is_array($dependencies) || !array_is_list($dependencies)) {

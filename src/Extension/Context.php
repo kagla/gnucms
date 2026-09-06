@@ -12,6 +12,8 @@ use Psr\Http\Message\ServerRequestInterface;
 /** 신뢰하는 패키지의 등록 API. 요청 처리는 route()의 콜백 안에서 수행한다. */
 final class Context
 {
+    public const TEST_ATTRIBUTE = 'gnucms.extension_test';
+
     private array $routes = [];
     private array $services = [];
 

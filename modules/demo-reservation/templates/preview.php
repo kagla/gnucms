@@ -12,6 +12,7 @@
   <nav aria-label="관리 메뉴"><a href="<?= $this->url('admin.modules') ?>">모듈 관리</a><a href="<?= $this->url('admin.plugins') ?>">플러그인 관리</a></nav>
   <span class="badge">모듈 데모 · <?= $uses_plugin ? '메시지 플러그인 연결됨' : '독립 실행' ?></span>
   <h1>예약 안내문 미리보기</h1>
+  <?php if ($is_admin_test): ?><p class="badge">관리자 테스트 · 사용 설정은 변경되지 않습니다.</p><?php endif ?>
   <p>예약 정보로 안내문 예시를 만듭니다.<br>실제 예약을 저장하거나 메시지를 발송하지 않습니다.</p>
   <p><?= $uses_plugin ? '메시지 플러그인의 알림 형식으로 안내문을 만듭니다.' : '기본 문구로 동작합니다. 메시지 플러그인을 켜면 알림 형식이 적용됩니다.' ?></p>
   <section class="card" aria-labelledby="input-title">

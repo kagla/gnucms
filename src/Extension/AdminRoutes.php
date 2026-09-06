@@ -43,6 +43,14 @@ final class AdminRoutes
                 return self::render($request, $response, $manager, $section, $page);
             })->setName('admin.' . $section);
 
+            $slim->map(['GET', 'POST'], '/admin/' . $section . '/{id:[a-z][a-z0-9_-]{0,63}}/test', static function (
+                ServerRequestInterface $request,
+                ResponseInterface $response,
+                array $args
+            ) use ($app, $section, $manager): ResponseInterface {
+                return $manager->test($app, $section . '/' . $args['id'], $request, $response);
+            })->setName('admin.' . $section . '.test');
+
             $slim->post('/admin/' . $section . '/state', static function (
                 ServerRequestInterface $request,
                 ResponseInterface $response
@@ -140,6 +148,8 @@ final class AdminRoutes
         }
         foreach ($packages as &$package) {
             $package['selected'] = isset($selection[$package['id']]) ? $selection[$package['id']] === '1' : $package['enabled'];
+            $package['entry_url'] = $package['entry_path'] === null ? null
+                : RouteContext::fromRequest($request)->getBasePath() . '/extensions/' . $package['key'] . $package['entry_path'];
         }
         unset($package);
         return View::fromRequest($request)->render($response, 'admin/extensions/index', [

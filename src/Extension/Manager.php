@@ -6,12 +6,15 @@ namespace GnuCms\Extension;
 
 use GnuCms\App;
 use GnuCms\Error\DomainError;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use Slim\App as SlimApp;
 use Throwable;
 
 final class Manager
 {
     private array $runtimeErrors = [];
+    private array $services = [];
 
     public function __construct(private Catalog $catalog, private StateStore $state)
     {
@@ -28,6 +31,7 @@ final class Manager
                 $packages[$key] = [
                     'key' => $key, 'id' => $id, 'section' => $section, 'name' => $id,
                     'description' => '', 'version' => '', 'requires' => [], 'optional' => [],
+                    'entry_path' => null, 'admin_test' => false,
                     'error' => '활성화된 패키지의 파일을 찾을 수 없습니다.',
                 ];
             }
@@ -94,6 +98,7 @@ final class Manager
     public function boot(App $app, SlimApp $slim): void
     {
         $this->runtimeErrors = [];
+        $this->services = [];
         $packages = $this->catalog->all();
         $active = $this->state->read();
         $order = [];
@@ -130,6 +135,47 @@ final class Manager
                 $this->runtimeErrors[$key] = '확장 실행에 실패했습니다. 패키지를 점검하거나 사용을 꺼 주세요.';
             }
         }
+        $this->services = $services;
+    }
+
+    /** 관리자 전용 요청에서만 미사용 패키지를 일시적으로 불러온다. 상태 파일에는 쓰지 않는다. */
+    public function test(App $app, string $key, ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        // bootstrap.php를 읽기 전에 권한과 CSRF를 검사한다.
+        $app->guestAcl()->assertGlobalAdmin();
+        if ($request->getMethod() === 'POST') {
+            Context::assertCsrf($request);
+        }
+        $packages = $this->catalog->all();
+        $package = $packages[$key] ?? null;
+        if ($package === null || !$package['admin_test']) {
+            throw DomainError::notFound('관리자 테스트를 지원하는 확장이 아닙니다.');
+        }
+        $active = $this->state->read();
+        $this->order($key, $packages, array_values(array_unique([...$active, $key])), [], []);
+        foreach ($package['requires'] as $dependency) {
+            if (isset($this->runtimeErrors[$dependency])) {
+                throw DomainError::serviceUnavailable('필수 확장을 실행하지 못했습니다: ' . $dependency);
+            }
+        }
+        try {
+            $context = new Context($app, $key, $this->services);
+            $register = (static fn (string $file) => require $file)($package['directory'] . '/bootstrap.php');
+            if (!is_callable($register)) {
+                throw new \RuntimeException('Invalid extension entry point');
+            }
+            $register($context);
+        } catch (Throwable $e) {
+            throw DomainError::serviceUnavailable('확장 테스트를 준비하지 못했습니다. 패키지를 확인해 주세요.');
+        }
+        foreach ($context->routes() as [$method, $url, $handler]) {
+            if ($method === $request->getMethod() && $url === '/extensions/' . $key . $package['entry_path']) {
+                return $handler($request->withAttribute(Context::TEST_ATTRIBUTE, true), $response, [])
+                    ->withHeader('Cache-Control', 'no-store')
+                    ->withHeader('X-Robots-Tag', 'noindex, nofollow');
+            }
+        }
+        throw DomainError::notFound('패키지에 테스트할 실행 경로가 등록되어 있지 않습니다.');
     }
 
     private function order(string $key, array $packages, array $active, array $visiting, array $ordered): array

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GnuCmsDemo\Modules\Reservation;
 
 use GnuCms\Error\DomainError;
+use GnuCms\Extension\Context;
 use GnuCms\View\PhpView;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -52,8 +53,11 @@ final class PreviewController
         return $view->render($response->withHeader('Cache-Control', 'no-store'), 'preview', [
             'values' => $values, 'errors' => $errors, 'result' => $result,
             'uses_plugin' => $this->service->usesPlugin(),
+            'is_admin_test' => $request->getAttribute(Context::TEST_ATTRIBUTE) === true,
             'csrf_token' => $_SESSION['csrf_token'],
-            'form_url' => $routes->getBasePath() . '/extensions/modules/demo-reservation/preview',
+            'form_url' => $request->getAttribute(Context::TEST_ATTRIBUTE) === true
+                ? $routes->getRouteParser()->urlFor('admin.modules.test', ['id' => 'demo-reservation'])
+                : $routes->getBasePath() . '/extensions/modules/demo-reservation/preview',
         ]);
     }
 }
