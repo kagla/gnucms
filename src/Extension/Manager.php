@@ -20,7 +20,8 @@ final class Manager
     public function packages(): array
     {
         $packages = $this->catalog->all();
-        $enabled = $this->state->read();
+        $snapshot = $this->state->snapshot();
+        $enabled = $snapshot['enabled'];
         foreach ($enabled as $key) {
             if (!isset($packages[$key])) {
                 [$section, $id] = explode('/', $key, 2);
@@ -36,19 +37,46 @@ final class Manager
             $package['error'] = $package['error'] ?? $this->runtimeErrors[$key] ?? null;
         }
         unset($package);
+        $rank = array_flip($snapshot['recent']);
+        uasort($packages, static fn (array $a, array $b): int =>
+            (($rank[$a['key']] ?? PHP_INT_MAX) <=> ($rank[$b['key']] ?? PHP_INT_MAX))
+            ?: strcmp($a['key'], $b['key']));
         return $packages;
     }
 
     public function setEnabled(string $key, bool $enabled): void
     {
-        $this->state->update(function (array $active) use ($key, $enabled): array {
+        $this->setEnabledMany([$key => $enabled]);
+    }
+
+    /** 전체 후보 상태를 검증한 후 한 번에 저장한다. $recentFirst는 마지막 조작부터 나열한다. */
+    public function setEnabledMany(array $changes, array $recentFirst = []): void
+    {
+        if ($changes === []) {
+            return;
+        }
+        $this->state->update(function (array $active) use ($changes): array {
             $packages = $this->catalog->all();
-            if (!$enabled) {
+            $candidate = $active;
+            foreach ($changes as $key => $enabled) {
+                if (!is_bool($enabled)) {
+                    throw DomainError::validation(['extension' => '사용 여부를 확인해 주세요.']);
+                }
                 if (!isset($packages[$key]) && !in_array($key, $active, true)) {
                     throw DomainError::notFound('확장을 찾을 수 없습니다.');
                 }
+                $candidate = array_values(array_diff($candidate, [$key]));
+                if ($enabled) {
+                    $candidate[] = $key;
+                }
+            }
+            foreach ($changes as $key => $enabled) {
+                if ($enabled) {
+                    $this->order($key, $packages, $candidate, [], []);
+                    continue;
+                }
                 foreach ($packages as $id => $package) {
-                    if ($id !== $key && in_array($id, $active, true) && in_array($key, $package['requires'], true)) {
+                    if ($id !== $key && in_array($id, $candidate, true) && in_array($key, $package['requires'], true)) {
                         try {
                             $this->order($id, $packages, $active, [], []);
                         } catch (DomainError $e) {
@@ -58,12 +86,9 @@ final class Manager
                         throw DomainError::validation(['extension' => $package['name'] . '에서 사용 중입니다. 먼저 해당 확장을 꺼 주세요.']);
                     }
                 }
-                return array_values(array_diff($active, [$key]));
             }
-            $candidate = array_values(array_unique([...$active, $key]));
-            $this->order($key, $packages, $candidate, [], []);
             return $candidate;
-        });
+        }, array_merge($recentFirst, array_keys($changes)));
     }
 
     public function boot(App $app, SlimApp $slim): void

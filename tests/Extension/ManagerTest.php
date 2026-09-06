@@ -220,4 +220,66 @@ PHP);
             self::assertSame('{broken', file_get_contents($file));
         }
     }
+
+    public function testBulkSaveValidatesFinalDependenciesAndDoesNotPartiallySave(): void
+    {
+        $this->package('plugins/provider');
+        $this->package('plugins/consumer', ['requires' => ['plugins/provider']]);
+        $this->package('plugins/other');
+        // 제출 순서가 의존 순서와 달라도 함께 활성화할 수 있다.
+        $this->manager->setEnabledMany(['plugins/consumer' => true, 'plugins/provider' => true]);
+        $before = $this->state->snapshot();
+        try {
+            $this->manager->setEnabledMany(['plugins/other' => true, 'plugins/provider' => false]);
+            self::fail('Dependent extension must block the whole save');
+        } catch (DomainError $e) {
+            self::assertSame(422, $e->status());
+            self::assertSame($before, $this->state->snapshot());
+        }
+        $this->manager->setEnabledMany(['plugins/provider' => false, 'plugins/consumer' => false]);
+        self::assertSame([], $this->state->read());
+    }
+
+    public function testRecentToggleOrderPersistsForBothOnAndOffAndIgnoresUnchangedValues(): void
+    {
+        foreach (['alpha', 'bravo', 'charlie'] as $id) {
+            $this->package('plugins/' . $id);
+        }
+        $this->manager->setEnabledMany(['plugins/alpha' => true, 'plugins/bravo' => true], ['plugins/bravo', 'plugins/alpha']);
+        self::assertSame(['plugins/bravo', 'plugins/alpha', 'plugins/charlie'], array_keys($this->manager->packages()));
+        $this->manager->setEnabled('plugins/alpha', false);
+        $fresh = new Manager(new Catalog($this->extensionRoot), new StateStore($this->extensionRoot . '/storage/extensions'));
+        self::assertSame(['plugins/alpha', 'plugins/bravo', 'plugins/charlie'], array_keys($fresh->packages()));
+        self::assertFalse($fresh->packages()['plugins/alpha']['enabled']);
+        $this->manager->setEnabled('plugins/bravo', true);
+        self::assertSame(['plugins/alpha', 'plugins/bravo', 'plugins/charlie'], array_keys($fresh->packages()));
+    }
+
+    public function testLegacyStateIsReadWithoutModificationAndMigratesOnSave(): void
+    {
+        $this->package('plugins/old');
+        mkdir($this->extensionRoot . '/storage/extensions', 0700, true);
+        $file = $this->extensionRoot . '/storage/extensions/enabled.json';
+        file_put_contents($file, '["plugins/old"]');
+        self::assertTrue($this->manager->packages()['plugins/old']['enabled']);
+        self::assertSame('["plugins/old"]', file_get_contents($file));
+        $this->manager->setEnabled('plugins/old', false);
+        self::assertSame(['enabled' => [], 'recent' => ['plugins/old']], $this->state->snapshot());
+        self::assertSame(2, json_decode(file_get_contents($file), true)['version']);
+    }
+
+    public function testInvalidHistoryIsNotSilentlyDiscarded(): void
+    {
+        mkdir($this->extensionRoot . '/storage/extensions', 0700, true);
+        $file = $this->extensionRoot . '/storage/extensions/enabled.json';
+        $invalid = '{"version":2,"enabled":[],"recent":["../wrong"]}';
+        file_put_contents($file, $invalid);
+        try {
+            $this->state->update(static fn (array $active): array => []);
+            self::fail('Invalid history must be preserved for recovery');
+        } catch (DomainError $e) {
+            self::assertSame(503, $e->status());
+            self::assertSame($invalid, file_get_contents($file));
+        }
+    }
 }

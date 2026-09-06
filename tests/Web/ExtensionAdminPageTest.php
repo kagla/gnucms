@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace GnuCms\Tests\Web;
 
 use GnuCms\App;
+use GnuCms\Extension\Catalog;
+use GnuCms\Extension\Manager;
 use GnuCms\Extension\StateStore;
 use GnuCms\Tests\Support\ExtensionFixtures;
 use GnuCms\Tests\Support\WebTestCase;
@@ -146,5 +148,94 @@ PHP);
         $_SESSION['user_id'] = $id;
         $_SESSION['session_epoch'] = 0;
         session_write_close();
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testBulkFormHasTwoSaveButtonsAndSortsByActualToggleOrder(array $dbConfig): void
+    {
+        $this->package('plugins/alpha');
+        $this->package('plugins/bravo');
+        $app = $this->makeApp($dbConfig, [], 'default');
+        $id = $app->users()->create('bulk-admin@example.com', '', '일괄 관리자', true);
+        $this->get($app, '/login');
+        $this->sessionUser($id);
+        $body = $this->body($this->get($app, '/admin/plugins'));
+        self::assertSame(2, substr_count($body, '>저장</button>'));
+        self::assertStringContainsString('form="extension-state-form"', $body);
+        self::assertStringContainsString('<th scope="col">사용 상태</th>', $body);
+        self::assertStringNotContainsString('<th scope="col">상태</th>', $body);
+        self::assertStringNotContainsString('<th scope="col">사용 여부</th>', $body);
+        $input = [
+            'csrf_token' => $_SESSION['csrf_token'], 'complete' => '1',
+            'original' => ['alpha' => '0', 'bravo' => '0'],
+            'enabled' => ['alpha' => '1', 'bravo' => '1'],
+            'changed_order' => '["bravo","alpha"]',
+        ];
+        $response = $this->post($app, '/admin/plugins/state', $input);
+        self::assertSame(303, $response->getStatusCode());
+        self::assertSame('/admin/plugins?saved=1', $response->getHeaderLine('Location'));
+        $body = $this->body($this->get($app, '/admin/plugins'));
+        self::assertLessThan(strpos($body, '<strong>alpha</strong>'), strpos($body, '<strong>bravo</strong>'));
+
+        $input['original'] = ['alpha' => '1', 'bravo' => '1'];
+        $input['enabled']['alpha'] = '0';
+        $input['changed_order'] = '["alpha"]';
+        self::assertSame(303, $this->post($app, '/admin/plugins/state', $input)->getStatusCode());
+        $body = $this->body($this->get($app, '/admin/plugins'));
+        self::assertLessThan(strpos($body, '<strong>bravo</strong>'), strpos($body, '<strong>alpha</strong>'));
+        self::assertSame(['plugins/bravo'], (new StateStore($app->storageDir() . '/extensions'))->read());
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testBulkSaveRejectsUnauthorizedMalformedAndPartialRequests(array $dbConfig): void
+    {
+        $this->package('plugins/alpha');
+        $app = $this->makeApp($dbConfig);
+        $url = '/admin/plugins/state';
+        self::assertSame(401, $this->post($app, $url, [])->getStatusCode());
+        $member = $app->users()->create('bulk-member@example.com', '', '일괄 회원');
+        $this->sessionUser($member);
+        self::assertSame(403, $this->post($app, $url, ['csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
+        $admin = $app->users()->create('bulk-admin@example.com', '', '일괄 관리자', true);
+        $this->sessionUser($admin);
+        self::assertSame(403, $this->post($app, $url, [])->getStatusCode());
+        $input = ['csrf_token' => $_SESSION['csrf_token'], 'complete' => '1',
+            'enabled' => ['alpha' => '1'], 'original' => ['alpha' => '0'], 'changed_order' => '["alpha"]'];
+        foreach ([
+            ['complete' => '0'], ['original' => []], ['enabled' => ['alpha' => []]],
+            ['enabled' => ['../modules/test' => '1']], ['changed_order' => '["other"]'], ['changed_order' => '{"bad":"alpha"}'],
+        ] as $invalid) {
+            self::assertSame(422, $this->post($app, $url, array_replace($input, $invalid))->getStatusCode());
+            self::assertSame([], (new StateStore($app->storageDir() . '/extensions'))->read());
+        }
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testFailedBulkSavePreservesSelectionsAndOtherSectionsAreNotOverwritten(array $dbConfig): void
+    {
+        $this->package('plugins/provider');
+        $this->package('plugins/consumer', ['requires' => ['plugins/provider']]);
+        $this->package('modules/standalone');
+        $app = $this->makeApp($dbConfig, [], 'default');
+        $admin = $app->users()->create('bulk-admin@example.com', '', '일괄 관리자', true);
+        $this->get($app, '/login');
+        $this->sessionUser($admin);
+        $store = new StateStore($app->storageDir() . '/extensions');
+        $manager = new Manager(new Catalog($this->extensionRoot), $store);
+        $manager->setEnabledMany(['plugins/provider' => true, 'modules/standalone' => true]);
+        // 오래 열린 화면의 미변경 provider 값으로 다른 관리자의 활성화를 덮어쓰지 않는다.
+        $input = ['csrf_token' => $_SESSION['csrf_token'], 'complete' => '1',
+            'original' => ['provider' => '0', 'consumer' => '0'], 'enabled' => ['provider' => '0', 'consumer' => '1']];
+        self::assertSame(303, $this->post($app, '/admin/plugins/state', $input)->getStatusCode());
+        self::assertSame(['modules/standalone', 'plugins/consumer', 'plugins/provider'], $store->read());
+        $before = $store->snapshot();
+        $input['original'] = ['provider' => '1', 'consumer' => '1'];
+        $input['enabled'] = ['provider' => '0', 'consumer' => '1'];
+        $response = $this->post($app, '/admin/plugins/state', $input);
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame($before, $store->snapshot());
+        self::assertStringContainsString('사용 중입니다', $this->body($response));
+        self::assertStringNotContainsString('name="enabled[provider]" value="1" checked', $this->body($response));
+        self::assertStringContainsString('name="enabled[consumer]" value="1" checked', $this->body($response));
     }
 }
