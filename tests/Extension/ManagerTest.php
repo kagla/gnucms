@@ -109,7 +109,7 @@ PHP);
         $this->manager->setEnabled('modules/booking', true);
         $slim = AppFactory::create();
         $this->manager->boot(new App([]), $slim);
-        $response = $slim->handle((new ServerRequestFactory())->createServerRequest('GET', '/extensions/modules/booking/ping'));
+        $response = $slim->handle((new ServerRequestFactory())->createServerRequest('GET', '/modules/booking/ping'));
         self::assertSame('message service', (string) $response->getBody());
         $this->manager->setEnabled('modules/booking', false);
         $slim = AppFactory::create();
@@ -164,7 +164,7 @@ return static function ($context): void {
 };
 PHP);
         $this->manager->setEnabled('modules/booking', true);
-        $request = (new ServerRequestFactory())->createServerRequest('GET', '/extensions/modules/booking/ping');
+        $request = (new ServerRequestFactory())->createServerRequest('GET', '/modules/booking/ping');
         $slim = AppFactory::create();
         $this->manager->boot(new App([]), $slim);
         self::assertSame('booking only', (string) $slim->handle($request)->getBody());

@@ -58,7 +58,7 @@ final class PreviewController
         return $view->render($response->withHeader('Cache-Control', 'no-store'), 'preview', [
             'values' => $values, 'errors' => $errors, 'result' => $result,
             'csrf_token' => $_SESSION['csrf_token'],
-            'form_url' => $routes->getBasePath() . '/extensions/plugins/demo-message/preview',
+            'form_url' => $routes->getBasePath() . '/plugins/demo-message/preview',
         ]);
     }
 }

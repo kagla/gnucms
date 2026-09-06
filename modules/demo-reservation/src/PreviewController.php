@@ -57,7 +57,7 @@ final class PreviewController
             'csrf_token' => $_SESSION['csrf_token'],
             'form_url' => $request->getAttribute(Context::TEST_ATTRIBUTE) === true
                 ? $routes->getRouteParser()->urlFor('admin.modules.test', ['id' => 'demo-reservation'])
-                : $routes->getBasePath() . '/extensions/modules/demo-reservation/preview',
+                : $routes->getBasePath() . '/modules/demo-reservation/preview',
         ]);
     }
 }

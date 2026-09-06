@@ -105,26 +105,26 @@ PHP);
         $this->sessionUser($adminId);
         self::assertSame(403, $this->post($app, $url, ['enabled' => '1'])->getStatusCode());
         $csrf = $_SESSION['csrf_token'];
-        self::assertSame(404, $this->get($app, '/extensions/plugins/demo/ping')->getStatusCode());
+        self::assertSame(404, $this->get($app, '/plugins/demo/ping')->getStatusCode());
         self::assertSame(422, $this->post($app, $url, ['enabled' => ['1'], 'csrf_token' => $csrf])->getStatusCode());
         $response = $this->post($app, $url, ['enabled' => '1', 'csrf_token' => $csrf]);
         self::assertSame(303, $response->getStatusCode());
         self::assertSame('/admin/plugins?saved=1', $response->getHeaderLine('Location'));
         self::assertSame(['plugins/demo'], (new StateStore($app->storageDir() . '/extensions'))->read());
-        self::assertSame('extension running', $this->body($this->get($app, '/extensions/plugins/demo/ping')));
-        self::assertSame(403, $this->post($app, '/extensions/plugins/demo/save', [])->getStatusCode());
-        self::assertSame(200, $this->post($app, '/extensions/plugins/demo/save', ['csrf_token' => $csrf])->getStatusCode());
+        self::assertSame('extension running', $this->body($this->get($app, '/plugins/demo/ping')));
+        self::assertSame(403, $this->post($app, '/plugins/demo/save', [])->getStatusCode());
+        self::assertSame(200, $this->post($app, '/plugins/demo/save', ['csrf_token' => $csrf])->getStatusCode());
         $body = $this->body($this->get($app, '/admin/plugins'));
         self::assertStringContainsString('&lt;script&gt;name&lt;/script&gt;', $body);
         self::assertStringNotContainsString('<script>name</script>', $body);
         self::assertStringContainsString('value="1" checked', $body);
         self::assertStringNotContainsString('name&lt;/script&gt;', $this->body($this->get($app, '/admin/modules')));
         $this->sessionUser($memberId);
-        self::assertSame(403, $this->get($app, '/extensions/plugins/demo/admin')->getStatusCode());
+        self::assertSame(403, $this->get($app, '/plugins/demo/admin')->getStatusCode());
         $this->sessionUser($adminId);
-        self::assertSame(200, $this->get($app, '/extensions/plugins/demo/admin')->getStatusCode());
+        self::assertSame(200, $this->get($app, '/plugins/demo/admin')->getStatusCode());
         self::assertSame(303, $this->post($app, $url, ['enabled' => '0', 'csrf_token' => $csrf])->getStatusCode());
-        self::assertSame(404, $this->get($app, '/extensions/plugins/demo/ping')->getStatusCode());
+        self::assertSame(404, $this->get($app, '/plugins/demo/ping')->getStatusCode());
     }
 
     #[DataProvider('connectionProvider')]
@@ -266,7 +266,7 @@ PHP);
         self::assertFileDoesNotExist($marker);
         self::assertSame(200, $this->get($app, $url)->getStatusCode());
         self::assertFileExists($marker);
-        self::assertSame(404, $this->get($app, '/extensions/modules/testable/preview')->getStatusCode());
+        self::assertSame(404, $this->get($app, '/modules/testable/preview')->getStatusCode());
         self::assertFileDoesNotExist($app->storageDir() . '/extensions/enabled.json');
     }
 

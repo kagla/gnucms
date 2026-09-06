@@ -18,8 +18,8 @@ final class DemoExtensionsTest extends WebTestCase
 {
     use ExtensionFixtures;
 
-    private const PLUGIN = '/extensions/plugins/demo-message/preview';
-    private const MODULE = '/extensions/modules/demo-reservation/preview';
+    private const PLUGIN = '/plugins/demo-message/preview';
+    private const MODULE = '/modules/demo-reservation/preview';
 
     protected function setUp(): void
     {
@@ -238,6 +238,9 @@ final class DemoExtensionsTest extends WebTestCase
         self::assertStringContainsString('href="' . self::MODULE . '"', $body);
         self::assertStringContainsString('>바로가기</a>', $body);
         self::assertStringNotContainsString('>관리자 테스트</a>', $body);
+        self::assertSame(200, $this->get($app, self::MODULE)->getStatusCode());
+        self::assertSame(404, $this->get($app, '/extensions' . self::MODULE)->getStatusCode());
+        self::assertSame(404, $this->get($app, '/extensions' . self::PLUGIN)->getStatusCode());
     }
 
     #[DataProvider('connectionProvider')]

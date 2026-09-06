@@ -44,7 +44,7 @@ final class Context
             || !preg_match('~^/(?:[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)?$~D', $path)) {
             throw new InvalidArgumentException('확장 라우트의 메서드 또는 경로가 올바르지 않습니다.');
         }
-        $url = '/extensions/' . $this->key . $path;
+        $url = '/' . $this->key . $path;
         if (isset($this->routes[$method . ' ' . $url])) {
             throw new InvalidArgumentException('확장 라우트가 중복됩니다.');
         }

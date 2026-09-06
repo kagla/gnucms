@@ -8,10 +8,10 @@
 
 1. GNUCMS 전체 관리자로 로그인한다.
 2. **플러그인** 메뉴에서 **데모 · 메시지 형식** 토글을 켜고 목록 위·아래의 **저장**을 누른다.
-3. `/extensions/plugins/demo-message/preview`에 접속한다.
+3. `/plugins/demo-message/preview`에 접속한다.
 4. 제목과 내용을 입력하고 **미리보기 생성**을 누른다.
 
-사이트가 `/cms`에 설치되어 있으면 `/cms/extensions/plugins/demo-message/preview`를 사용한다.
+사이트가 `/cms`에 설치되어 있으면 `/cms/plugins/demo-message/preview`를 사용한다.
 메뉴에 데모가 자동으로 표시되며 위 주소로 접속할 수 있다. 이 플러그인은 실행 주소 메타데이터를
 선언하지 않았다. 목록 바로가기도 제공하려면 설명 파일에 `entry_path: "/preview"`를 추가한다.
 처음에는 비활성 상태이며, 끄면 미리보기 주소도 404가 된다.

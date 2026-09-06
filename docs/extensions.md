@@ -10,13 +10,15 @@
 
 | 종류 | 패키지와 개발 안내 | 활성화 후 관리자 실행 주소 |
 | --- | --- | --- |
-| 플러그인 | [메시지 형식](../plugins/demo-message/README.md) | `/extensions/plugins/demo-message/preview` |
-| 모듈 | [예약 안내문](../modules/demo-reservation/README.md) | `/extensions/modules/demo-reservation/preview` |
+| 플러그인 | [메시지 형식](../plugins/demo-message/README.md) | `/plugins/demo-message/preview` |
+| 모듈 | [예약 안내문](../modules/demo-reservation/README.md) | `/modules/demo-reservation/preview` |
 
 모듈 목록의 **관리자 테스트**로 미사용 상태에서 확인하거나, 모듈을 켜고 **바로가기**로 실행할 수 있다.
 플러그인을 켜면 메시지 형식 연동을 비교할 수 있다.
 둘 다 관리자 전용 미리보기이며 실제 예약 저장·외부 발송은 하지 않는다.
 하위 경로에 설치했다면 실행 주소 앞에 설치 경로를 붙인다.
+기존 `/extensions/modules/…`, `/extensions/plugins/…` 주소를 사용하는 링크와 폼은
+각각 `/modules/…`, `/plugins/…`로 변경해야 한다. 이전 주소는 404를 반환한다.
 
 ## 관리와 배포
 
@@ -91,7 +93,7 @@
 - 폴더, 설명 파일, 진입 파일에 심볼릭 링크를 사용하지 않는다.
 - 목록 탐색과 설명 파일 검증은 비활성 패키지의 PHP를 실행하지 않는다.
 - 선택 필드 `entry_path`에 `/preview`처럼 패키지의 고정 실행 경로를 지정하면 관리 목록에
-  `/extensions/{종류}/{id}{entry_path}` 주소가 표시된다. 사용 중에는 주소 링크와 **바로가기**를 제공한다.
+  `/{종류}/{id}{entry_path}` 주소가 표시된다. 사용 중에는 주소 링크와 **바로가기**를 제공한다.
   외부 URL·쿼리·동적 경로는 허용하지 않는다.
 - 선택 필드 `admin_test`는 기본값이 `false`다. `true`이고 `entry_path`가 있으면 미사용 상태에서
   **관리자 테스트** 버튼을 제공한다. `bootstrap.php`는 해당 경로의 GET과 필요한 POST를 등록해야 한다.
@@ -155,14 +157,14 @@ return static function (Context $context): void {
 };
 ```
 
-주소는 `/extensions/modules/reservation/status`다. 선택 플러그인이 꺼져 있어도 동작한다.
+주소는 `/modules/reservation/status`다. 선택 플러그인이 꺼져 있어도 동작한다.
 실제 예약·발송 기능은 이 예제에 포함하지 않는다. 패키지의 추가 PHP 파일과 완성된
 의존성은 진입점에서 `require_once` 등으로 불러오며 코어 Composer 설정을 수정하지 않는다.
 
 ## 라우트와 보안
 
 - `route('GET' 또는 'POST', '/경로', $handler, admin: false)`로 등록한다.
-- 경로 앞에 `/extensions/{plugins 또는 modules}/{id}`가 자동으로 붙어 충돌을 방지한다.
+- 경로 앞에 `/{plugins 또는 modules}/{id}`가 자동으로 붙어 충돌을 방지한다.
 - 초기 API는 고정 경로만 지원한다. 경로 세그먼트에는 영문·숫자·`_`·`-`를 사용한다.
   동적 ID는 쿼리나 POST 본문으로 받아 서버에서 검증한다.
 - 코어의 세션·오류 처리 미들웨어를 공유하며 모든 POST에 기존 세션 CSRF 토큰 검사를 적용한다.

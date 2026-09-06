@@ -169,7 +169,7 @@ final class Manager
             throw DomainError::serviceUnavailable('확장 테스트를 준비하지 못했습니다. 패키지를 확인해 주세요.');
         }
         foreach ($context->routes() as [$method, $url, $handler]) {
-            if ($method === $request->getMethod() && $url === '/extensions/' . $key . $package['entry_path']) {
+            if ($method === $request->getMethod() && $url === '/' . $key . $package['entry_path']) {
                 return $handler($request->withAttribute(Context::TEST_ATTRIBUTE, true), $response, [])
                     ->withHeader('Cache-Control', 'no-store')
                     ->withHeader('X-Robots-Tag', 'noindex, nofollow');
