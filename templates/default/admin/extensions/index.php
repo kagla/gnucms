@@ -46,8 +46,10 @@
             <p><small>실행 주소:
               <?php if ($package['enabled'] && $package['error'] === null): ?>
                 <a class="link link-hover" href="<?= $this->e($package['entry_url']) ?>"><?= $this->e($package['entry_url']) ?></a>
+                <a class="btn btn-ghost btn-square btn-xs" href="<?= $this->e($package['entry_url']) ?>" target="_blank" rel="noopener noreferrer" title="새 창으로 열기" aria-label="<?= $this->e($package['name']) ?> 새 창으로 열기"><?= $this->icon('external', 14) ?></a>
               <?php elseif ($package['admin_test'] && $package['error'] === null): ?>
                 <a class="link link-hover" href="<?= $this->url('admin.' . $extension_section . '.test', ['id' => $package['id']]) ?>" title="관리자 테스트로 열기"><?= $this->e($package['entry_url']) ?></a>
+                <a class="btn btn-ghost btn-square btn-xs" href="<?= $this->url('admin.' . $extension_section . '.test', ['id' => $package['id']]) ?>" target="_blank" rel="noopener noreferrer" title="관리자 테스트를 새 창으로 열기" aria-label="<?= $this->e($package['name']) ?> 관리자 테스트를 새 창으로 열기"><?= $this->icon('external', 14) ?></a>
               <?php else: ?>
                 <span><?= $this->e($package['entry_url']) ?></span>
               <?php endif ?>

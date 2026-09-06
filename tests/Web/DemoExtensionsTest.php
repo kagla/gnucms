@@ -210,6 +210,7 @@ final class DemoExtensionsTest extends WebTestCase
         $body = $this->body($this->get($app, '/admin/modules'));
         self::assertStringContainsString('실행 주소:', $body);
         self::assertStringContainsString('href="' . $url . '" title="관리자 테스트로 열기">' . self::MODULE . '</a>', $body);
+        self::assertStringContainsString('href="' . $url . '" target="_blank" rel="noopener noreferrer" title="관리자 테스트를 새 창으로 열기"', $body);
         self::assertStringContainsString(self::MODULE, $body);
         self::assertStringContainsString('href="' . $url . '"', $body);
         self::assertStringContainsString('>관리자 테스트</a>', $body);
@@ -238,6 +239,7 @@ final class DemoExtensionsTest extends WebTestCase
         $body = $this->body($this->get($app, '/admin/modules'));
         self::assertStringContainsString('href="' . self::MODULE . '"', $body);
         self::assertStringContainsString('>바로가기</a>', $body);
+        self::assertStringContainsString('href="' . self::MODULE . '" target="_blank" rel="noopener noreferrer" title="새 창으로 열기"', $body);
         self::assertStringNotContainsString('>관리자 테스트</a>', $body);
         self::assertSame(200, $this->get($app, self::MODULE)->getStatusCode());
         self::assertSame(404, $this->get($app, '/extensions' . self::MODULE)->getStatusCode());
