@@ -146,6 +146,11 @@ final class ShopTest extends WebTestCase
         $credentials = \GnuCms\Tests\Payment\Fixtures::config('toss');
         $response = $this->post($this->app, $path, $this->csrf($credentials + ['action' => 'save', 'environment' => 'test']));
         self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('admin-shell', $this->body($response));
+        self::assertStringContainsString('extension-admin', $this->body($response));
+        self::assertStringContainsString('extensions.css?v=', $this->body($response));
+        self::assertStringContainsString('id="payment-secret_key"', $this->body($response));
+        self::assertStringNotContainsString('font:16px/1.6 system-ui', $this->body($response));
         self::assertStringNotContainsString($credentials['secret_key'], $this->body($response));
         self::assertSame(200, $this->post($this->app, $path, $this->csrf(['action' => 'enable', 'environment' => 'test']))->getStatusCode());
         $settings = new Settings($this->app, 'toss'); self::assertTrue($settings->available('test'));

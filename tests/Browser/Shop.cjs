@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
 const path = require('node:path');
+const fs = require('node:fs');
 const puppeteer = require(process.env.PUPPETEER_MODULE || 'puppeteer-core');
 const root = path.resolve(__dirname, '../..');
 const render = scenario => execFileSync('php', [path.join(__dirname, 'ShopFixture.php'), scenario, '/cms'], {cwd: root, encoding: 'utf8'});
@@ -14,6 +15,9 @@ const render = scenario => execFileSync('php', [path.join(__dirname, 'ShopFixtur
       page.on('pageerror', error => errors.push(error.message));
       await page.setRequestInterception(true);
       page.on('request', request => {
+        if (new URL(request.url()).pathname.endsWith('/extensions.css')) return request.respond({status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(root, 'www/themes/default/extensions.css'), 'utf8')});
+        if (request.url().includes('daisyui.css')) return request.respond({status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(root, 'www/vendor/daisyui/daisyui.css'), 'utf8')});
+        if (new URL(request.url()).pathname.endsWith('/theme.css')) return request.respond({status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(root, 'www/themes/default/theme.css'), 'utf8')});
         if (request.url() === 'https://stgstdpay.inicis.com/stdjs/INIStdPay.js') return request.respond({status: 200, contentType: 'text/javascript', body: 'window.INIStdPay={pay:function(id){window.testPayment=Object.fromEntries(new FormData(document.getElementById(id)));}};'});
         if (request.method() === 'POST') { posts.push({url: request.url(), data: new URLSearchParams(request.postData())}); return request.respond({status: 200, body: 'submitted'}); }
         return request.respond({status: 200, contentType: 'text/html', body: html});
@@ -22,6 +26,15 @@ const render = scenario => execFileSync('php', [path.join(__dirname, 'ShopFixtur
       await page.goto('https://shop.example.test/cms/modules/shop/' + (scenario === 'payment' ? 'order' : scenario));
       assert.ok((await page.$eval('h1', el => el.textContent)).length > 0, scenario);
       assert.deepEqual(errors, [], scenario);
+      const adminScreen = ['admin', 'products', 'manage-order', 'settings', 'inventory', 'settlement'].includes(scenario);
+      assert.equal(await page.$$eval('.admin-shell', els => els.length), adminScreen ? 1 : 0, scenario + ' admin layout');
+      assert.equal(await page.$$eval('.shop-header', els => els.length), adminScreen ? 0 : 1, scenario + ' storefront layout');
+      if (!adminScreen) assert.equal(await page.$$eval('.notice.alert, .banner.alert', els => els.length), 0, scenario + ' storefront notices keep their own style');
+      if (adminScreen) {
+        const weights = await page.$$eval('#main .extension-label > .input', els => els.map(el => getComputedStyle(el).fontWeight));
+        assert.ok(weights.every(weight => weight === '400'), scenario + ' field text must match core forms');
+      }
+      if (scenario === 'products') await page.screenshot({path: '/tmp/gnucms-shop-admin-desktop.png', fullPage: true});
       if (scenario === 'manage-order') {
         const claims = await page.$$eval('article.claim', rows => rows.map(row => row.textContent));
         assert.equal(claims.length, 2);

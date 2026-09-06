@@ -13,7 +13,6 @@ use GnuCms\Modules\Shop\Controller;
 use GnuCms\Modules\Shop\Service;
 use GnuCms\Modules\Shop\Store;
 use GnuCms\Tests\Shop\FakeGateway;
-use GnuCms\View\PhpView;
 use GnuCms\Web\Middleware\ViewMiddleware;
 use Slim\Psr7\Factory\ServerRequestFactory;
 
@@ -56,7 +55,7 @@ if ($page === 'manage-order') {
 }
 $_SESSION = ['csrf_token' => bin2hex(random_bytes(16)), 'shop_cart' => $cart];
 $slim = \Slim\Factory\AppFactory::create(); $slim->setBasePath($base);
-$view = new PhpView([dirname(__DIR__, 2) . '/templates/default'], $slim->getRouteCollector()->getRouteParser(), $base, static fn ($p) => '', static fn ($p) => '');
+$view = \GnuCms\Tests\Support\AdminViewFixture::view($base);
 $controller = new Controller($shop);
 if ($scenario === 'toss-return') $controller = new \GnuCms\Modules\Shop\TossReturnController($shop);
 $slim->map(['GET', 'POST'], '/modules/shop/' . $page, static fn ($request, $response) => $scenario === 'toss-return' ? $controller->handle($request, $response) : $controller->handle($page, $request, $response));

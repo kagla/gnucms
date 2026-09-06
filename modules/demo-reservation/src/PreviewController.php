@@ -6,7 +6,7 @@ namespace GnuCmsDemo\Modules\Reservation;
 
 use GnuCms\Error\DomainError;
 use GnuCms\Extension\Context;
-use GnuCms\View\PhpView;
+use GnuCms\View\View;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Routing\RouteContext;
@@ -43,13 +43,7 @@ final class PreviewController
     private function render(ServerRequestInterface $request, ResponseInterface $response, array $values, array $errors = [], ?string $result = null): ResponseInterface
     {
         $routes = RouteContext::fromRequest($request);
-        $view = new PhpView(
-            [dirname(__DIR__) . '/templates'],
-            $routes->getRouteParser(),
-            $routes->getBasePath(),
-            static fn (string $path): string => '',
-            static fn (string $text): string => htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
-        );
+        $view = View::forExtension($request, 'demo-reservation', dirname(__DIR__) . '/templates');
         return $view->render($response->withHeader('Cache-Control', 'no-store'), 'preview', [
             'values' => $values, 'errors' => $errors, 'result' => $result,
             'uses_plugin' => $this->service->usesPlugin(),

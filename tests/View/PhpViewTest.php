@@ -106,6 +106,47 @@ final class PhpViewTest extends TestCase
         self::assertSame('local', $view->fetch('a', ['site' => 'local']));
     }
 
+    public function testExtensionInheritsSiteLayoutAssetsAndGlobalsWithoutChangingSiteView(): void
+    {
+        $this->write('layout', '<main><?= $this->block("body") ?></main>');
+        $this->write('page', 'site');
+        $this->write('sub/page', '<?php $this->layout("layout") ?><?php $this->start("body") ?><?= $this->e($site) ?>|<?= $this->asset("theme.css") ?>|<?= $this->url("admin.index") ?>|<?php $this->insert("part") ?><?php $this->stop() ?>');
+        $this->write('sub/part', 'package');
+        $view = $this->view();
+        $view->addGlobal('site', '관리자');
+        $extension = $view->forExtension('sample', $this->dir . '/sub');
+        self::assertSame('<main>관리자|/themes/t/theme.css|/r/admin.index|package</main>', $extension->fetch('page'));
+        self::assertSame('site', $view->fetch('page'));
+        // 화면 전체를 복사하지 않아도 개별 조각을 테마에서 재정의할 수 있다.
+        mkdir($this->dir . '/extensions/sample', 0700, true);
+        try {
+            file_put_contents($this->dir . '/extensions/sample/part.php', 'theme');
+            self::assertStringContainsString('|theme</main>', $extension->fetch('page'));
+            self::assertSame('package', $view->fetch('sub/part'));
+        } finally {
+            unlink($this->dir . '/extensions/sample/part.php');
+            rmdir($this->dir . '/extensions/sample');
+            rmdir($this->dir . '/extensions');
+        }
+    }
+
+    public function testSharedExtensionLayoutUsesExistingCustomAdminLayout(): void
+    {
+        mkdir($this->dir . '/admin', 0700);
+        $this->write('admin/layout', '<section>custom-admin|<?= $this->block("body") ?></section>');
+        $this->write('sub/page', '<?php $this->layout("admin/extension") ?><?php $this->start("extension_body") ?>업무 화면<?php $this->stop() ?>');
+        $view = $this->view()->forExtension('sample', $this->dir . '/sub');
+        try {
+            self::assertStringContainsString('custom-admin|', $view->fetch('page'));
+            self::assertStringContainsString('업무 화면', $view->fetch('page'));
+            $this->write('admin/extension', '<?php $this->layout("admin/layout") ?><?php $this->start("body") ?>theme-override|<?= $this->block("extension_body") ?><?php $this->stop() ?>');
+            self::assertSame('<section>custom-admin|theme-override|업무 화면</section>', $view->fetch('page'));
+        } finally {
+            foreach (glob($this->dir . '/admin/*.php') as $file) unlink($file);
+            rmdir($this->dir . '/admin');
+        }
+    }
+
     public function testUrlAssetHtmlJsonDateHelpers(): void
     {
         $this->write('a', "<?= \$this->url('posts.show', ['id' => '7'], ['q' => 'a b']) ?>|<?= \$this->asset('theme.css') ?>|<?= \$this->html('<p>x</p>') ?>|<?= \$this->json(['a' => '<']) ?>|<?= \$this->date('2026-08-30 01:02:03', 'Y.m.d H:i') ?>|<?= \$this->base ?>");

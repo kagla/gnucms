@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace GnuCms\Payment;
 
 use GnuCms\Error\DomainError;
-use GnuCms\View\PhpView;
 use GnuCms\View\View;
-use Slim\Routing\RouteContext;
 
 final class SettingsController
 {
@@ -36,13 +34,7 @@ final class SettingsController
             $response = $response->withStatus($e->status());
             $errors = $e->status() >= 500 ? ['설정 저장에 실패했습니다. 데이터 설치와 암호화 키를 확인해 주세요.'] : ($e->details() ?: [$e->getMessage()]);
         }
-        $route = RouteContext::fromRequest($request);
-        $siteView = View::fromRequest($request);
-        $paths = [__DIR__ . '/templates'];
-        if ($siteView instanceof PhpView && $siteView->exists('extensions/payment/settings')) {
-            $paths = [dirname($siteView->resolve('extensions/payment/settings')), ...$paths];
-        }
-        $view = new PhpView($paths, $route->getRouteParser(), $route->getBasePath(), static fn ($p) => '', static fn ($p) => '');
+        $view = View::forExtension($request, 'payment', __DIR__ . '/templates');
         return $view->render($response->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer'), 'settings', [
             'fields' => ProviderConfig::fields($this->settings->provider), 'manual' => ProviderConfig::manual($this->settings->provider),
             'integration_ready' => in_array($this->settings->provider, ['inicis', 'toss'], true),

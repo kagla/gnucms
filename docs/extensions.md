@@ -66,7 +66,18 @@ SQLite 자동 복원은 백업과 현재 설정의 DB 테이블 접두사가 같
 
 관리 화면은 `admin/extensions/index`를 사용한다. 관리자 화면을 재정의하는 테마는
 해당 템플릿과 `admin/_sidebar`의 플러그인·모듈 메뉴를 함께 반영해야 한다.
-공통 패키지 템플릿 재정의 API는 제공하지 않는다. 쇼핑몰은 `extensions/shop/page.php`, 결제 플러그인은 `extensions/payment/settings.php`를 통한 패키지별 재정의를 제공한다. [쇼핑몰 운영 안내](shop.md)를 참고한다.
+확장 운영 화면은 `admin/extension`을 통해 기존 `admin/layout`의 메뉴, 글꼴, 폼·버튼·표, 다크 모드와 모바일 메뉴를 사용한다. 업무별 본문만 패키지에 두며 별도 전역 CSS로 관리자 화면을 덮어쓰지 않는다.
+
+컨트롤러는 다음과 같이 요청의 뷰를 확장해서 렌더링한다. 기존 뷰를 복제하므로 다른 화면의 템플릿 경로와 전역값을 변경하지 않는다.
+
+```php
+$view = \GnuCms\View\View::forExtension($request, 'my-module', __DIR__ . '/templates');
+return $view->render($response, 'page', $data);
+```
+
+템플릿은 `admin/extension`을 레이아웃으로 지정하고 `title`, `admin_section` (`plugins` 또는 `modules`), `extension_body` 블록을 채운다. 추가 JavaScript는 `scripts` 블록을 사용한다. 자산의 내용 해시 URL, 사이트 설정, 로그인 사용자, 공통 아이콘을 그대로 재사용한다. 관리자 화면에서는 공통 레이아웃에 따라 사이트 추적·광고 코드를 실행하지 않는다.
+
+탐색 순서는 선택 테마의 `extensions/<이름>/`, 패키지 템플릿, 사이트 공통 템플릿, 코어의 `src/Extension/templates/` 공통 확장 조각이다. 기존 테마에 `admin/extension`이 없어도 코어 조각이 해당 테마의 `admin/layout`을 사용한다. 배치용 `extensions.css`는 테마 자산으로 불러오며 선택 테마에 없으면 기본 자산을 사용한다. 화면 전체를 복사하지 않아도 개별 조각만 재정의할 수 있다. 제공하는 이름은 `bizppurio`, `alimtalk`, `payment`, `shop`, `demo-message`, `demo-reservation`이다. 예를 들어 `extensions/payment/settings.php` 또는 `extensions/shop/_orders.php`를 재정의할 수 있다. 공통 관리자 레이아웃을 재정의하는 테마는 `admin/extension`이 사용하는 블록을 함께 유지한다. [쇼핑몰 운영 안내](shop.md)를 참고한다.
 
 기본 패키지 루트는 GNUCMS 루트다. 특수 배치·테스트에서는 설정의 `extensions.root`로
 `plugins/`, `modules/`를 포함하는 상위 디렉터리의 절대 경로를 지정할 수 있다.
@@ -183,7 +194,7 @@ return static function (Context $context): void {
 
 ## 현재 범위 밖
 
-웹 ZIP 설치·자동 업데이트·의존 버전 범위 검사·패키지 설정/메뉴/템플릿 등록 API·
+웹 ZIP 설치·자동 업데이트·의존 버전 범위 검사·패키지 설정/메뉴 등록 API·
 주기적 작업 실행기는 아직 제공하지 않는다.
 
 주기적 실행에 호스팅 cron을 요구하지 않는다. 후속 방문 기반 실행 플러그인은 접속이

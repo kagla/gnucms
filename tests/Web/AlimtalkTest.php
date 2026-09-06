@@ -46,6 +46,7 @@ final class AlimtalkTest extends WebTestCase
             $slim->post('/' . $page, static fn ($request, $response) => $controller->handle($page, $request, $response));
         }
         $slim->addRoutingMiddleware();
+        $slim->add(new \GnuCms\Web\Middleware\ViewMiddleware(\GnuCms\Tests\Support\AdminViewFixture::view()));
         $post = static fn (string $page, array $body) => $slim->handle((new ServerRequestFactory())->createServerRequest('POST', '/' . $page)->withParsedBody($body));
         try {
             self::assertSame(200, $post('send', ['action' => 'preview', 'phone' => '01000000000', 'variables' => ['이름' => '원본']])->getStatusCode());
@@ -134,7 +135,7 @@ final class AlimtalkTest extends WebTestCase
             'template_id' => $template['id'], 'revision' => $template['revision'], 'phone' => '01000000000', 'variables' => ['이름' => '<script>alert(1)</script>']]);
         self::assertSame(200, $response->getStatusCode());
         self::assertStringContainsString('&lt;script&gt;', $this->body($response));
-        self::assertStringNotContainsString('<script>', $this->body($response));
+        self::assertStringNotContainsString('<script>alert(1)</script>', $this->body($response));
         self::assertStringContainsString('name="confirmation"', $this->body($response));
         self::assertSame(0, $service->history(['environment' => 'test'])['total']);
         $response = $this->post($this->app, '/modules/alimtalk/send', ['action' => 'send', 'environment' => 'test', 'csrf_token' => $_SESSION['csrf_token'], 'confirmation' => 'not-a-confirmation']);
@@ -182,6 +183,7 @@ final class AlimtalkTest extends WebTestCase
         $slim = \Slim\Factory\AppFactory::create();
         $slim->post('/settings', [$controller, 'handle']);
         $slim->addRoutingMiddleware();
+        $slim->add(new \GnuCms\Web\Middleware\ViewMiddleware(\GnuCms\Tests\Support\AdminViewFixture::view()));
         foreach ([3007 => 'API 연동용 모듈 비밀번호가 유효하지 않습니다. 홈페이지 로그인 비밀번호와 별도입니다.', 3010 => '해당 계정의 REST API 사용 가능 여부'] as $code => $expected) {
             $http->respond = static fn (): array => ['status' => 400, 'body' => ['code' => $code, 'description' => $password]];
             $request = (new ServerRequestFactory())->createServerRequest('POST', '/settings')->withParsedBody(['action' => 'connect', 'environment' => 'test']);

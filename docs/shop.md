@@ -167,7 +167,7 @@ php modules/shop/bin/maintenance.php sync --order=<주문번호>
 
 같은 PG 상점 코드에서 인증키나 요청 서버 IPv4 주소를 변경하면 과거 주문도 최신 설정을 사용한다. 주문 당시의 상점·금액·환경 검증은 유지한다. 상점 ID 자체를 바꾼 경우에는 과거 상점 인증값을 보존하므로 이전 상점을 폐쇄하기 전에 남은 주문·환불을 처리한다.
 
-선택 테마의 `extensions/shop/page.php`를 제공하면 그 디렉터리의 쇼핑몰 템플릿을 우선 사용하고 없는 파일은 모듈 기본값으로 보완한다. 결제 설정 화면은 `extensions/payment/settings.php`로 재정의한다. 결제 설정 재정의는 PG별 `fields` 입력과 `integration_ready` 상태를 표시해야 한다. 주문 화면 재정의는 새 결제 폼 계약을 적용해야 한다. 토스는 `payment.kind=toss`의 `client_key`, `customer_key`, `request`로 SDK를 호출하며 JSON을 스크립트에 넣을 때 HTML 특수문자를 이스케이프한다. 인증 결과 전달 화면 `toss-return.php`는 모듈에서 직접 제공한다.
+쇼핑몰 운영 화면은 기존 관리자 공통 레이아웃·글꼴·입력·버튼·표·다크 모드를 사용한다. 고객용 상품·장바구니·주문 화면은 별도 상점 화면을 사용한다. 선택 테마의 `extensions/shop/` 아래 템플릿을 우선 사용하고 없는 파일은 모듈 기본값으로 보완한다. `page.php`는 운영/고객 화면을 선택하고 `storefront.php`는 고객 화면의 외곽을 구성한다. 개별 조각만 재정의할 수도 있다. 결제 설정 화면은 `extensions/payment/settings.php`로 재정의한다. 결제 설정 재정의는 PG별 `fields` 입력과 `integration_ready` 상태를 표시해야 한다. 주문 화면 재정의는 새 결제 폼 계약을 적용해야 한다. 토스는 `payment.kind=toss`의 `client_key`, `customer_key`, `request`로 SDK를 호출하며 JSON을 스크립트에 넣을 때 HTML 특수문자를 이스케이프한다. 인증 결과 전달 화면 `toss-return.php`는 모듈에서 직접 제공한다.
 
 ## 검증과 운영 전 확인
 

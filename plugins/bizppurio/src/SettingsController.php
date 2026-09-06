@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace GnuCms\Plugins\Bizppurio;
 
 use GnuCms\Error\DomainError;
-use GnuCms\View\PhpView;
+use GnuCms\View\View;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Routing\RouteContext;
@@ -78,8 +78,7 @@ final class SettingsController
             $response = $response->withStatus(503);
         }
         $routes = RouteContext::fromRequest($request);
-        $view = new PhpView([dirname(__DIR__) . '/templates'], $routes->getRouteParser(), $routes->getBasePath(),
-            static fn (string $path): string => '', static fn (string $text): string => htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+        $view = View::forExtension($request, 'bizppurio', dirname(__DIR__) . '/templates');
         return $view->render($response->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer'), 'settings', [
             'base' => $routes->getBasePath(), 'environment' => $environment, 'ready' => $ready, 'settings' => $settings,
             'notice' => $notice, 'errors' => $errors, 'webhook' => $webhook, 'csrf_token' => $_SESSION['csrf_token'] ?? '',

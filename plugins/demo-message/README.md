@@ -25,10 +25,8 @@
 | `src/MessageFormatter.php` | 길이와 제목 형식을 검증하고 일반 텍스트 생성 |
 | `src/PreviewController.php` | 요청 입력 검증, 오류 응답, 패키지 전용 화면 렌더링 |
 | `templates/preview.php` | CSRF 토큰을 포함한 폼과 이스케이프된 결과 출력 |
-| `templates/_style.php` | 외부 라이브러리·빌드 없이 사용하는 화면 스타일 |
 
-화면은 패키지 내부 템플릿과 GNUCMS의 `PhpView`를 사용한다.
-`templates/default/`나 사용자 테마를 수정하지 않으며 관리자 화면의 테마를 상속하지 않는다.
+본문은 패키지 내부 템플릿이 담당하고 `View::forExtension()`으로 관리자 공통 레이아웃·글꼴·폼·버튼을 재사용한다. 테마의 `extensions/demo-message/`에서 화면이나 개별 조각을 재정의할 수 있다. 운영 서버에서 별도 빌드는 필요하지 않다.
 자산·HTML 렌더러 콜백은 이 텍스트 전용 예제의 제한된 용도에 맞췄다.
 
 ## 다른 모듈에서 사용

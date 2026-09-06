@@ -192,3 +192,7 @@ $result = $send([
 [운영 가이드](https://bizppurio.github.io/guides/operations/),
 [결과 코드](https://bizppurio.github.io/response-codes/).
 후속 범위는 [개발 계획](../../docs/bizppurio-alimtalk-plan.md)에 정리했다.
+
+## 관리자 화면과 테마
+
+설정 화면은 관리자 공통 메뉴·글꼴·폼·버튼·다크 모드를 사용한다. 검수/운영 환경은 탭으로 선택한다. 테마의 `extensions/bizppurio/settings.php` 또는 개별 조각으로 재정의하며, 비밀번호 표시 동작과 CSRF 필드를 유지한다.

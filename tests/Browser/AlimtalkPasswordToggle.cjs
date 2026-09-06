@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
 const path = require('node:path');
+const fs = require('node:fs');
 const puppeteer = require(process.env.PUPPETEER_MODULE || 'puppeteer-core');
 const root = path.resolve(__dirname, '../..');
 
@@ -11,7 +12,7 @@ function html(base, environment) {
     require 'vendor/autoload.php';
     $base = $argv[1]; $environment = $argv[2];
     $slim = \Slim\Factory\AppFactory::create();
-    $view = new \GnuCms\View\PhpView(['plugins/bizppurio/templates'], $slim->getRouteCollector()->getRouteParser(), $base, static fn ($p) => '', static fn ($s) => $s);
+    $view = \GnuCms\Tests\Support\AdminViewFixture::view($base)->forExtension('bizppurio', 'plugins/bizppurio/templates');
     echo $view->fetch('settings', ['base' => $base, 'environment' => $environment, 'ready' => true,
       'settings' => ['configured' => true, 'enabled' => false, 'account' => 'browser-test', 'revision' => str_repeat('a', 32), 'senderkey' => bin2hex(random_bytes(20))],
       'notice' => '', 'errors' => [], 'webhook' => null, 'csrf_token' => 'browser-test-csrf']);
@@ -30,6 +31,9 @@ function html(base, environment) {
       page.on('pageerror', error => errors.push(error.message));
       await page.setRequestInterception(true);
       page.on('request', request => {
+        if (new URL(request.url()).pathname.endsWith('/extensions.css')) return request.respond({status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(root, 'www/themes/default/extensions.css'), 'utf8')});
+        if (request.url().includes('daisyui.css')) return request.respond({status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(root, 'www/vendor/daisyui/daisyui.css'), 'utf8')});
+        if (new URL(request.url()).pathname.endsWith('/theme.css')) return request.respond({status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(root, 'www/themes/default/theme.css'), 'utf8')});
         if (request.method() === 'POST') {
           requests.push({url: request.url(), body: new URLSearchParams(request.postData())});
           return request.respond(request.url() === url

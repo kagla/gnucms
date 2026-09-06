@@ -10,7 +10,7 @@ use Slim\Interfaces\RouteParserInterface;
 
 /**
  * PHP 파일 템플릿 엔진. 경로 목록에서 '{이름}.php' 를 찾아 PhpTemplate 로 돌린다.
- * 지금은 경로가 하나(선택 테마)뿐이다. 나중에 PHP 테마끼리 폴백할 때 둘 이상이 된다.
+ * 선택 테마와 확장 패키지의 경로를 우선순위대로 탐색한다.
  */
 final class PhpView implements ViewInterface
 {
@@ -68,6 +68,23 @@ final class PhpView implements ViewInterface
     public function globals(): array
     {
         return $this->globals;
+    }
+
+    /** 테마 재정의 → 패키지 → 사이트 순으로 찾고 공통 레이아웃·자산·전역값을 재사용한다. */
+    public function forExtension(string $name, string $templates): self
+    {
+        if (!preg_match('/^[a-z][a-z0-9_-]{0,63}$/D', $name)) {
+            throw new RuntimeException('확장 템플릿 이름이 올바르지 않습니다.');
+        }
+        $view = clone $this;
+        $view->paths = [
+            ...array_map(static fn (string $path): string => $path . '/extensions/' . $name, $this->paths),
+            rtrim($templates, '/'),
+            ...$this->paths,
+            dirname(__DIR__) . '/Extension/templates',
+        ];
+        $view->icons = null;
+        return $view;
     }
 
 

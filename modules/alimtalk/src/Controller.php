@@ -6,7 +6,7 @@ namespace GnuCms\Modules\Alimtalk;
 
 use GnuCms\Error\DomainError;
 use GnuCms\Support\Clock;
-use GnuCms\View\PhpView;
+use GnuCms\View\View;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Routing\RouteContext;
@@ -103,8 +103,7 @@ final class Controller
         $data['status_labels'] = ['prepared' => '준비', 'sending' => '접수 확인 중', 'accepted' => '접수됨', 'rejected' => '접수 거절',
             'unknown' => '접수 불명확', 'pending' => '결과 대기', 'delivered' => '도달 성공', 'failed' => '도달 실패', 'uncertain' => '도달 불확실'];
         $data['time'] = static fn ($timestamp): string => (new \DateTimeImmutable('@' . (int) $timestamp))->setTimezone(new \DateTimeZone('Asia/Seoul'))->format('Y-m-d H:i:s');
-        $view = new PhpView([dirname(__DIR__) . '/templates'], $routes->getRouteParser(), $base,
-            static fn (string $path): string => '', static fn (string $text): string => htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+        $view = View::forExtension($request, 'alimtalk', dirname(__DIR__) . '/templates');
         return $view->render($response->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer'), 'page', $data);
     }
 

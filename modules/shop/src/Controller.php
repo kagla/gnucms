@@ -6,7 +6,6 @@ namespace GnuCms\Modules\Shop;
 
 use GnuCms\Error\DomainError;
 use GnuCms\Support\Clock;
-use GnuCms\View\PhpView;
 use GnuCms\View\View;
 use Slim\Routing\RouteContext;
 
@@ -203,10 +202,7 @@ final class Controller
             'cancelled' => '주문 취소', 'refunded' => '전액 환불', 'requested' => '접수', 'approved' => '승인·회수 대기', 'received' => '회수·검수 완료',
             'refund_pending' => '환불 확인 중', 'completed' => '처리 완료', 'rejected' => '거절', 'succeeded' => '환불 완료', 'failed' => '미처리 확인'];
         $data['time'] = static fn ($timestamp) => (int) $timestamp > 0 ? (new \DateTimeImmutable('@' . (int) $timestamp))->setTimezone(new \DateTimeZone('Asia/Seoul'))->format('Y-m-d H:i') : '—';
-        $siteView = View::fromRequest($request);
-        $paths = [dirname(__DIR__) . '/templates'];
-        if ($siteView instanceof PhpView && $siteView->exists('extensions/shop/page')) $paths = [dirname($siteView->resolve('extensions/shop/page')), ...$paths];
-        $view = new PhpView($paths, $route->getRouteParser(), $base, static fn ($p) => '', static fn ($p) => '');
+        $view = View::forExtension($request, 'shop', dirname(__DIR__) . '/templates');
         return $view->render($response->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer'), 'page', $data);
     }
 
