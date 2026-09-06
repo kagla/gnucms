@@ -31,6 +31,8 @@ final class Routes
 {
     public static function register(SlimApp $slim, App $app): void
     {
+        \GnuCms\Extension\AdminRoutes::register($slim, $app);
+
         $seo = new SeoController($app);
         $slim->get('/sitemap.xml', [$seo, 'sitemap'])->setName('seo.sitemap');
         $slim->get('/robots.txt', [$seo, 'robots'])->setName('seo.robots');
