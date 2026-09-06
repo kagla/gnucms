@@ -37,7 +37,7 @@ final class SqliteDialect implements DialectInterface
         return '';
     }
 
-    public function lastInsertId(PDO $pdo, string $table): string
+    public function lastInsertId(PDO $pdo): string
     {
         return (string) $pdo->lastInsertId();
     }

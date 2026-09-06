@@ -19,7 +19,7 @@ return [
         'kakao' => ['client_id' => '', 'client_secret' => ''],
     ],
 
-    // DSN 은 sqlite: / mysql: / pgsql: 중 하나로 시작한다.
+    // DSN 은 sqlite: / mysql: 중 하나로 시작한다.
     'db' => [
         'dsn'      => 'sqlite:' . __DIR__ . '/../storage/board.sqlite',
         'username' => null,

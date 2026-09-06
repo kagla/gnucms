@@ -11,7 +11,7 @@ use GnuCms\Error\DomainError;
 use Throwable;
 
 /**
- * PDO 얇은 래퍼. 여기서 쓰는 SQL 은 세 DB 공통 문법이어야 하며,
+ * PDO 얇은 래퍼. 여기서 쓰는 SQL 은 지원 DB 공통 문법이어야 하며,
  * 방언 차이는 전부 DialectInterface 를 통해서만 표현한다.
  */
 final class Connection
@@ -97,7 +97,7 @@ final class Connection
         return $this->q($this->tableName($logicalName));
     }
 
-    /** PostgreSQL에서는 인덱스도 테이블과 같은 이름 공간을 쓰므로 함께 격리한다. */
+    /** 같은 DB에 설치한 사이트끼리 인덱스 이름이 겹치지 않도록 격리한다. */
     public function index(string $logicalName): string
     {
         return $this->q($this->prefix . $logicalName);
@@ -135,7 +135,7 @@ final class Connection
 
         $this->run($sql, $data);
 
-        return $this->dialect->lastInsertId($this->pdo, $this->tableName($table));
+        return $this->dialect->lastInsertId($this->pdo);
     }
 
     /**

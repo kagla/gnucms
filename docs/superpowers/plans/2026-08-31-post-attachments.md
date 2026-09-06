@@ -6,7 +6,7 @@
 
 **Architecture:** 백엔드는 기존 것을 재사용한다 — 서명 디스크립터 `AttachmentService`(업로드·검증), `posts.attachments` JSON 칸, `FileController` 다운로드, `posts/show.php` 첨부 목록. 새로 만드는 것은 웹 업로드 라우트 하나(`POST /boards/{key}/files`), 폼 조각(`posts/_attachments.php`, 외부 라이브러리 없는 HTML5 드래그), 사이트 설정 두 칸, 그리고 "버려진 파일 정리" 단추다.
 
-**Tech Stack:** PHP 8.1+/Slim 4/PDO(SQLite·MySQL·PostgreSQL), PHPUnit 10, daisyUI 5 CDN. 서버에 composer·npm·컴파일 없음 — 자산은 빌드 없이 넣는다.
+**Tech Stack:** PHP 8.1+/Slim 4/PDO(SQLite·MySQL/MariaDB), PHPUnit 10, daisyUI 5 CDN. 서버에 composer·npm·컴파일 없음 — 자산은 빌드 없이 넣는다.
 
 스펙: `docs/superpowers/specs/2026-08-31-post-attachments-design.md`
 

@@ -62,7 +62,7 @@ final class BackupManager
     public function status(): array
     {
         $driver = $this->driver();
-        $binary = $driver === 'mysql' ? 'mysqldump' : ($driver === 'pgsql' ? 'pg_dump' : null);
+        $binary = $driver === 'mysql' ? 'mysqldump' : null;
         $availableFormats = $this->availableArchiveFormats();
         $hasArchiveSupport = $availableFormats !== [];
         $canCreate = $hasArchiveSupport && ($driver === 'sqlite'
@@ -147,7 +147,7 @@ final class BackupManager
 
             $driver = (string) ($manifest['database']['driver'] ?? '');
             $databaseEntry = (string) ($manifest['database']['path'] ?? '');
-            $this->verifyDatabaseEntry($archiveHandle, $path, $databaseEntry, $driver);
+            $this->verifyDatabaseEntry($archiveHandle, $path, $databaseEntry, $driver, $manifest['database']['prefix'] ?? '');
         } finally {
             $this->closeArchive($archiveHandle);
         }
@@ -180,6 +180,10 @@ final class BackupManager
         }
         if ($this->sqliteDatabasePath() === null) {
             throw new RuntimeException('메모리 SQLite 또는 확인할 수 없는 SQLite 경로는 복원할 수 없습니다.');
+        }
+        $manifest = $this->readManifest($this->resolveArchive($archive));
+        if (($manifest['database']['prefix'] ?? '') !== $this->db->prefix()) {
+            throw new RuntimeException('백업과 현재 설치의 테이블 프리픽스가 달라 복원할 수 없습니다.');
         }
 
         return $this->withLock(function () use ($archive): array {
@@ -342,7 +346,6 @@ final class BackupManager
         $databaseEntry = match ($driver) {
             'sqlite' => 'database/sqlite.sqlite',
             'mysql' => 'database/mysql.sql',
-            'pgsql' => 'database/postgresql.dump',
             default => throw new RuntimeException('지원하지 않는 DB 드라이버입니다: ' . $driver),
         };
 
@@ -384,7 +387,7 @@ final class BackupManager
                 'reason' => $reason,
                 'database' => [
                     'driver' => $driver,
-                    'format' => $driver === 'pgsql' ? 'pg_dump-custom' : ($driver === 'mysql' ? 'sql' : 'sqlite3'),
+                    'format' => $driver === 'mysql' ? 'sql' : 'sqlite3',
                     'path' => $databaseEntry,
                     'prefix' => $this->db->prefix(),
                 ],
@@ -426,6 +429,9 @@ final class BackupManager
             $this->db->pdo()->exec("VACUUM INTO '" . str_replace("'", "''", $destination) . "'");
             return;
         }
+        if ($driver !== 'mysql') {
+            throw new RuntimeException('지원하지 않는 DB 드라이버입니다: ' . $driver);
+        }
         if (!function_exists('proc_open')) {
             throw new RuntimeException('서버에서 외부 명령 실행이 꺼져 있어 DB 덤프를 만들 수 없습니다.');
         }
@@ -439,40 +445,22 @@ final class BackupManager
         $password = (string) ($this->config['db']['password'] ?? '');
         $tables = array_map(fn (string $table): string => $this->db->tableName($table), Schema::TABLES);
 
-        if ($driver === 'mysql') {
-            $binary = $this->findExecutable('mysqldump');
-            if ($binary === null) {
-                throw new RuntimeException('mysqldump 명령을 찾을 수 없습니다.');
-            }
-            $command = [$binary, '--single-transaction', '--quick', '--skip-lock-tables', '--triggers',
-                '--hex-blob', '--default-character-set=utf8mb4'];
-            if (($dsn['unix_socket'] ?? '') !== '') {
-                $command[] = '--socket=' . $dsn['unix_socket'];
-            } else {
-                $command[] = '--host=' . (string) ($dsn['host'] ?? 'localhost');
-                $command[] = '--port=' . (string) ($dsn['port'] ?? '3306');
-            }
-            $command[] = '--user=' . $username;
-            $command[] = $database;
-            array_push($command, ...$tables);
-            $this->runDump($command, $destination, $password === '' ? [] : ['MYSQL_PWD' => $password]);
-            return;
-        }
-
-        $binary = $this->findExecutable('pg_dump');
+        $binary = $this->findExecutable('mysqldump');
         if ($binary === null) {
-            throw new RuntimeException('pg_dump 명령을 찾을 수 없습니다.');
+            throw new RuntimeException('mysqldump 명령을 찾을 수 없습니다.');
         }
-        $command = [
-            $binary, '--format=custom', '--no-owner', '--no-privileges',
-            '--host=' . (string) ($dsn['host'] ?? 'localhost'), '--port=' . (string) ($dsn['port'] ?? '5432'),
-            '--username=' . $username,
-        ];
-        foreach ($tables as $table) {
-            $command[] = '--table=' . $table;
+        $command = [$binary, '--single-transaction', '--quick', '--skip-lock-tables', '--triggers',
+            '--hex-blob', '--default-character-set=utf8mb4'];
+        if (($dsn['unix_socket'] ?? '') !== '') {
+            $command[] = '--socket=' . $dsn['unix_socket'];
+        } else {
+            $command[] = '--host=' . (string) ($dsn['host'] ?? 'localhost');
+            $command[] = '--port=' . (string) ($dsn['port'] ?? '3306');
         }
+        $command[] = '--user=' . $username;
         $command[] = $database;
-        $this->runDump($command, $destination, $password === '' ? [] : ['PGPASSWORD' => $password]);
+        array_push($command, ...$tables);
+        $this->runDump($command, $destination, $password === '' ? [] : ['MYSQL_PWD' => $password]);
     }
 
     private function runDump(array $command, string $destination, array $extraEnvironment): void
@@ -579,28 +567,18 @@ final class BackupManager
         if (!is_array($manifest) || ($manifest['format'] ?? null) !== self::FORMAT
             || ($manifest['format_version'] ?? null) !== self::FORMAT_VERSION
             || !is_string($manifest['created_at'] ?? null)
-            || !in_array($manifest['database']['driver'] ?? null, ['sqlite', 'mysql', 'pgsql'], true)) {
+            || !in_array($manifest['database']['driver'] ?? null, ['sqlite', 'mysql'], true)
+            || !is_string($manifest['database']['prefix'] ?? '')) {
             throw new RuntimeException('지원하는 GNUCMS 전체 백업 형식이 아닙니다.');
         }
 
         return $manifest;
     }
 
-    private function verifyDatabaseEntry(object $archive, string $archivePath, string $entry, string $driver): void
+    private function verifyDatabaseEntry(object $archive, string $archivePath, string $entry, string $driver, string $prefix): void
     {
         if (!$this->validEntryName($entry)) {
             throw new RuntimeException('데이터베이스 파일 경로가 올바르지 않습니다.');
-        }
-        if ($driver === 'pgsql') {
-            $handle = $this->openArchiveEntryStream($archive, $archivePath, $entry);
-            $magic = is_resource($handle) ? fread($handle, 5) : false;
-            if (is_resource($handle)) {
-                fclose($handle);
-            }
-            if ($magic !== 'PGDMP') {
-                throw new RuntimeException('PostgreSQL custom dump 형식이 아닙니다.');
-            }
-            return;
         }
         if ($driver === 'mysql') {
             $handle = $this->openArchiveEntryStream($archive, $archivePath, $entry);
@@ -620,7 +598,7 @@ final class BackupManager
         $temporary = $this->archiveDir() . '/.verify-' . bin2hex(random_bytes(6)) . '.sqlite';
         try {
             $this->copyArchiveEntry($archive, $archivePath, $entry, $temporary);
-            $copy = Connection::create(['dsn' => 'sqlite:' . $temporary]);
+            $copy = Connection::create(['dsn' => 'sqlite:' . $temporary, 'prefix' => $prefix]);
             $integrity = $copy->pdo()->query('PRAGMA integrity_check')->fetchColumn();
             if ($integrity !== 'ok' || !(new Schema($copy))->exists()) {
                 throw new RuntimeException('SQLite 무결성 검사에 실패했습니다.');
@@ -1014,7 +992,7 @@ final class BackupManager
     private function resolveArchive(string $archive): string
     {
         $name = basename($archive);
-        if (preg_match('/^gnucms-(?:sqlite|mysql|pgsql)-\d{8}-\d{6}(?:-\d+)?\.(?:zip|tar)$/D', $name) !== 1) {
+        if (preg_match('/^gnucms-(?:sqlite|mysql)-\d{8}-\d{6}(?:-\d+)?\.(?:zip|tar)$/D', $name) !== 1) {
             throw new RuntimeException('백업 파일 이름이 올바르지 않습니다.');
         }
         // 웹 라우트는 basename만 전달하므로 저장 폴더 밖을 읽을 수 없다. CLI에서는
@@ -1187,24 +1165,14 @@ final class BackupManager
         }
         $dsn = $this->parseDsn((string) ($this->config['db']['dsn'] ?? ''));
         $host = (string) ($dsn['host'] ?? 'localhost');
-        $port = (string) ($dsn['port'] ?? ($driver === 'mysql' ? '3306' : '5432'));
+        $port = (string) ($dsn['port'] ?? '3306');
         $database = (string) ($dsn['dbname'] ?? 'DATABASE');
         $username = (string) ($this->config['db']['username'] ?? 'USER');
-        if ($driver === 'mysql') {
-            return [
-                '백업 ZIP 또는 TAR에서 database/mysql.sql을 먼저 압축 해제합니다.',
-                'mysql --host=' . escapeshellarg($host) . ' --port=' . escapeshellarg($port)
-                    . ' --user=' . escapeshellarg($username) . ' ' . escapeshellarg($database) . ' < database/mysql.sql',
-                '복원 전에 서비스 쓰기를 중지하고, DB 비밀번호는 프롬프트나 안전한 옵션 파일로 입력하세요.',
-            ];
-        }
-
         return [
-            '백업 ZIP 또는 TAR에서 database/postgresql.dump를 먼저 압축 해제합니다.',
-            'pg_restore --clean --if-exists --no-owner --no-privileges --host=' . escapeshellarg($host)
-                . ' --port=' . escapeshellarg($port) . ' --username=' . escapeshellarg($username)
-                . ' --dbname=' . escapeshellarg($database) . ' database/postgresql.dump',
-            '복원 전에 서비스 쓰기를 중지하고, DB 비밀번호는 프롬프트나 .pgpass로 입력하세요.',
+            '백업 ZIP 또는 TAR에서 database/mysql.sql을 먼저 압축 해제합니다.',
+            'mysql --host=' . escapeshellarg($host) . ' --port=' . escapeshellarg($port)
+                . ' --user=' . escapeshellarg($username) . ' ' . escapeshellarg($database) . ' < database/mysql.sql',
+            '복원 전에 서비스 쓰기를 중지하고, DB 비밀번호는 프롬프트나 안전한 옵션 파일로 입력하세요.',
         ];
     }
 

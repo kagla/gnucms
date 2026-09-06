@@ -20,11 +20,6 @@ final class DialectFactoryTest extends TestCase
         $this->assertSame('mysql', DialectFactory::fromDsn('mysql:host=localhost;dbname=b')->name());
     }
 
-    public function testResolvesPgsql(): void
-    {
-        $this->assertSame('pgsql', DialectFactory::fromDsn('pgsql:host=localhost;dbname=b')->name());
-    }
-
     public function testUnknownDriverThrows(): void
     {
         $this->expectException(DomainError::class);
@@ -35,12 +30,11 @@ final class DialectFactoryTest extends TestCase
     {
         $this->assertSame('"posts"', DialectFactory::fromDsn('sqlite::memory:')->quoteIdentifier('posts'));
         $this->assertSame('`posts`', DialectFactory::fromDsn('mysql:host=h')->quoteIdentifier('posts'));
-        $this->assertSame('"posts"', DialectFactory::fromDsn('pgsql:host=h')->quoteIdentifier('posts'));
     }
 
     public function testEveryDialectDefinesAllTypePlaceholders(): void
     {
-        foreach (['sqlite::memory:', 'mysql:host=h', 'pgsql:host=h'] as $dsn) {
+        foreach (['sqlite::memory:', 'mysql:host=h'] as $dsn) {
             $map = DialectFactory::fromDsn($dsn)->typeMap();
             $this->assertArrayHasKey('{AUTO_PK}', $map, $dsn);
             $this->assertArrayHasKey('{DATETIME}', $map, $dsn);

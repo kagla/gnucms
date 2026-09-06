@@ -6,7 +6,6 @@ namespace GnuCms\Db;
 
 use GnuCms\Db\Dialect\DialectInterface;
 use GnuCms\Db\Dialect\MysqlDialect;
-use GnuCms\Db\Dialect\PgsqlDialect;
 use GnuCms\Db\Dialect\SqliteDialect;
 use GnuCms\Error\DomainError;
 
@@ -21,8 +20,6 @@ final class DialectFactory
                 return new SqliteDialect();
             case 'mysql':
                 return new MysqlDialect();
-            case 'pgsql':
-                return new PgsqlDialect();
         }
 
         throw DomainError::internal('지원하지 않는 DB 드라이버입니다: ' . $driver);

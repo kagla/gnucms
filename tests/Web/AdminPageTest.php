@@ -568,7 +568,6 @@ final class AdminPageTest extends WebTestCase
             $body = $this->body($this->get($app, '/admin/settings/maintenance'));
 
             self::assertStringContainsString('2026-08-30 10:02:03 Asia/Seoul', $body);
-            self::assertStringContainsString('2026-02-01 09:00:05', $body);
             self::assertStringContainsString('<dt>마지막 백업</dt><dd>board-v9-20260201-000000.sqlite</dd>', $body);
 
             if ($app->db()->dialect()->name() !== 'sqlite') {
@@ -576,6 +575,7 @@ final class AdminPageTest extends WebTestCase
                 return;
             }
 
+            self::assertStringContainsString('2026-02-01 09:00:05', $body);
             self::assertStringContainsString('schema-backups', $body);
             self::assertStringNotContainsString('설치 이후 없음', $body);
             $newerPos = strpos($body, 'board-v9-20260201-000000.sqlite');

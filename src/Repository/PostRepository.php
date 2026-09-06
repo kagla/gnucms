@@ -403,7 +403,7 @@ final class PostRepository
 
     public function adjustCommentCount(int $id, int $delta): void
     {
-        // 0 미만으로 내려가지 않도록 GREATEST 대신 CASE 를 쓴다. 세 DB 공통 문법이다.
+        // 0 미만으로 내려가지 않도록 GREATEST 대신 CASE 를 쓴다. 지원 DB 공통 문법이다.
         $this->db->execute(
             'UPDATE ' . $this->db->table('posts')
             . ' SET comment_count = CASE WHEN comment_count + ? < 0 THEN 0 ELSE comment_count + ? END'

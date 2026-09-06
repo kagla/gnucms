@@ -92,14 +92,7 @@ final class PostListTest extends WebTestCase
     }
 
     /**
-     * PostRepository::paginate() 는 평범한 LIKE 로 검색한다. MySQL 과 (아스키 범위에서는)
-     * SQLite 에서는 대소문자를 가리지 않지만, PostgreSQL 의 LIKE 는 대소문자를 가린다.
-     * 지금까지의 검색 테스트는 대소문자 구분이 없는 한글이라 이 차이를 드러내지 못했다.
-     *
-     * 이 테스트는 SQLite 와 MySQL 에서는 통과한다. PostgreSQL 로 돌리면 실패할 것으로
-     * 예상한다 — 그게 이 테스트의 목적이다. pgsql 에서 이 테스트가 실패하면 버그가
-     * 아니라 여기서 미리 표시해 둔 실제 동작 차이이니, 테스트를 고치지 말고 ILIKE 로
-     * 바꾸는 등 PostRepository 를 고쳐야 한다.
+     * 한글 검색 외에 영문 제목도 대소문자 구분 없이 검색되는지 확인한다.
      *
      * @dataProvider connectionProvider
      */

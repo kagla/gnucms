@@ -172,13 +172,13 @@ if ($step === 2) {
             . ($values['type'] === $key ? ' checked' : '') . ($on ? '' : ' disabled') . '>' . h($label)
             . ($on ? '' : '<span class="hint">드라이버 없음</span>') . '</label>';
     }
-    $body = '<p class="intro">SQLite 는 파일 하나로 끝나고, MySQL·PostgreSQL 은 DB 서버 접속 정보가 필요합니다.</p>'
+    $body = '<p class="intro">SQLite 는 파일 하나로 끝나고, MySQL/MariaDB는 DB 서버 접속 정보가 필요합니다.</p>'
         . (isset($errors['_']) ? '<p class="alert">' . h($errors['_']) . '</p>' : '')
         . '<form method="post"><div class="radios">' . $radios . '</div>' . err($errors, 'type')
         . '<div id="sqlite">' . field('SQLite 파일 경로', 'sqlite_path', $values['sqlite_path'], $errors, 'text', '웹에서 접근할 수 없는 폴더의 절대 경로') . '</div>'
         . '<div id="server">'
         . field('호스트', 'host', $values['host'], $errors)
-        . field('포트', 'port', $values['port'], $errors, 'text', '비우면 기본값 (MySQL 3306, PostgreSQL 5432)', 'inputmode="numeric"')
+        . field('포트', 'port', $values['port'], $errors, 'text', '비우면 기본값 (MySQL/MariaDB 3306)', 'inputmode="numeric"')
         . field('DB 이름', 'name', $values['name'], $errors)
         . field('DB 계정', 'user', $values['user'], $errors)
         . field('DB 비밀번호', 'password', '', $errors, 'password', '', 'autocomplete="off"')
