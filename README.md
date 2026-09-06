@@ -364,6 +364,12 @@ MySQL/MariaDB 백업에는 서버의 `mysqldump`, PostgreSQL 백업에는 `pg_du
 운영 중 오류는 기본적으로 `storage/logs/error.log`에 기록됩니다. 운영 사이트에서는
 `config/config.php`의 `debug`를 `false`로 유지해 주세요.
 
+## 작은 쇼핑몰과 결제
+
+1인 운영 쇼핑몰 모듈과 **PortOne V2 기반 이니시스·KCP·KSPay 결제 플러그인**을 제공한다. 상품 옵션은 두 종류까지이며 조합별 재고, 회원 주문, 배송·반품·환불·교환, 수량·금액 정산을 관리한다. 결제는 원화 일반 과세 카드결제를 사용한다.
+
+[쇼핑몰 설치·운영 안내](docs/shop.md)에서 외부 계정 준비, 테스트·운영 전환, 오류 복구와 정산 기준을 확인할 수 있다.
+
 ## 라이선스
 
 GNUCMS는 MIT 라이선스로 배포됩니다. 자세한 내용은 [LICENSE](LICENSE)를 확인해 주세요.

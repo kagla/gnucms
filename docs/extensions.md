@@ -66,7 +66,7 @@ SQLite 자동 복원은 백업과 현재 설정의 DB 테이블 접두사가 같
 
 관리 화면은 `admin/extensions/index`를 사용한다. 관리자 화면을 재정의하는 테마는
 해당 템플릿과 `admin/_sidebar`의 플러그인·모듈 메뉴를 함께 반영해야 한다.
-현재 패키지 전용 템플릿의 테마 재정의 API는 제공하지 않는다.
+공통 패키지 템플릿 재정의 API는 제공하지 않는다. 쇼핑몰은 `extensions/shop/page.php`, 결제 플러그인은 `extensions/payment/settings.php`를 통한 패키지별 재정의를 제공한다. [쇼핑몰 운영 안내](shop.md)를 참고한다.
 
 기본 패키지 루트는 GNUCMS 루트다. 특수 배치·테스트에서는 설정의 `extensions.root`로
 `plugins/`, `modules/`를 포함하는 상위 디렉터리의 절대 경로를 지정할 수 있다.
