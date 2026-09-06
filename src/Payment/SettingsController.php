@@ -26,7 +26,7 @@ final class SettingsController
                 if ($action === 'install') $this->settings->install();
                 elseif ($action === 'save') $this->settings->save($environment, $input);
                 elseif (in_array($action, ['enable', 'disable'], true)) {
-                    if ($action === 'enable' && $this->settings->provider !== 'inicis') throw DomainError::validation(['payment' => '직접 연동 규격 확인이 완료되지 않아 결제 실행을 허용할 수 없습니다.']);
+                    if ($action === 'enable' && !in_array($this->settings->provider, ['inicis', 'toss'], true)) throw DomainError::validation(['payment' => '직접 연동 규격 확인이 완료되지 않아 결제 실행을 허용할 수 없습니다.']);
                     $this->settings->enable($environment, $action === 'enable');
                 }
                 else throw DomainError::validation(['action' => '작업을 확인해 주세요.']);
@@ -45,7 +45,7 @@ final class SettingsController
         $view = new PhpView($paths, $route->getRouteParser(), $route->getBasePath(), static fn ($p) => '', static fn ($p) => '');
         return $view->render($response->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer'), 'settings', [
             'fields' => ProviderConfig::fields($this->settings->provider), 'manual' => ProviderConfig::manual($this->settings->provider),
-            'integration_ready' => $this->settings->provider === 'inicis',
+            'integration_ready' => in_array($this->settings->provider, ['inicis', 'toss'], true),
             'label' => Settings::PROVIDERS[$this->settings->provider], 'key' => $this->settings->key(), 'environment' => $environment,
             'ready' => $this->settings->ready(), 'settings' => $this->settings->summary($environment), 'notice' => $notice,
             'errors' => $errors, 'csrf_token' => $_SESSION['csrf_token'] ?? '',

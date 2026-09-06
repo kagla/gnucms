@@ -13,7 +13,7 @@ use GnuCms\Mail\SecretCipher;
 /** 이전 주문의 조회·환불에 필요한 암호화 설정 판을 보존한다. */
 final class Settings
 {
-    public const PROVIDERS = ['inicis' => 'KG이니시스', 'kcp' => 'NHN KCP', 'kspay' => 'KSPay (KSNET)'];
+    public const PROVIDERS = ['inicis' => 'KG이니시스', 'kcp' => 'NHN KCP', 'kspay' => 'KSPay (KSNET)', 'toss' => '토스페이먼츠'];
     private SecretCipher $cipher;
     private string $table;
 
@@ -109,7 +109,7 @@ final class Settings
         self::environment($environment);
         if (!$this->ready()) throw DomainError::serviceUnavailable('결제 플러그인 데이터를 먼저 설치해 주세요.');
         $before = $this->row($environment);
-        $data = ProviderConfig::validate($this->provider, $input, $this->current($environment) ?? [])
+        $data = ProviderConfig::validate($this->provider, $input, $this->current($environment) ?? [], $environment)
             + ['integration' => 'direct-v1', 'environment' => $environment, 'revision' => bin2hex(random_bytes(16))];
         (new RuntimePermit($this->app->storageDir()))->set($this->key() . '/' . $environment, null);
         $payload = $this->cipher->encrypt(json_encode($data, JSON_THROW_ON_ERROR));

@@ -11,6 +11,7 @@ use GnuCms\Payment\InicisGateway;
 use GnuCms\Payment\KcpGateway;
 use GnuCms\Payment\KspayGateway;
 use GnuCms\Payment\Settings;
+use GnuCms\Payment\TossGateway;
 
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit; }
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
@@ -43,7 +44,7 @@ try {
         $gateways = [];
         foreach (array_keys(Settings::PROVIDERS) as $provider) {
             if (in_array('plugins/payment-' . $provider, $enabled, true)) {
-                $class = match ($provider) { 'inicis' => InicisGateway::class, 'kcp' => KcpGateway::class, 'kspay' => KspayGateway::class };
+                $class = match ($provider) { 'inicis' => InicisGateway::class, 'kcp' => KcpGateway::class, 'kspay' => KspayGateway::class, 'toss' => TossGateway::class };
                 $gateways[$provider] = new $class(new Settings($app, $provider));
             }
         }

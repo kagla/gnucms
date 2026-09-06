@@ -11,6 +11,7 @@
   "optional": [
     "plugins/payment-inicis",
     "plugins/payment-kcp",
-    "plugins/payment-kspay"
+    "plugins/payment-kspay",
+    "plugins/payment-toss"
   ]
 }

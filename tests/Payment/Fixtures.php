@@ -11,6 +11,7 @@ final class Fixtures
         if ($provider === 'inicis') return ['merchant_id' => 'gnu' . substr(bin2hex(random_bytes(4)), 0, 7), 'sign_key' => bin2hex(random_bytes(32)),
             'hash_key' => bin2hex(random_bytes(16)), 'api_key' => bin2hex(random_bytes(16)), 'client_ip' => '192.0.2.10'];
         if ($provider === 'kspay') return ['merchant_id' => '2999900000', 'api_key' => base64_encode(random_bytes(48))];
+        if ($provider === 'toss') return ['merchant_id' => 'gnu' . bin2hex(random_bytes(5)), 'client_key' => 'test_ck_' . bin2hex(random_bytes(24)), 'secret_key' => 'test_sk_' . bin2hex(random_bytes(24))];
         $file = tempnam(sys_get_temp_dir(), 'gnucms-test-openssl-');
         file_put_contents($file, "[req]\ndistinguished_name=dn\n[dn]\nCN=example.test\n");
         try {

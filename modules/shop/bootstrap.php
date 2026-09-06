@@ -13,12 +13,13 @@ require_once __DIR__ . '/autoload.php';
 
 return static function (Context $context): void {
     $gateways = [];
-    foreach (['inicis', 'kcp', 'kspay'] as $id) {
+    foreach (array_keys(\GnuCms\Payment\Settings::PROVIDERS) as $id) {
         $gateway = $context->service('plugins/payment-' . $id, 'gateway.v2');
         if ($gateway instanceof Gateway) $gateways[$id] = $gateway;
     }
     $service = new Service($context->app, $gateways);
     $controller = new Controller($service);
+    $context->route('GET', '/toss-return', [new \GnuCms\Modules\Shop\TossReturnController($service), 'handle']);
     foreach (['catalog', 'product', 'cart', 'checkout', 'orders', 'order', 'return'] as $page) {
         $context->route('GET', '/' . $page, static fn ($request, $response) => $controller->handle($page, $request, $response));
         if (in_array($page, ['cart', 'checkout', 'order'], true)) $context->route('POST', '/' . $page, static fn ($request, $response) => $controller->handle($page, $request, $response));

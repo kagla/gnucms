@@ -3,6 +3,7 @@
 <nav><a href="<?= $this->e($this->base) ?>/admin/plugins">플러그인 관리</a><a href="<?= $this->e($this->base) ?>/modules/shop/admin">쇼핑몰 관리</a></nav>
 <h1><?= $this->e($label) ?> 결제</h1><p>PG 직접 연동 · 원화 과세 카드결제</p>
 <aside>가맹점 등록 후 PG에서 발급한 <strong>상점 코드와 인증 정보</strong>를 입력해 주세요. 리셀러 코드는 가맹점 등록에 사용합니다. 인증 정보는 암호화해서 저장합니다.</aside>
+<?php if ($key === 'plugins/payment-toss'): ?><p>토스페이먼츠 개발자센터에서 같은 MID의 API 개별 연동 클라이언트 키(ck)·시크릿 키(sk)를 입력하세요. API 버전은 2022-11-16을 사용합니다. 카드·간편결제 통합결제창을 제공하며, 주문서형·결제창형 연동 키(gck/gsk)는 지원하지 않습니다.</p><?php endif ?>
 <?php if (!$integration_ready): ?><p class="error" role="status">직접 연동 준비 중입니다. 결제창·승인·조회 규격 확인이 끝나기 전에는 쇼핑몰에서 이 결제사를 선택할 수 없습니다.</p><?php endif ?>
 <?php foreach ($errors as $error): ?><p class="error" role="alert"><?= $this->e($error) ?></p><?php endforeach ?>
 <?php if ($notice): ?><p class="notice" role="status"><?= $this->e($notice) ?></p><?php endif ?>

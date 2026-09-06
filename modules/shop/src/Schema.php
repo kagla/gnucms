@@ -9,7 +9,7 @@ use GnuCms\Extension\PackageSchema;
 final class Schema
 {
     public const KEY = 'modules/shop';
-    public const VERSION = 1;
+    public const VERSION = 2;
     public const TABLES = ['shop_settings', 'shop_products', 'shop_variants', 'shop_orders', 'shop_items',
         'shop_claims', 'shop_refunds', 'shop_money', 'shop_stock', 'shop_payouts', 'shop_events'];
 
@@ -28,7 +28,7 @@ final class Schema
                     order_name VARCHAR(200) NOT NULL, customer {TEXT} NOT NULL, provider VARCHAR(10) NOT NULL,
                     environment VARCHAR(4) NOT NULL, config_revision VARCHAR(32) NOT NULL, status VARCHAR(24) NOT NULL,
                     total BIGINT NOT NULL CHECK (total > 0), shipping BIGINT NOT NULL, refunded BIGINT NOT NULL,
-                    shipping_refunded BIGINT NOT NULL, transaction_id VARCHAR(100) UNIQUE, checkout_started BIGINT NOT NULL,
+                    shipping_refunded BIGINT NOT NULL, transaction_id VARCHAR(200) UNIQUE, checkout_started BIGINT NOT NULL,
                     paid_at BIGINT NOT NULL, created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL,
                     stock_released SMALLINT NOT NULL, carrier VARCHAR(80) NOT NULL, tracking VARCHAR(80) NOT NULL,
                     shipped_at BIGINT NOT NULL, delivered_at BIGINT NOT NULL, version INTEGER NOT NULL, needs_review SMALLINT NOT NULL,
@@ -48,7 +48,7 @@ final class Schema
                     provider_ref VARCHAR(100), created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL',
                 'shop_money' => 'id VARCHAR(64) PRIMARY KEY, order_id VARCHAR(32) NOT NULL, environment VARCHAR(4) NOT NULL,
                     provider VARCHAR(10) NOT NULL, kind VARCHAR(16) NOT NULL, amount BIGINT NOT NULL, occurred_at BIGINT NOT NULL,
-                    reference VARCHAR(100) NOT NULL',
+                    reference VARCHAR(200) NOT NULL',
                 'shop_stock' => 'id VARCHAR(32) PRIMARY KEY, variant_id VARCHAR(32) NOT NULL, delta INTEGER NOT NULL,
                     kind VARCHAR(20) NOT NULL, reference VARCHAR(100) NOT NULL, created_at BIGINT NOT NULL',
                 'shop_payouts' => 'id VARCHAR(32) PRIMARY KEY, request_key VARCHAR(64) NOT NULL UNIQUE, environment VARCHAR(4) NOT NULL,
@@ -62,6 +62,13 @@ final class Schema
             $types = $db->dialect()->typeMap() + ['{OPTION_COLLATION}' => $db->dialect()->name() === 'mysql' ? ' COLLATE utf8mb4_bin' : ''];
             foreach ($definitions as $table => $definition) {
                 $db->execute('CREATE TABLE IF NOT EXISTS ' . $db->table($table) . ' (' . strtr($definition, $types) . ')' . $db->dialect()->tableSuffix());
+            }
+            // SQLite VARCHAR에는 길이 제한이 없다. MySQL의 기존 두 컬럼만 멱등 확장한다.
+            if ($db->dialect()->name() === 'mysql') {
+                foreach (['shop_orders' => ['transaction_id', 'NULL'], 'shop_money' => ['reference', 'NOT NULL']] as $table => [$column, $nullable]) {
+                    $info = $db->selectOne('SELECT CHARACTER_MAXIMUM_LENGTH AS max_length FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?', [$db->tableName($table), $column]);
+                    if ((int) $info['max_length'] < 200) $db->execute('ALTER TABLE ' . $db->table($table) . ' MODIFY ' . $db->q($column) . ' VARCHAR(200) ' . $nullable);
+                }
             }
             foreach (['shop_order_user' => ['shop_orders', 'user_id'], 'shop_item_order' => ['shop_items', 'order_id'],
                 'shop_claim_order' => ['shop_claims', 'order_id'], 'shop_refund_order' => ['shop_refunds', 'order_id'],

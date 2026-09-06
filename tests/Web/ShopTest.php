@@ -32,7 +32,7 @@ final class ShopTest extends WebTestCase
         $config['prefix'] = 'sw' . bin2hex(random_bytes(4)) . '_';
         $this->app = $this->makeApp($config, ['storage' => ['dir' => $this->root], 'auth' => ['secret' => bin2hex(random_bytes(32))], 'app' => ['url' => 'https://shop.example.test']]);
         $manager = new Manager(new Catalog(dirname(__DIR__, 2)), new StateStore($this->root . '/extensions'));
-        $manager->setEnabledMany(['modules/shop' => true, 'plugins/payment-inicis' => true, 'plugins/payment-kcp' => true, 'plugins/payment-kspay' => true]);
+        $manager->setEnabledMany(['modules/shop' => true, 'plugins/payment-inicis' => true, 'plugins/payment-kcp' => true, 'plugins/payment-kspay' => true, 'plugins/payment-toss' => true]);
         $this->shop = new Service($this->app, ['inicis' => new FakeGateway()]);
         if ($install) $this->shop->install();
     }
@@ -134,5 +134,49 @@ final class ShopTest extends WebTestCase
         self::assertSame(422, $this->get($this->app, '/modules/shop/catalog', ['q' => ['bad']])->getStatusCode());
         self::assertSame(403, $this->post($this->app, '/modules/shop/settings', ['open' => '1'])->getStatusCode());
         self::assertSame([], $this->shop->orders(null));
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testTossSettingsCheckoutAndAuthenticatedReturnOnlyPreparePost(array $config): void
+    {
+        $this->setupShop($config);
+        self::assertSame(401, $this->get($this->app, '/plugins/payment-toss/settings')->getStatusCode());
+        $user = $this->signIn(true); $path = '/plugins/payment-toss/settings';
+        self::assertSame(200, $this->post($this->app, $path, $this->csrf(['action' => 'install']))->getStatusCode());
+        $credentials = \GnuCms\Tests\Payment\Fixtures::config('toss');
+        $response = $this->post($this->app, $path, $this->csrf($credentials + ['action' => 'save', 'environment' => 'test']));
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringNotContainsString($credentials['secret_key'], $this->body($response));
+        self::assertSame(200, $this->post($this->app, $path, $this->csrf(['action' => 'enable', 'environment' => 'test']))->getStatusCode());
+        $settings = new Settings($this->app, 'toss'); self::assertTrue($settings->available('test'));
+        $this->shop->saveSettings(['name' => '상점', 'seller' => '상호', 'owner' => '대표', 'business_number' => '000', 'phone' => '01000000000', 'email' => 'shop@example.test',
+            'address' => '주소', 'return_address' => '반품 주소', 'policy' => '정책', 'shipping' => 3000, 'free_shipping' => 50000, 'environment' => 'test', 'open' => '1']);
+        $p = $this->product();
+        $shop = new Service($this->app, ['toss' => new \GnuCms\Payment\TossGateway($settings)]);
+        $order = $shop->createOrder($user, [$p['variants'][0]['id'] => 1], ['name' => '구매자', 'phone' => '01000000000', 'email' => 'buyer@example.test', 'postcode' => '00000', 'address' => '주소', 'consent' => '1'], 'toss', Store::id(), 13000);
+        $response = $this->post($this->app, '/modules/shop/order', $this->csrf(['id' => $order['id'], 'action' => 'pay']));
+        self::assertSame(200, $response->getStatusCode()); self::assertStringContainsString('https://js.tosspayments.com/v2/standard', $this->body($response));
+        self::assertStringNotContainsString($credentials['secret_key'], $this->body($response));
+        $query = ['id' => $order['id'], 'state' => \GnuCms\Payment\CallbackToken::create($this->app, $order),
+            'paymentKey' => bin2hex(random_bytes(100)), 'orderId' => $order['id'], 'amount' => '13000'];
+        $this->app->setIdentity(\GnuCms\Auth\Identity::guest());
+        $request = (new ServerRequestFactory())->createServerRequest('GET', '/cms/modules/shop/toss-return?' . http_build_query($query));
+        $response = Kernel::create($this->app, dirname(__DIR__, 2) . '/templates', '/cms')->handle($request);
+        self::assertSame(200, $response->getStatusCode(), $this->body($response));
+        self::assertStringContainsString('action="/cms/modules/shop/callback?', $this->body($response));
+        self::assertStringContainsString('name="paymentKey" value="' . $query['paymentKey'] . '"', $this->body($response));
+        self::assertSame('no-store', $response->getHeaderLine('Cache-Control')); self::assertSame('no-referrer', $response->getHeaderLine('Referrer-Policy'));
+        self::assertStringContainsString("form-action 'self'", $response->getHeaderLine('Content-Security-Policy'));
+        self::assertSame('pending', $shop->store->get('shop_orders', $order['id'])['status']);
+        self::assertSame('ready', (new \GnuCms\Payment\Journal($settings))->read($order['id'])['approval']);
+        self::assertSame(403, $this->get($this->app, '/modules/shop/toss-return', array_replace($query, ['state' => str_repeat('0', 64)]))->getStatusCode());
+        foreach ([['amount' => '1'], ['orderId' => Store::id()], ['paymentKey' => ['bad']], ['paymentKey' => '"><script>']] as $bad) {
+            self::assertSame(422, $this->get($this->app, '/modules/shop/toss-return', array_replace($query, $bad))->getStatusCode());
+        }
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/modules/shop/callback?' . http_build_query(['id' => $order['id'], 'state' => $query['state']]))
+            ->withHeader('Content-Type', 'application/x-www-form-urlencoded');
+        $request->getBody()->write(http_build_query(['paymentKey' => $query['paymentKey'], 'orderId' => $order['id'], 'amount' => '1']));
+        self::assertSame(303, Kernel::create($this->app, dirname(__DIR__, 2) . '/templates', '')->handle($request)->getStatusCode());
+        self::assertSame('ready', (new \GnuCms\Payment\Journal($settings))->read($order['id'])['approval']);
     }
 }

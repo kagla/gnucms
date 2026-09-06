@@ -10,7 +10,7 @@ final class StreamTransport implements Transport
 {
     public function request(string $method, string $url, array $headers, ?array $body): array
     {
-        if (!self::allowed($url) || $method !== 'POST') throw DomainError::internal('결제 API 경로가 올바르지 않습니다.');
+        if (!self::allowed($url, $method) || ($method === 'GET' && $body !== null)) throw DomainError::internal('결제 API 경로가 올바르지 않습니다.');
         $contentType = $headers['Content-Type'] ?? 'application/json';
         $form = str_starts_with($contentType, 'application/x-www-form-urlencoded');
         $lines = ['Accept: application/json', 'Content-Type: ' . $contentType];
@@ -57,8 +57,11 @@ final class StreamTransport implements Transport
         return json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 
-    public static function allowed(string $url): bool
+    public static function allowed(string $url, string $method = 'POST'): bool
     {
+        if ($method === 'GET') return (bool) preg_match('~^https://api\.tosspayments\.com/v1/payments/orders/[a-f0-9]{32}$~D', $url);
+        if ($method !== 'POST') return false;
+        if (preg_match('~^https://api\.tosspayments\.com/v1/payments/(?:confirm|[A-Za-z0-9_-]{1,200}/cancel)$~D', $url)) return true;
         return (bool) preg_match('~^https://(?:(?:stg)?iniapi\.inicis\.com/v2/pg/(?:inquiry|refund|partialRefund)|(?:fc|ks|stg)stdpay\.inicis\.com/api/[A-Za-z0-9]+|(?:fc|ks|stg)mobile\.inicis\.com/smart/(?:payReq|payNetCancel)\.ini|(?:stg-)?spl\.kcp\.co\.kr/(?:std/inquery|std/brpay/treg|gw/enc/v1/payment|gw/mod/v1/cancel)|pay(?:dev)?\.ksnet\.co\.kr/kspay/webfep/api/v1/card/cancel)$~D', $url);
     }
 }

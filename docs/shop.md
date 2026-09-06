@@ -10,6 +10,7 @@
 | `plugins/payment-inicis` | KG이니시스 카드결제 | `/plugins/payment-inicis/settings` |
 | `plugins/payment-kcp` | NHN KCP 카드결제 | `/plugins/payment-kcp/settings` |
 | `plugins/payment-kspay` | KSPay / KSNET 카드결제 | `/plugins/payment-kspay/settings` |
+| `plugins/payment-toss` | 토스페이먼츠 카드·간편결제 | `/plugins/payment-toss/settings` |
 
 **PG에 직접 연동한다. 리셀러 코드는 가맹점 등록용이고, 결제 요청에는 등록 후 발급받은 상점 코드를 사용한다.** 별도 결제 중계 서비스의 계정·채널 키는 사용하지 않는다.
 
@@ -20,16 +21,17 @@
 | 이니시스 | MID, 웹표준 SignKey, 모바일 Hash Key, INIAPI Key, 서버 IPv4 | PC·모바일 승인, 서버 조회, 전체/부분 환불 코드 구현. 가맹점 실연동 검증 필요 |
 | KCP | site_cd, 서비스 인증서·개인키 PEM, 개인키 비밀번호 | 거래 등록·승인·취소 코드 작성. 조회 서명 규격 미확인으로 결제 실행 차단 |
 | KSPay | MID, pgapi 인증키 | 직접 취소 코드 작성. 결제창·승인·조회 규격 미확보로 결제 실행 차단 |
+| 토스페이먼츠 | MID, API 개별 연동 클라이언트 키(ck)·시크릿 키(sk) | PC·모바일 카드·간편결제창, 서버 승인·조회, 전체/부분 환불 구현. 가맹점 실연동 검증 필요 |
 
 KCP 공개 조회 문서는 `kcp_sign_data` 서명식에 `mod_type`을 포함하지만 해당 값과 요청 항목을 명시하지 않는다. 공식 공개 테스트 인증서로 임의의 존재하지 않는 주문번호를 조회했으나 `S032`(접근권한 없음)로 거부되었다. 서명 규격 및 조회 API 권한 확인 전에는 구현 완료로 취급하지 않는다. KSPay는 KSNET의 해당 계약용 결제창·서버 승인·조회 문서와 샘플이 필요하다. 공개 REST의 카드번호 직접 입력 API는 일반 결제창을 대체하지 않는다.
 
-각 플러그인은 `gateway.v2` 서비스를 제공한다. 쇼핑몰은 활성화하고 준비가 완료된 결제사만 선택할 수 있다. 결제 범위는 **KRW 일반 과세 카드결제와 전체·부분 취소**다. 카드번호를 GNUCMS에서 입력받거나 저장하지 않는다. 가상계좌, 계좌이체, 휴대폰, 빌링, 에스크로, 면세·복합과세, 쿠폰·적립금, 차액 결제는 포함하지 않는다. 교환은 동일 상품의 동일 가격 옵션으로 처리한다.
+각 플러그인은 `gateway.v2` 서비스를 제공한다. 쇼핑몰은 활성화하고 준비가 완료된 결제사만 선택할 수 있다. 결제 범위는 **KRW 일반 과세 카드결제와 전체·부분 취소**이며 토스페이먼츠 통합결제창의 간편결제도 지원한다. 카드번호를 GNUCMS에서 입력받거나 저장하지 않는다. 가상계좌, 계좌이체, 휴대폰, 빌링, 에스크로, 면세·복합과세, 쿠폰·적립금, 차액 결제는 포함하지 않는다. 교환은 동일 상품의 동일 가격 옵션으로 처리한다.
 
 ## 설치와 판매 시작
 
 1. 관리자 → 플러그인에서 사용할 결제 플러그인을 활성화한다.
 2. 결제 플러그인 설정에서 **데이터 설치**를 실행한다. GET 조회만으로 테이블을 설치하지 않는다.
-3. 이니시스 테스트 환경에 발급받은 MID와 세 종류의 인증키, 서버 IPv4 주소를 저장한다. API 실행을 허용한다. SignKey와 INIAPI Key는 서로 다른 키다.
+3. 이니시스 테스트 환경에 발급받은 MID와 세 종류의 인증키, 서버 IPv4 주소를 저장한다. API 실행을 허용한다. SignKey와 INIAPI Key는 서로 다른 키다. 토스페이먼츠는 아래의 상점별 MID·API 개별 연동 키를 저장한다.
 4. 관리자 → 모듈에서 작은 쇼핑몰을 활성화하고 **쇼핑몰 데이터 설치**를 실행한다.
 5. 상점 설정에서 상호·대표자·사업장·연락처·반품 주소와 실제 운영에 맞는 배송·반품·개인정보 처리 정책을 입력한다. 개인정보 보관기간 및 결제·택배 위탁 정보도 운영 정책에 명시한다.
 6. `config/config.php`의 `app.url`을 외부에서 접근 가능한 HTTPS 사이트 주소로 설정한다. 하위 경로 설치는 `https://example.com/cms`처럼 경로까지 포함한다.
@@ -37,7 +39,20 @@ KCP 공개 조회 문서는 `kcp_sign_data` 서명식에 `mod_type`을 포함하
 8. 운영용 상점 코드와 인증 정보를 별도로 저장하고 API 실행을 허용한 뒤 상점의 결제 환경을 운영으로 바꾼다. 주문 접수를 연다.
 9. CMS 사이트 메뉴에 `/modules/shop/catalog`를 추가해 상점으로 연결한다.
 
-운영 서버에서 Composer·npm 설치나 빌드를 하지 않는다. PHP 코드와 정적 템플릿은 배포본에 포함하고, 이니시스 PC 결제창에서 PG 공식 스크립트를 읽고, 모바일 결제는 PG 결제창으로 폼을 전송한다. 주문·정산 화면의 PHP·CSS에는 새 패키지 의존성이 없다. 이미지와 런타임 잠금은 `storage/` 또는 기존 업로드 설정 경로에 저장한다.
+운영 서버에서 Composer·npm 설치나 빌드를 하지 않는다. PHP 코드와 정적 템플릿은 배포본에 포함하고, 이니시스 PC와 토스페이먼츠 결제창에서 PG 공식 스크립트를 읽고, 이니시스 모바일 결제는 PG 결제창으로 폼을 전송한다. 주문·정산 화면의 PHP·CSS에는 새 패키지 의존성이 없다. 이미지와 런타임 잠금은 `storage/` 또는 기존 업로드 설정 경로에 저장한다.
+
+## 토스페이먼츠 설정
+
+토스페이먼츠 개발자센터에서 결제창 서비스의 **상점아이디(MID)** 를 선택하고 **API 개별 연동**의 클라이언트 키와 시크릿 키를 함께 등록한다. API 버전은 **2022-11-16**을 선택한다. SDK는 V2 `payment().requestPayment()` 방식이며, 공식 문서에서는 이 통합결제창을 현재 “결제창(구버전)”으로 표기한다. 별도의 결제 중계 서비스 가입은 필요하지 않다.
+
+- 테스트 환경은 `test_ck_…`·`test_sk_…`, 운영 환경은 `live_ck_…`·`live_sk_…` 쌍을 사용한다. 환경이 섞이거나 주문서형·결제창형 연동 키(`gck/gsk`)를 입력하면 저장을 거절한다.
+- MID는 응답의 상점을 확인하는 기준이다. 결제창은 클라이언트 키, 서버 승인·조회·환불은 시크릿 키로 해당 MID에 연결한다. 리셀러 코드를 승인 요청에 넣지 않는다.
+- 같은 MID에서 비워 둔 키는 기존 값을 유지한다. 저장 후에는 API 실행을 다시 허용한다. 시크릿 키는 암호화하고 브라우저에는 공개 클라이언트 키만 전달한다.
+- PC·모바일 모두 `https://js.tosspayments.com/v2/standard`의 카드·간편결제창을 연다. 금액·주문번호는 저장된 주문에서 만들고 구매자 식별값은 서버 HMAC으로 생성한다.
+- 인증 성공 URL은 `/modules/shop/toss-return?id=…&state=…`다. GET 화면은 HMAC·주문번호·금액을 검사하고 기존 `/modules/shop/callback`으로 POST한다. 자바스크립트가 꺼져 있으면 확인 버튼으로 진행한다. GET만으로 승인하지 않으며 복귀 화면은 외부 자산을 읽지 않고 캐시·리퍼러 전송을 막는다.
+- 서버는 `/v1/payments/confirm`으로 승인하고 `/v1/payments/orders/{orderId}`로 다시 조회한다. MID·주문번호·거래키·KRW·총액·잔액·승인 시각·결제수단·취소 내역이 일치할 때만 주문과 원장에 반영한다. 승인 응답을 받지 못했어도 주문번호 조회로 복구한다.
+- 취소 전 PG 잔액과 부분 취소 가능 여부를 조회한다. 취소 요청에 금액, 예상 잔액(`refundableAmount`), `Idempotency-Key`를 보내고 응답에서 새 취소 ID 한 건과 금액을 대조한다. `refundableAmount`는 공식 문서에서 deprecated로 표시되어 있으나 현재 지원하는 추가 잔액 검사 항목이다. 응답이 불확실하면 자동 재전송을 막고 기존 관리자 대조 절차를 사용한다.
+- 가상계좌 입금, 빌링, 에스크로·면세 상점은 이번 연동 범위에 포함되지 않는다. 정산 화면의 토스페이먼츠 필터와 입금 대조는 기존 확정 결제·환불 원장을 사용하며 PG 정산서 자동 수집은 제공하지 않는다.
 
 ## 상품과 옵션
 
@@ -146,13 +161,13 @@ php modules/shop/bin/maintenance.php sync --order=<주문번호>
 
 ## 백업과 테마
 
-쇼핑몰 스키마 판은 `modules/shop/src/Schema.php`의 `VERSION = 1`이다. 결제 플러그인 스키마 판은 2이며 암호화된 거래 처리 기록 테이블을 추가한다. 기존 설치에서는 결제 설정의 데이터 설치/갱신을 실행한다. 코어 DB의 구조를 바꾸지 않으므로 코어 `Schema::VERSION`과 제품 `version.txt`는 변경하지 않는다.
+쇼핑몰 스키마 판은 `modules/shop/src/Schema.php`의 `VERSION = 2`다. 토스 거래키를 위해 주문의 거래번호와 금액 원장의 참조값을 최대 200자로 확장한다. 기존 쇼핑몰은 관리자에서 데이터 설치/갱신을 실행한다. MySQL/MariaDB는 두 컬럼을 멱등 확장하며, SQLite의 기존 VARCHAR에는 길이 제한이 없어 기존 테이블을 그대로 사용할 수 있다. 결제 플러그인 스키마 판은 2이며 암호화된 거래 처리 기록 테이블을 추가한다. 기존 설치에서는 결제 설정의 데이터 설치/갱신을 실행한다. 코어 DB의 구조를 바꾸지 않으므로 코어 `Schema::VERSION`과 제품 `version.txt`는 변경하지 않는다.
 
 전체 백업에는 설치 레지스트리의 쇼핑몰·결제 설정·거래 처리 기록 테이블과 기존 업로드 경로의 상품 이미지가 포함된다. 암호화에 사용한 `auth.secret`을 함께 보존해야 한다. 과거 주문의 조회·환불을 위해 결제 설정의 이전 판을 보관한다. SQLite 복원 후 API 실행 허용은 해제된다. 거래·재고를 결제사와 대조하고 API 실행을 다시 허용한다. 요청 중에는 백업·복원과의 공통 잠금을 유지한다.
 
 같은 PG 상점 코드에서 인증키나 요청 서버 IPv4 주소를 변경하면 과거 주문도 최신 설정을 사용한다. 주문 당시의 상점·금액·환경 검증은 유지한다. 상점 ID 자체를 바꾼 경우에는 과거 상점 인증값을 보존하므로 이전 상점을 폐쇄하기 전에 남은 주문·환불을 처리한다.
 
-선택 테마의 `extensions/shop/page.php`를 제공하면 그 디렉터리의 쇼핑몰 템플릿을 우선 사용하고 없는 파일은 모듈 기본값으로 보완한다. 결제 설정 화면은 `extensions/payment/settings.php`로 재정의한다. 결제 설정 재정의는 PG별 `fields` 입력과 `integration_ready` 상태를 표시해야 한다. 주문 화면 재정의는 새 결제 폼 계약을 적용해야 한다.
+선택 테마의 `extensions/shop/page.php`를 제공하면 그 디렉터리의 쇼핑몰 템플릿을 우선 사용하고 없는 파일은 모듈 기본값으로 보완한다. 결제 설정 화면은 `extensions/payment/settings.php`로 재정의한다. 결제 설정 재정의는 PG별 `fields` 입력과 `integration_ready` 상태를 표시해야 한다. 주문 화면 재정의는 새 결제 폼 계약을 적용해야 한다. 토스는 `payment.kind=toss`의 `client_key`, `customer_key`, `request`로 SDK를 호출하며 JSON을 스크립트에 넣을 때 HTML 특수문자를 이스케이프한다. 인증 결과 전달 화면 `toss-return.php`는 모듈에서 직접 제공한다.
 
 ## 검증과 운영 전 확인
 
@@ -162,11 +177,12 @@ php modules/shop/bin/maintenance.php sync --order=<주문번호>
 ./vendor/bin/phpunit tests/Web/ShopTest.php
 ./vendor/bin/phpunit
 PUPPETEER_MODULE=/설치경로/puppeteer-core CHROME_BIN=/설치경로/chrome node tests/Browser/Shop.cjs
+PUPPETEER_MODULE=/설치경로/puppeteer-core CHROME_BIN=/설치경로/chrome node tests/Browser/Toss.cjs
 ```
 
 DB 테스트는 `connectionProvider`로 SQLite·MySQL/MariaDB를 실행한다. 동시 주문, 금액·상점 변조, 중복 콜백, 부분·전체 취소, 반품 수량, 교환품 재반품, 통신 단절·재전송 차단, 외부 환불 연결, 날짜 경계와 정산 차이를 검증한다. 브라우저 테스트는 외부 SDK를 대체하고 실제 결제 요청을 보내지 않는다.
 
-자동 테스트는 PG 응답을 대체한다. 이니시스 운영 개통 전 가맹점 테스트 환경에서 PC·모바일 승인, 취소, 응답 유실 복구, 실제 PG 정산서 대조를 수행해야 한다. 현재 KCP·KSPay 연동은 미완성이므로 운영용으로 활성화할 수 없다.
+자동 테스트는 PG 응답을 대체한다. 이니시스·토스페이먼츠 운영 개통 전 가맹점 테스트 환경에서 PC·모바일 승인, 취소, 응답 유실 복구, 실제 PG 정산서 대조를 수행해야 한다. 현재 KCP·KSPay 연동은 미완성이므로 운영용으로 활성화할 수 없다.
 
 ## 연동 참고 자료
 
@@ -179,3 +195,8 @@ DB 테스트는 `connectionProvider`로 SQLite·MySQL/MariaDB를 실행한다. �
 - [KCP 취소](https://developer.kcp.co.kr/reference/cancel)
 - [KCP 인증서·서명](https://developer.kcp.co.kr/docs/support/support-service-cert-info.md)
 - [KSNET pgapi](https://paydev.ksnet.co.kr/kspay/webfep/doc)
+
+- [토스페이먼츠 카드·간편결제창](https://docs.tosspayments.com/guides/v2/payment-window/integration)
+- [토스페이먼츠 API 키](https://docs.tosspayments.com/reference/using-api/api-keys)
+- [토스페이먼츠 결제·조회·취소 API](https://docs.tosspayments.com/reference)
+- [토스페이먼츠 인증·멱등키](https://docs.tosspayments.com/reference/using-api/authorization)

@@ -9,10 +9,17 @@
 <?php if ($payment !== null): ?><div class="notice"><p>결제 금액을 확인했습니다. 카드 결제창을 열어 결제를 마쳐 주세요.</p>
 <form id="shop-payment-form" method="post" action="<?= $this->e($payment['action'] ?? '') ?>" accept-charset="<?= $this->e($payment['charset'] ?? 'UTF-8') ?>">
 <?php foreach ($payment['fields'] as $field => $value): ?><input type="hidden" name="<?= $this->e($field) ?>" value="<?= $this->e($value) ?>"><?php endforeach ?>
-<button type="<?= $payment['kind'] === 'inicis' ? 'button' : 'submit' ?>" id="shop-pay-button">카드 결제창 열기</button></form><p id="shop-payment-message" role="status"></p></div>
+<button type="<?= in_array($payment['kind'], ['inicis', 'toss'], true) ? 'button' : 'submit' ?>" id="shop-pay-button"><?= $payment['kind'] === 'toss' ? '카드·간편결제창 열기' : '카드 결제창 열기' ?></button></form><p id="shop-payment-message" role="status"></p></div>
 <?php if ($payment['kind'] === 'inicis'): ?>
 <script src="<?= $this->e($payment['script']) ?>"></script>
 <script>(()=>{'use strict';const button=document.getElementById('shop-pay-button'),message=document.getElementById('shop-payment-message');button.addEventListener('click',()=>{if(!window.INIStdPay){message.textContent='결제창 연결을 확인해 주세요.';return;}window.INIStdPay.pay('shop-payment-form');});})();</script>
+<?php elseif ($payment['kind'] === 'toss'): ?>
+<script src="<?= $this->e($payment['script']) ?>"></script>
+<script>(()=>{'use strict';const options=<?= json_encode(['clientKey' => $payment['client_key'], 'customerKey' => $payment['customer_key'], 'request' => $payment['request']], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?>;
+const button=document.getElementById('shop-pay-button'),message=document.getElementById('shop-payment-message');
+button.addEventListener('click',async()=>{if(button.disabled)return;button.disabled=true;message.textContent='결제창을 여는 중입니다.';
+try{if(!window.TossPayments)throw new Error();await window.TossPayments(options.clientKey).payment({customerKey:options.customerKey}).requestPayment(options.request);}
+catch(error){message.textContent=error&&error.code==='USER_CANCEL'?'결제를 취소했습니다. 다시 결제할 수 있습니다.':'결제창 연결을 확인한 뒤 다시 시도해 주세요.';button.disabled=false;}});})();</script>
 <?php endif ?>
 <?php endif ?></section>
 <div class="cols"><section class="panel table-wrap"><h2>주문 상품</h2><table><thead><tr><th>상품 / 옵션</th><th class="num">단가</th><th class="num">수량</th><th class="num">반품 / 교환</th></tr></thead><tbody><?php foreach ($order['items'] as $item): ?><tr><td><?= $this->e($item['name']) ?><br><small><?= $this->e($item['options']) ?></small></td><td class="num"><?= number_format((int) $item['price']) ?>원</td><td class="num"><?= (int) $item['quantity'] ?>개</td><td class="num"><?= (int) $item['returned'] ?> / <?= (int) $item['exchanged'] ?></td></tr><?php endforeach ?></tbody></table></section>
