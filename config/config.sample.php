@@ -7,6 +7,10 @@ return [
         'url' => 'https://example.com',
     ],
 
+    // 생략하면 GNUCMS 루트의 plugins/와 modules/를 사용한다.
+    // 별도 배치 시 두 폴더를 포함한 상위 디렉터리의 절대 경로를 지정한다.
+    // 'extensions' => ['root' => '/absolute/path/to/packages'],
+
     'mail' => [
         'from' => 'no-reply@example.com',
     ],

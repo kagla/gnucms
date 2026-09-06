@@ -4,22 +4,134 @@
 동작하거나 플러그인을 조합하는 업무 프로그램이다. 독립 동작은 GNUCMS 안에서
 다른 플러그인 없이 실행되는 것을 의미한다.
 
-## 현재 구현
+## 관리와 배포
 
-- 관리자 사이드바의 확장 영역에 플러그인과 모듈을 별도 메뉴로 제공한다.
-- `/admin/plugins`, `/admin/modules`는 전체 관리자만 접근할 수 있다.
-- 현재 화면은 준비 상태를 표시한다. 패키지 탐색·설치·실행·토글 저장은 아직 없다.
-- 공통 라우트에서 `Extension\AdminRoutes`를 한 번 연결한다. 개별 확장 기능은
-  코어 컨트롤러나 라우트 파일에 추가하지 않는 방향으로 개발한다.
-- 화면은 `admin/extensions/index`를 사용한다. 관리자 화면을 재정의하는 테마는
-  해당 템플릿과 `admin/_sidebar`의 새 메뉴를 함께 반영해야 한다.
+- 관리자 메뉴를 `/admin/plugins`, `/admin/modules`로 분리한다. 전체 관리자만 접근한다.
+- 패키지를 루트의 `plugins/{id}/`, `modules/{id}/`에 배포하면 목록에 나타난다.
+- 최초 상태는 사용 안 함이다. 패키지별 토글을 변경하고 **저장**하면 다음 요청부터 반영된다.
+- OFF는 패키지 실행과 라우트 등록을 중단한다. 파일·업무 데이터는 삭제하지 않는다.
+  이미 진행 중인 요청이나 외부에 접수된 발송을 취소하지는 않는다.
+- 상태는 `storage/extensions/enabled.json`에 저장한다. 동시 변경에는 공통 잠금을 사용하고
+  임시 파일을 원자적으로 교체한다. 패키지 폴더에는 런타임 쓰기를 하지 않는다.
+- 의존성과 설명 파일을 검증한 후 사용 설정을 저장한다. 실제 진입점 실행이 실패하면
+  사용 설정은 유지하되 화면에 **실행 불가**를 표시한다. 수정하거나 토글을 꺼서 복구한다.
+- 필수 확장을 먼저 켜야 한다. 사용 중인 필수 확장을 끄려면 의존하는 확장을 먼저 끈다.
+  배포로 의존성이 깨지거나 순환한 경우에는 토글을 꺼서 복구할 수 있다.
+- 파일이 사라진 활성 패키지도 관리 목록에 표시하며 끌 수 있다.
+- JSON 상태가 손상되면 확장은 실행하지 않으며 파일을 덮어쓰지 않는다. 코어 화면은
+  계속 열리고 관리 화면에 오류를 표시한다. 보관한 상태 파일을 복원해 복구한다.
 
-## 후속 개발 원칙
+현재 수동 백업은 확장 패키지와 `storage/extensions/`를 포함하지 않는다.
+서버 이전·복구 때 이 경로와 각 확장의 업무 데이터를 별도로 보관해야 한다.
 
-- 패키지는 `plugins/`, `modules/`에 각각 두고 코드·템플릿·DB 변경을 소유한다.
-- 공통 로더를 구축한 이후 개별 패키지 추가와 사용 여부 변경에는 코어 수정이 없어야 한다.
-- 사용 여부는 패키지별 토글로 정한다. 비활성화는 데이터를 삭제하지 않는다.
-- 실제 활성화와 저장 처리가 구현되기 전에는 작동하는 것처럼 보이는 토글을 표시하지 않는다.
-- 운영 서버에서 Composer나 프런트엔드 빌드를 실행하지 않는다.
-- cron을 요구하지 않는다. 방문 기반 작업 실행은 별도 플러그인으로 설계하고,
-  접속이 없으면 지연될 수 있으므로 업무상 기한 검증은 모듈 자체에서 수행한다.
+운영 서버에서는 Composer·npm 설치나 빌드를 하지 않는다. 패키지의 의존성·정적 자산은
+개발 환경이나 CI에서 준비한 완성본으로 배포한다. 패키지는 서버 권한으로 실행되는
+신뢰하는 PHP 코드이며, 등록 API는 보안 샌드박스가 아니다.
+
+## 코어와의 경계
+
+`src/Web/Routes.php`의 공통 연결점은 `Extension\AdminRoutes::register()` 한 곳이다.
+패키지마다 코어 라우트·컨트롤러·App에 메서드를 추가하지 않는다. 이후 패키지 추가는
+해당 디렉터리 배포와 관리자 토글만으로 처리한다. 확장 기반 구현은 `src/Extension/`에 있다.
+
+관리 화면은 `admin/extensions/index`를 사용한다. 관리자 화면을 재정의하는 테마는
+해당 템플릿과 `admin/_sidebar`의 플러그인·모듈 메뉴를 함께 반영해야 한다.
+현재 패키지 전용 템플릿의 테마 재정의 API는 제공하지 않는다.
+
+기본 패키지 루트는 GNUCMS 루트다. 특수 배치·테스트에서는 설정의 `extensions.root`로
+`plugins/`, `modules/`를 포함하는 상위 디렉터리의 절대 경로를 지정할 수 있다.
+
+## 패키지 설명 파일
+
+예: `plugins/message/extension.json`
+
+```json
+{
+  "id": "message",
+  "type": "plugin",
+  "name": "메시지 기능",
+  "description": "여러 모듈에서 사용하는 메시지 기능입니다.",
+  "version": "1.0.0",
+  "api": 1,
+  "requires": [],
+  "optional": []
+}
+```
+
+- ID는 폴더명과 같고, 영문 소문자로 시작하는 1~64자의 영문 소문자·숫자·`_`·`-`만 허용한다.
+- `type`은 `plugins/`에서는 `plugin`, `modules/`에서는 `module`이다.
+- `api`는 정수 `1`이어야 한다. `version`은 표시용 패키지 버전이며 의존 버전 범위는 아직 지원하지 않는다.
+- `requires`는 필수 확장의 전체 ID 배열이다. 예: `["plugins/message"]`.
+- `optional`은 선택 확장의 전체 ID 배열이다. 활성화된 선택 확장을 먼저 등록하되,
+  없거나 실행에 실패하면 해당 서비스 없이 현재 패키지를 실행한다.
+- 필수 의존성은 순서대로 등록한다. 필수 의존성의 순환·누락·실행 실패는 해당 패키지 실행을 차단한다.
+- 폴더, 설명 파일, 진입 파일에 심볼릭 링크를 사용하지 않는다.
+- 목록 탐색과 설명 파일 검증은 비활성 패키지의 PHP를 실행하지 않는다.
+
+## 진입점과 서비스
+
+`bootstrap.php`는 `Context`를 받는 콜백을 반환한다. 활성 패키지마다 요청당 한 번 호출한다.
+여기서는 서비스와 라우트만 등록한다. 발송·예약 생성·DB 마이그레이션 같은 부수 효과를
+진입점에서 실행하면 모든 방문마다 반복될 수 있으므로 넣지 않는다.
+
+예: `plugins/message/bootstrap.php`
+
+```php
+<?php
+
+use GnuCms\Extension\Context;
+
+return static function (Context $context): void {
+    $context->provide('formatter', new class {
+        public function format(string $text): string
+        {
+            return '[알림] ' . $text;
+        }
+    });
+};
+```
+
+모듈에서 `optional: ["plugins/message"]`를 선언하고 선택적으로 서비스를 사용한다.
+예: `modules/reservation/bootstrap.php` (설명 파일은 `type: "module"`, `id: "reservation"`):
+
+```php
+<?php
+
+use GnuCms\Extension\Context;
+
+return static function (Context $context): void {
+    $formatter = $context->service('plugins/message', 'formatter');
+
+    $context->route('GET', '/status', static function ($request, $response) use ($formatter) {
+        $text = $formatter === null ? '예약 기능 준비' : $formatter->format('예약 기능 준비');
+        $response->getBody()->write(json_encode(['message' => $text], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        return $response->withHeader('Content-Type', 'application/json');
+    }, admin: true);
+};
+```
+
+주소는 `/extensions/modules/reservation/status`다. 선택 플러그인이 꺼져 있어도 동작한다.
+실제 예약·발송 기능은 이 예제에 포함하지 않는다. 패키지의 추가 PHP 파일과 완성된
+의존성은 진입점에서 `require_once` 등으로 불러오며 코어 Composer 설정을 수정하지 않는다.
+
+## 라우트와 보안
+
+- `route('GET' 또는 'POST', '/경로', $handler, admin: false)`로 등록한다.
+- 경로 앞에 `/extensions/{plugins 또는 modules}/{id}`가 자동으로 붙어 충돌을 방지한다.
+- 초기 API는 고정 경로만 지원한다. 경로 세그먼트에는 영문·숫자·`_`·`-`를 사용한다.
+  동적 ID는 쿼리나 POST 본문으로 받아 서버에서 검증한다.
+- 코어의 세션·오류 처리 미들웨어를 공유하며 모든 POST에 기존 세션 CSRF 토큰 검사를 적용한다.
+- `admin: true`는 전체 관리자 권한을 검사한다. 기본값은 공개 라우트다.
+- `$context->app`으로 기존 서비스를 사용할 수 있다. 로그인·글 소유권·업무 권한 등
+  추가 권한 검사는 각 요청 처리기에서 수행한다. 등록 시점에는 사용자 세션이 복원되기 전이다.
+- 등록 도중 예외가 발생하면 해당 패키지의 서비스·라우트를 공개하지 않고 필수 의존 모듈도 중단한다.
+  예외 원문에는 비밀키가 포함될 수 있으므로 관리 화면에는 일반 오류만 표시한다.
+- 요청 처리 중 예외는 공통 오류 처리로 전달된다. 템플릿 출력은 이스케이프하고 입력은 서버에서 검증한다.
+
+## 현재 범위 밖
+
+웹 ZIP 설치·자동 업데이트·의존 버전 범위 검사·패키지별 DB 마이그레이션 실행기·
+패키지 설정/메뉴/템플릿 등록 API·주기적 작업 실행기는 아직 제공하지 않는다.
+
+주기적 실행에 호스팅 cron을 요구하지 않는다. 후속 방문 기반 실행 플러그인은 접속이
+없으면 지연될 수 있어야 하며, 예약 만료 같은 업무상 기한 검증은 모듈 자체에서 수행한다.
