@@ -1,0 +1,12 @@
+{
+  "id": "payment-inicis",
+  "type": "plugin",
+  "name": "KG이니시스 결제",
+  "description": "PortOne V2를 통한 원화 카드결제, 서버 검증, 전체·부분 취소를 제공합니다.",
+  "version": "1.0.0",
+  "api": 2,
+  "entry_path": "/settings",
+  "admin_test": false,
+  "requires": [],
+  "optional": []
+}
