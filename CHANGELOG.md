@@ -2,35 +2,32 @@
 
 ## [0.5.0](https://github.com/kagla/gnucms/compare/v0.4.0...v0.5.0) (2026-09-07)
 
+관리자에서 플러그인과 모듈을 따로 관리할 수 있으며, 로그인이 필요한 화면에 접근하면 로그인 후 원래 주소로 돌아갑니다.
 
-### ⚠ BREAKING CHANGES
+### 주요 변경
 
-* main no longer includes plugins/bizppurio or its settings and result endpoints. Disable previous package enablement and remove old package directories when deploying by overlay. Stored credentials, templates and message history remain intact.
-* main no longer includes modules/alimtalk or its operations routes. Disable previous module enablement and remove the old package directory when deploying by overlay. Provider settings, templates and dispatch data are retained.
-* main no longer bundles electronic payment plugins or GnuCms Payment classes. Existing installations should disable these plugins and remove their old package and source directories when deploying by overlay. Stored payment settings and transaction data are retained.
-* main no longer includes the standalone shop or its routes. Existing installations should disable the module and remove its old package directory when deploying by overlay; stored shop data is retained.
-* payment and shop packages use gateway.v2 and direct-PG configuration. Upgrade payment package data to schema 2, enter merchant credentials and adapt any overridden payment/settings templates.
+- 플러그인·모듈 목록, 사용 여부 일괄 저장, 최근 변경 순서, 실행 바로가기와 관리자 전용 미리보기를 추가했습니다.
+- 확장 패키지의 의존성 검사, 서비스·라우트 등록, 짧은 실행 주소, 테마 재정의와 인증된 외부 콜백을 지원합니다.
+- 확장 화면에 관리자 공통 폼·버튼·표·다크 모드를 적용하고 목록의 홀짝 행 배경색을 구분했습니다.
+- 확장 패키지의 DB 설치·갱신, 데이터·활성 상태 백업과 복원 시 외부 실행 허용 해제를 지원합니다.
+- 메시지 형식 플러그인과 예약 안내문 모듈을 확장 개발 예제로 제공합니다.
+- 일반 로그인과 소셜 로그인에서 원래 화면으로 복귀하며, 외부 주소나 잘못된 복귀 주소는 차단합니다.
+- 게시글 검색의 영문 대소문자 처리와 DB 호환성을 개선했습니다.
 
-### Features
+### 배포 범위와 업그레이드
 
-* add direct INICIS payments and remove payment intermediary ([43df49d](https://github.com/kagla/gnucms/commit/43df49d63e0cced2f895804389fce10b18ca8a7f))
-* add direct Toss Payments integration ([940a80c](https://github.com/kagla/gnucms/commit/940a80c2a306fea5d80d525213a82b14fc1cf329))
-* complete shop storefront and product management ([71ec244](https://github.com/kagla/gnucms/commit/71ec244fa93d8defe9dee718d485d57884bc2c77))
-* redirect guests to login and return to the original page ([81f8d64](https://github.com/kagla/gnucms/commit/81f8d647bd0c6c1055bd4ad5a2431029ec23425f))
+- 쇼핑몰, 전자결제, 비즈뿌리오 알림톡·문자는 별도 개발 중이며 이번 배포에 포함하지 않습니다.
+- 해당 기능의 개발 버전을 설치한 경우 먼저 사용을 해제해 주세요. 덮어쓰기 배포 시 기존 패키지 폴더와 전용 소스도 별도로 제거해야 합니다. 저장된 설정과 업무 데이터는 보존해 주세요.
+- DB 구조 판 번호는 21에서 22로 변경됩니다. 확장 패키지 관리 테이블을 추가하며 기존 데이터를 유지합니다. 업그레이드 전에 전체 백업을 만들고 기존 `config/config.php`와 `storage/`를 보존해 주세요.
+- 새 전체 백업은 형식 2로 생성됩니다. 이번 버전에서는 기존 형식 1 백업도 읽을 수 있지만, 새 백업을 이전 버전에서 복원할 수는 없습니다.
+- 배포 ZIP에는 운영 의존성과 정적 자산이 포함됩니다. 운영 서버에서 Composer나 npm을 실행할 필요가 없습니다.
 
+### 검증
 
-### Bug Fixes
-
-* apply shared admin UI to direct payment settings ([bf23605](https://github.com/kagla/gnucms/commit/bf236059f740fae0bd8cea0678aa19f446a59f28))
-* distinguish rows in extension lists ([3fe8e76](https://github.com/kagla/gnucms/commit/3fe8e76ace22b38ed457af970d27727e6c8760fc))
-
-
-### Code Refactoring
-
-* exclude complete Bizppurio integration from main ([a47b22f](https://github.com/kagla/gnucms/commit/a47b22f91c5dca51ab44f1ce0126fa9a9ddc26e6))
-* exclude payment plugins from main distribution ([2b1b338](https://github.com/kagla/gnucms/commit/2b1b3383dc7075a181abaf2aef823c17c37544ac))
-* exclude standalone shop from main distribution ([993cb49](https://github.com/kagla/gnucms/commit/993cb49e2ddc195ef27e28095267dadd394becd2))
-* keep Alimtalk operations on the Bizppurio branch ([1f7735e](https://github.com/kagla/gnucms/commit/1f7735e04764d7dc363ccbe93b9b1d7791edce1b))
+- 로컬 PHP 8.4.1에서 SQLite·MariaDB 전체 테스트 1,068개와 5,127개 검증을 통과했습니다.
+- GitHub CI의 PHP 8.2에서 테스트 689개와 3,021개 검증을 통과했습니다.
+- 두 DB 계열에서 0.4.0 데이터의 업그레이드·반복 마이그레이션·새 설치와 관리자 인증 정보를 확인했습니다.
+- 관리자 브라우저 검사 8개 화면에서 밝은·어두운 테마, 모바일 화면, 표와 폼 제출을 확인했습니다.
 
 ## [0.4.0](https://github.com/kagla/gnucms/compare/v0.3.0...v0.4.0) (2026-09-06)
 
