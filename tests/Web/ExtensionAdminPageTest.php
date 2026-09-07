@@ -158,8 +158,8 @@ PHP);
         $this->get($app, '/login');
         $this->sessionUser($adminId);
         $state = new StateStore($app->storageDir() . '/extensions');
-        $payments = ['plugins/payment-inicis', 'plugins/payment-kcp', 'plugins/payment-kspay', 'plugins/payment-toss'];
-        $state->update(static fn (array $enabled): array => $payments);
+        $remaining = ['plugins/bizppurio'];
+        $state->update(static fn (array $enabled): array => $remaining);
         $body = $this->body($this->get($app, '/admin/modules'));
         self::assertStringNotContainsString('작은 쇼핑몰', $body);
         self::assertStringNotContainsString('name="enabled[shop]"', $body);
@@ -170,7 +170,7 @@ PHP);
         foreach (['/shop', '/shop/orders', '/admin/shop', '/admin/shop/products', '/modules/shop', '/modules/shop/admin'] as $path) {
             self::assertSame(404, $this->get($app, $path)->getStatusCode(), $path);
         }
-        foreach (['/', '/account', '/admin/modules', ...array_map(static fn (string $key): string => '/' . $key . '/settings', $payments)] as $path) {
+        foreach (['/', '/account', '/admin/modules', '/plugins/bizppurio/settings'] as $path) {
             $response = $this->get($app, $path);
             self::assertSame(200, $response->getStatusCode(), $path);
             $body = $this->body($response);
@@ -182,8 +182,46 @@ PHP);
         }
         $response = $this->post($app, '/admin/modules/shop/state', ['enabled' => '0', 'csrf_token' => $_SESSION['csrf_token']]);
         self::assertSame(303, $response->getStatusCode());
-        self::assertSame($payments, $state->read());
+        self::assertSame($remaining, $state->read());
         self::assertStringNotContainsString('name="enabled[shop]"', $this->body($this->get($app, '/admin/modules')));
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testBundledCmsExcludesPaymentPluginsAndCanDisablePreviousEnablement(array $dbConfig): void
+    {
+        $app = $this->makeApp($dbConfig, ['extensions' => ['root' => dirname(__DIR__, 2)]], 'default');
+        $adminId = $app->users()->create('payments-removed-admin@example.test', '', '관리자', true);
+        $this->get($app, '/login');
+        $this->sessionUser($adminId);
+        $state = new StateStore($app->storageDir() . '/extensions');
+        $remaining = ['modules/alimtalk', 'plugins/bizppurio'];
+        $providers = ['inicis', 'kcp', 'kspay', 'toss'];
+        $payments = array_map(static fn (string $id): string => 'plugins/payment-' . $id, $providers);
+        $state->update(static fn (array $enabled): array => $remaining);
+        $body = $this->body($this->get($app, '/admin/plugins'));
+        self::assertStringNotContainsString('payment-', $body);
+        self::assertStringContainsString('비즈뿌리오', $body);
+        self::assertStringContainsString('메시지 형식', $body);
+
+        $state->update(static fn (array $enabled): array => [...$enabled, ...$payments]);
+        foreach ($payments as $key) {
+            $path = '/' . $key . '/settings';
+            self::assertSame(404, $this->get($app, $path)->getStatusCode(), $path);
+            self::assertSame(404, $this->post($app, $path, ['action' => 'install', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode(), $path);
+        }
+        foreach (['/admin/plugins', '/admin/modules', '/plugins/bizppurio/settings', '/modules/alimtalk/home'] as $path) {
+            $response = $this->get($app, $path);
+            self::assertSame(200, $response->getStatusCode(), $path);
+            self::assertStringNotContainsString('href="/plugins/payment-', $this->body($response));
+        }
+        foreach ($providers as $id) {
+            $response = $this->post($app, '/admin/plugins/payment-' . $id . '/state', ['enabled' => '0', 'csrf_token' => $_SESSION['csrf_token']]);
+            self::assertSame(303, $response->getStatusCode());
+        }
+        self::assertSame($remaining, $state->read());
+        self::assertStringNotContainsString('payment-', $this->body($this->get($app, '/admin/plugins')));
+        self::assertSame(404, $this->post($app, '/admin/plugins/payment-inicis/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
+        self::assertSame($remaining, $state->read());
     }
 
     #[DataProvider('connectionProvider')]

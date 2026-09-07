@@ -5,7 +5,6 @@ declare(strict_types=1);
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 use GnuCms\Tests\Support\AdminViewFixture;
-use GnuCms\Payment\{ProviderConfig, Settings};
 
 $scenario = $argv[1] ?? 'core'; $base = $argv[2] ?? '/cms';
 $view = AdminViewFixture::view($base);
@@ -16,25 +15,17 @@ if ($scenario === 'core') {
     $section = $scenario === 'core-list' ? 'plugins' : 'modules';
     $catalog = (new \GnuCms\Extension\Catalog(dirname(__DIR__, 2)))->all();
     $packages = [];
-    foreach ($section === 'plugins' ? ['bizppurio', 'payment-toss'] : ['demo-reservation', 'alimtalk'] as $id) {
+    foreach ($section === 'plugins' ? ['bizppurio', 'demo-message'] : ['demo-reservation', 'alimtalk'] as $id) {
         $package = $catalog[$section . '/' . $id];
         $prefix = $package['route_prefix'] ?? '/' . $section . '/' . $id;
         $package += ['enabled' => true, 'selected' => true,
-            'entry_url' => $base . \GnuCms\Extension\RoutePrefix::path($package['admin_route_prefix'] ?? $prefix, $package['entry_path']),
+            'entry_url' => $package['entry_path'] === null ? null : $base . \GnuCms\Extension\RoutePrefix::path($package['admin_route_prefix'] ?? $prefix, $package['entry_path']),
             'public_url' => $package['public_path'] === null ? null : $base . \GnuCms\Extension\RoutePrefix::path($prefix, $package['public_path'])];
         // 공개 주소가 있는 모듈도 표시할 수 있는지 확인하는 예제 데이터다.
         if ($id === 'demo-reservation') $package['public_url'] = $base . '/book';
         $packages[] = $package;
     }
     echo $view->fetch('admin/extensions/index', ['extension_page' => ['title' => $section === 'plugins' ? '플러그인' : '모듈', 'description' => '확장 기능 관리', 'icon' => 'grid'], 'extension_section' => $section, 'extension_error' => null, 'saved' => false, 'packages' => $packages, 'changed_order' => '[]']);
-} elseif (in_array($scenario, ['inicis', 'kcp', 'kspay', 'toss', 'toss-live'], true)) {
-    $provider = $scenario === 'toss-live' ? 'toss' : $scenario;
-    if ($scenario === 'toss-live') $common['environment'] = 'live';
-    echo $view->forExtension('payment', dirname(__DIR__, 2) . '/src/Payment/templates')->fetch('settings', $common + [
-        'label' => Settings::PROVIDERS[$provider], 'key' => 'plugins/payment-' . $provider, 'fields' => ProviderConfig::fields($provider),
-        'manual' => ProviderConfig::manual($provider), 'integration_ready' => in_array($provider, ['inicis', 'toss'], true),
-        'settings' => ['configured' => true, 'enabled' => false, 'merchant_id' => $scenario === 'kcp' ? 'T9999' : '2999900000', 'client_ip' => '192.0.2.10'],
-    ]);
 } elseif ($scenario === 'bizppurio') {
     echo $view->forExtension('bizppurio', dirname(__DIR__, 2) . '/plugins/bizppurio/templates')->fetch('settings', $common + [
         'webhook' => null, 'settings' => ['configured' => true, 'enabled' => false, 'account' => 'browser-test', 'account_type' => 'module', 'revision' => str_repeat('a', 32),

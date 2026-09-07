@@ -358,13 +358,13 @@ DB 비밀번호는 명령 인자에 직접 넣지 말고 프롬프트 또는 MyS
 운영 중 오류는 기본적으로 `storage/logs/error.log`에 기록됩니다. 운영 사이트에서는
 `config/config.php`의 `debug`를 `false`로 유지해 주세요.
 
-## 결제 플러그인과 별도 쇼핑몰 브랜치
+## 쇼핑몰·전자결제 별도 브랜치
 
-`main`은 **PG 상점 코드를 사용하는 직접 결제 플러그인**을 제공한다. 이니시스·토스페이먼츠 어댑터와 관리자 설정을 포함하며 KCP·KSPay는 미확인 규격으로 결제 실행을 제한한 준비 단계다. 결제 기능을 사용하는 모듈은 `gateway.v2` 계약으로 연결한다. 설정과 연동 범위는 각 [이니시스](plugins/payment-inicis/README.md)·[토스페이먼츠](plugins/payment-toss/README.md)·[KCP](plugins/payment-kcp/README.md)·[KSPay](plugins/payment-kspay/README.md) 문서를 참고한다.
+작은 쇼핑몰과 전자결제 플러그인의 코드·화면·테스트·운영 문서는 `feat/direct-pg-payments` 브랜치에 보관한다. 이니시스·KCP·KSPay·토스페이먼츠 플러그인과 공통 결제 코드를 포함하며, 해당 브랜치의 `docs/shop.md`와 각 플러그인의 `README.md`에서 연동 범위를 확인할 수 있다.
 
-작은 쇼핑몰의 코드·화면·테스트·운영 문서는 `feat/direct-pg-payments` 브랜치에 보관한다. `main` 배포본에는 쇼핑몰 모듈과 전용 자산, `/shop`·`/admin/shop` 화면, 회원의 주문 메뉴를 포함하지 않는다. 쇼핑몰 브랜치는 별도로 개발하며 `main`에 자동 병합하지 않는다.
+`main` 배포본에는 쇼핑몰 모듈·전용 자산, `/shop`·`/admin/shop` 화면과 주문 메뉴, 전자결제 플러그인·설정 화면·공통 결제 코드를 포함하지 않는다. 쇼핑몰·전자결제는 별도로 개발하며 사용자의 별도 요청 없이 `main`에 병합하지 않는다.
 
-기존 설치에서 쇼핑몰을 사용했다면 관리자 모듈 목록에서 사용을 끈다. 파일을 덮어쓰는 방식으로 배포할 때는 이전 `modules/shop/` 폴더도 제거해야 한다. 쇼핑몰의 주문·상품 DB와 업로드 데이터는 자동 삭제하지 않는다.
+기존 설치에서 사용했다면 관리자 모듈·플러그인 목록에서 해당 기능의 사용을 끈다. 파일을 덮어쓰는 방식으로 배포할 때는 이전 `modules/shop/`, `plugins/payment-inicis/`, `plugins/payment-kcp/`, `plugins/payment-kspay/`, `plugins/payment-toss/`, `src/Payment/` 폴더도 제거해야 한다. 쇼핑몰 주문·상품과 결제 설정·거래 기록 DB, 업로드 데이터는 자동 삭제하지 않는다.
 
 ## 라이선스
 

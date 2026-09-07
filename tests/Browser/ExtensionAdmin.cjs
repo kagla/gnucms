@@ -6,9 +6,8 @@ const {execFileSync} = require('node:child_process');
 const puppeteer = require(process.env.PUPPETEER_MODULE || 'puppeteer-core');
 const root = path.resolve(__dirname, '../..');
 const render = (scenario, base) => execFileSync('php', [path.join(__dirname, 'ExtensionAdminFixture.php'), scenario, base], {cwd: root, encoding: 'utf8'});
-const route = scenario => scenario === 'core-modules' ? '/admin/modules' : scenario === 'toss-live' ? '/plugins/payment-toss/settings?environment=live'
+const route = scenario => scenario === 'core-modules' ? '/admin/modules'
   : scenario === 'core-list' ? '/admin/plugins'
-  : ['inicis', 'kcp', 'kspay', 'toss'].includes(scenario) ? '/plugins/payment-' + scenario + '/settings'
   : scenario === 'bizppurio' ? '/plugins/bizppurio/settings'
   : scenario.startsWith('alimtalk-') ? '/modules/alimtalk/' + scenario.slice(9)
   : scenario.startsWith('core') ? '/admin/settings' : '/' + (scenario === 'demo-message' ? 'plugins' : 'modules') + '/' + scenario + '/preview';
@@ -86,7 +85,7 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules' : scena
         if (base === '/cms') await page.screenshot({path: '/tmp/gnucms-module-links-' + width + '.png', fullPage: true});
       }
       assert.deepEqual(errors, [], 'module user link');
-      for (const scenario of ['inicis', 'kcp', 'kspay', 'toss', 'toss-live', 'bizppurio', 'demo-message', 'demo-reservation', 'alimtalk-home', 'alimtalk-templates', 'alimtalk-send', 'alimtalk-history', 'alimtalk-detail']) {
+      for (const scenario of ['bizppurio', 'demo-message', 'demo-reservation', 'alimtalk-home', 'alimtalk-templates', 'alimtalk-send', 'alimtalk-history', 'alimtalk-detail']) {
         await page.setViewport({width: 1280, height: 960});
         await open(scenario);
         assert.equal(await page.$$eval('.admin-shell', els => els.length), 1, scenario);
@@ -95,17 +94,10 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules' : scena
         const field = '#main input.input';
         if (await page.$(field)) assert.deepEqual(await style(field, Object.keys(input)), input, scenario + ' input');
         if (await page.$('#main button.btn-primary')) assert.deepEqual(await style('#main button.btn-primary', Object.keys(button)), button, scenario + ' button');
-        if (scenario.startsWith('toss')) {
-          assert.deepEqual(await style('#payment-client_key', Object.keys(input)), input, scenario + ' client key');
-          assert.deepEqual(await style('#payment-secret_key', Object.keys(input)), input, scenario + ' secret key');
-          assert.equal(await page.$eval('.settings-tabs a[aria-current=page]', el => new URL(el.href).searchParams.get('environment')), scenario === 'toss-live' ? 'live' : 'test');
-          assert.equal(await page.$eval('button[value=enable]', el => el.disabled), false);
-        }
         const section = scenario.startsWith('alimtalk-') || scenario === 'demo-reservation' ? 'modules' : 'plugins';
         assert.equal(await page.$eval('.admin-sidebar a[aria-current=page]', el => new URL(el.href).pathname), base + '/admin/' + section);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), scenario + ' desktop width');
-        if (base === '/cms' && scenario === 'inicis') await page.screenshot({path: '/tmp/gnucms-extension-admin-desktop.png', fullPage: true});
-        if (base === '/cms' && scenario === 'toss') await page.screenshot({path: '/tmp/gnucms-toss-admin-desktop.png', fullPage: true});
+        if (base === '/cms' && scenario === 'bizppurio') await page.screenshot({path: '/tmp/gnucms-extension-admin-desktop.png', fullPage: true});
         await page.click('[data-theme-toggle]');
         assert.equal(await page.$eval('html', el => el.dataset.themeMode), 'dark');
         const dark = await style('body', ['backgroundColor']);
@@ -120,26 +112,19 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules' : scena
         assert.equal(await page.$eval('#admin-drawer', el => el.checked), false);
         await page.waitForFunction(() => document.querySelector('.admin-sidebar').getBoundingClientRect().right <= 1);
         if (base === '/cms' && scenario === 'alimtalk-history') await page.screenshot({path: '/tmp/gnucms-extension-admin-mobile.png', fullPage: true});
-        if (base === '/cms' && scenario === 'toss') await page.screenshot({path: '/tmp/gnucms-toss-admin-mobile.png', fullPage: true});
         await page.click('[data-theme-toggle]');
         assert.deepEqual(errors, [], scenario);
         count++;
       }
-      await open('inicis');
+      await open('bizppurio');
       await page.$eval('button[value=save]', button => button.form.requestSubmit(button));
       await page.waitForFunction(() => document.body.textContent.includes('submitted'));
-      assert.equal(posts.at(-1).url, 'https://gnucms.test' + base + '/plugins/payment-inicis/settings');
+      assert.equal(posts.at(-1).url, 'https://gnucms.test' + base + '/plugins/bizppurio/settings');
       assert.equal(posts.at(-1).data.get('action'), 'save');
-      assert.equal(posts.at(-1).data.get('merchant_id'), '2999900000');
+      assert.equal(posts.at(-1).data.get('account'), 'browser-test');
       assert.equal(posts.at(-1).data.get('csrf_token'), 'browser-test-csrf');
-      await open('toss-live');
-      await page.$eval('button[value=save]', button => button.form.requestSubmit(button));
-      await page.waitForFunction(() => document.body.textContent.includes('submitted'));
-      assert.equal(posts.at(-1).url, 'https://gnucms.test' + base + '/plugins/payment-toss/settings');
-      assert.equal(posts.at(-1).data.get('action'), 'save');
-      assert.equal(posts.at(-1).data.get('environment'), 'live');
-      assert.equal(posts.at(-1).data.get('csrf_token'), 'browser-test-csrf');
-      assert.equal(posts.at(-1).data.get('secret_key'), '');
+      assert.equal(posts.at(-1).data.get('environment'), 'test');
+      assert.equal(posts.at(-1).data.get('password'), '');
       await page.close();
     }
     console.log(`Extension admin browser checks passed: ${count} pages, core typography/controls, light/dark themes, mobile navigation, tables and settings submission.`);
