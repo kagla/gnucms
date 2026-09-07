@@ -12,6 +12,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Routing\RouteContext;
 use GnuCms\View\View;
+use GnuCms\Web\LoginRedirect;
 use Psr\Http\Message\UploadedFileInterface;
 
 final class AuthController
@@ -25,8 +26,13 @@ final class AuthController
 
     public function loginForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        $returnUrl = LoginRedirect::fromRequest($request);
+        if ($returnUrl !== null && !$this->app->guestAcl()->identity()->isGuest()) {
+            return $response->withStatus(303)->withHeader('Location', $returnUrl);
+        }
         return View::fromRequest($request)->render($response, 'auth/login', [
             'errors' => [], 'values' => [], 'unverified_email' => null, 'turnstile_required' => false,
+            'return_url' => $returnUrl,
         ]);
     }
 
@@ -34,6 +40,7 @@ final class AuthController
     {
         $input = $this->input($request);
         $this->assertCsrf($input);
+        $returnUrl = LoginRedirect::fromRequest($request);
         $identifier = isset($input['email']) && is_scalar($input['email'])
             ? strtolower(trim((string) $input['email'])) : null;
         $throttleKey = $identifier !== null && filter_var($identifier, FILTER_VALIDATE_EMAIL) !== false
@@ -61,6 +68,7 @@ final class AuthController
                 [
                     'errors' => $details,
                     'values' => ['email' => $email],
+                    'return_url' => $returnUrl,
                     // 비밀번호까지 맞았는데 인증만 안 된 사람에게는 '다시 보내기' 를 내준다.
                     'unverified_email' => isset($details['unverified']) ? $email : null,
                     'turnstile_required' => $throttleKey !== null
@@ -75,7 +83,7 @@ final class AuthController
         $this->recordLogin($request, (int) $user['id'], $identifier, 'success');
         $this->storeSession($user);
 
-        return $this->homeRedirect($request, $response);
+        return $response->withStatus(303)->withHeader('Location', LoginRedirect::destination($request, $returnUrl));
     }
 
     public function registerForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -167,6 +175,7 @@ final class AuthController
     {
         $input = $this->input($request);
         $this->assertCsrf($input);
+        $returnUrl = LoginRedirect::fromRequest($request);
         $email = isset($input['email']) && is_scalar($input['email']) ? (string) $input['email'] : '';
         try {
             $this->verifyTurnstile($request, $input, 'verification_resend');
@@ -176,6 +185,7 @@ final class AuthController
                 return View::fromRequest($request)->render($response->withStatus(422), 'auth/login', [
                     'errors' => $e->details(), 'values' => ['email' => $email],
                     'unverified_email' => $email, 'turnstile_required' => false,
+                    'return_url' => $returnUrl,
                 ]);
             }
             if ($e->status() !== 422) {
@@ -185,6 +195,7 @@ final class AuthController
             return View::fromRequest($request)->render($response->withStatus(422), 'auth/login', [
                 'errors' => ['email' => '인증 메일을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.'],
                 'values' => ['email' => $email], 'unverified_email' => $email, 'turnstile_required' => false,
+                'return_url' => $returnUrl,
             ]);
         }
         return View::fromRequest($request)->render($response, 'auth/check_email');

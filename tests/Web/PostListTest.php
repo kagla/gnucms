@@ -153,7 +153,7 @@ final class PostListTest extends WebTestCase
     }
 
     /** @dataProvider connectionProvider */
-    public function testUnreadableBoardRendersUnauthorizedPage(array $dbConfig): void
+    public function testUnreadableBoardRedirectsToLogin(array $dbConfig): void
     {
         $app = $this->makeApp($dbConfig);
         $app->boardService()->create($this->adminAcl(), [
@@ -164,7 +164,7 @@ final class PostListTest extends WebTestCase
 
         $response = $this->get($app, '/boards/secret');
 
-        self::assertSame(401, $response->getStatusCode());
+        $this->assertLoginRedirect($response, '/boards/secret');
     }
 
     /** @dataProvider connectionProvider */
@@ -175,8 +175,7 @@ final class PostListTest extends WebTestCase
 
         $response = $this->get($app, '/boards/free/new');
 
-        self::assertSame(401, $response->getStatusCode());
-        self::assertStringContainsString('로그인이 필요합니다', $this->body($response));
+        $this->assertLoginRedirect($response, '/boards/free/new');
     }
 
     /**

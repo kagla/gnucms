@@ -87,7 +87,7 @@ final class NotificationTest extends WebTestCase
         $app = $this->makeApp($dbConfig);
         $this->logout($app);
 
-        self::assertSame(401, $this->get($app, '/notifications')->getStatusCode());
+        $this->assertLoginRedirect($this->get($app, '/notifications'), '/notifications');
         self::assertStringNotContainsString(
             '/notifications',
             $this->body($this->get($app, '/')),

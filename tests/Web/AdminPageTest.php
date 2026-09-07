@@ -15,9 +15,9 @@ final class AdminPageTest extends WebTestCase
     {
         $app = $this->makeApp($dbConfig);
 
-        self::assertSame(401, $this->get($app, '/admin')->getStatusCode());
-        self::assertSame(401, $this->get($app, '/admin/boards')->getStatusCode());
-        self::assertSame(401, $this->get($app, '/admin/login-history')->getStatusCode());
+        $this->assertLoginRedirect($this->get($app, '/admin'), '/admin');
+        $this->assertLoginRedirect($this->get($app, '/admin/boards'), '/admin/boards');
+        $this->assertLoginRedirect($this->get($app, '/admin/login-history'), '/admin/login-history');
     }
 
     #[DataProvider('connectionProvider')]

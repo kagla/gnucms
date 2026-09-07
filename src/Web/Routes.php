@@ -195,18 +195,6 @@ final class Routes
         $slim->get('/boards/{key}', [$posts, 'index'])->setName('posts.index');
         $slim->get('/boards/{key}/new', [$posts, 'createForm'])->setName('posts.create');
         $slim->post('/boards/{key}/new', [$posts, 'create']);
-        // 옛 주소. 관리 화면(/admin/boards/new 등)과 같게 '만들기 = new' 로 통일했다.
-        $slim->get('/boards/{key}/write', static function (
-            ServerRequestInterface $request,
-            ResponseInterface $response,
-            array $args
-        ): ResponseInterface {
-            $url = RouteContext::fromRequest($request)->getRouteParser()->urlFor('posts.create', [
-                'key' => (string) $args['key'],
-            ]);
-            return $response->withHeader('Location', $url)->withStatus(301);
-        });
-        $slim->post('/boards/{key}/write', [$posts, 'create']);
         $slim->get('/b/{key}', static function (
             ServerRequestInterface $request,
             ResponseInterface $response,
@@ -218,17 +206,6 @@ final class Routes
             $query = $request->getUri()->getQuery();
             return $response->withHeader('Location', $url . ($query === '' ? '' : '?' . $query))->withStatus(301);
         });
-        $slim->get('/b/{key}/write', static function (
-            ServerRequestInterface $request,
-            ResponseInterface $response,
-            array $args
-        ): ResponseInterface {
-            $url = RouteContext::fromRequest($request)->getRouteParser()->urlFor('posts.create', [
-                'key' => (string) $args['key'],
-            ]);
-            return $response->withHeader('Location', $url)->withStatus(301);
-        });
-        $slim->post('/b/{key}/write', [$posts, 'create']);
         $files = new FileController($app);
         $slim->get('/posts/{id:[0-9]+}', [$posts, 'show'])->setName('posts.show');
         $slim->post('/posts/{id:[0-9]+}/password', [$posts, 'unlockSecret'])->setName('posts.password');

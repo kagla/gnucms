@@ -16,7 +16,7 @@ final class AdminPostsTest extends WebTestCase
     {
         $app = $this->makeApp($dbConfig);
 
-        self::assertSame(401, $this->get($app, '/admin/posts')->getStatusCode());
+        $this->assertLoginRedirect($this->get($app, '/admin/posts'), '/admin/posts');
     }
 
     #[DataProvider('connectionProvider')]

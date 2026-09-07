@@ -6,10 +6,67 @@ namespace GnuCms\Tests\Web;
 
 use GnuCms\Db\Schema;
 use GnuCms\Tests\Support\WebTestCase;
+use GnuCms\Web\Kernel;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Slim\Psr7\Factory\ServerRequestFactory;
 
 final class ErrorPageTest extends WebTestCase
 {
     private const SQLITE = ['dsn' => 'sqlite::memory:', 'username' => null, 'password' => null];
+
+    #[DataProvider('connectionProvider')]
+    public function testLoginRequiredRequestRedirectsWithinTheInstallationPath(array $dbConfig): void
+    {
+        $app = $this->makeApp($dbConfig, [], 'default');
+        $factory = new ServerRequestFactory();
+
+        foreach (['', '/cms', '/cms/index.php'] as $base) {
+            foreach (['/admin', '/account'] as $path) {
+                $kernel = Kernel::create($app, dirname(__DIR__, 2) . '/templates', $base);
+                $response = $kernel->handle($factory->createServerRequest('GET', $base . $path));
+                $this->assertLoginRedirect($response, $base . $path, $base);
+                self::assertSame('no-store', $response->getHeaderLine('Cache-Control'));
+                $login = $kernel->handle($factory->createServerRequest('GET', $response->getHeaderLine('Location')));
+                self::assertSame(200, $login->getStatusCode());
+                self::assertStringContainsString('name="url" value="' . $base . $path . '"', $this->body($login));
+            }
+        }
+    }
+
+    public function testForbiddenErrorKeepsHomeActionForSignedInMember(): void
+    {
+        $app = $this->makeApp(self::SQLITE, [], 'default');
+        $id = $app->users()->createSocial('error-member@example.com', '일반회원');
+        $this->get($app, '/login');
+        session_start();
+        $_SESSION['user_id'] = $id;
+        $_SESSION['session_epoch'] = 0;
+        session_write_close();
+
+        $response = $this->get($app, '/admin');
+
+        self::assertSame(403, $response->getStatusCode());
+        self::assertMatchesRegularExpression(
+            '~<div class="card-actions">\s*<a[^>]+href="/"[^>]*>.*?홈으로 가기</a>~s',
+            $this->body($response)
+        );
+    }
+
+    public function testLoginRequiredJsonRequestKeepsUnauthorizedResponse(): void
+    {
+        $app = $this->makeApp(self::SQLITE);
+        $request = (new ServerRequestFactory())->createServerRequest('GET', '/admin')
+            ->withHeader('Accept', 'application/json');
+        $response = Kernel::create($app, dirname(__DIR__, 2) . '/templates', '')->handle($request);
+
+        self::assertSame(401, $response->getStatusCode());
+        self::assertSame('application/json; charset=utf-8', $response->getHeaderLine('Content-Type'));
+        self::assertSame('', $response->getHeaderLine('Location'));
+        self::assertSame(
+            ['error' => ['message' => '로그인이 필요합니다.', 'status' => 401]],
+            json_decode($this->body($response), true)
+        );
+    }
 
     /**
      * ErrorPageMiddleware 는 HttpNotFoundException 만 이름으로 잡고 나머지 Slim 라우팅

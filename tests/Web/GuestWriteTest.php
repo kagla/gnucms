@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace GnuCms\Tests\Web;
 
 use GnuCms\Tests\Support\WebTestCase;
+use GnuCms\Web\Kernel;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Slim\Psr7\Factory\ServerRequestFactory;
 
 /** 비회원 글쓰기: 폼이 이름·비밀번호 칸을 내주고, 새 주소는 /new 다. */
 final class GuestWriteTest extends WebTestCase
@@ -31,8 +33,7 @@ final class GuestWriteTest extends WebTestCase
 
         $response = $this->get($app, '/boards/free/new');
 
-        self::assertSame(401, $response->getStatusCode());
-        self::assertStringContainsString('로그인이 필요합니다', $this->body($response));
+        $this->assertLoginRedirect($response, '/boards/free/new');
     }
 
     #[DataProvider('connectionProvider')]
@@ -148,14 +149,36 @@ final class GuestWriteTest extends WebTestCase
     }
 
     #[DataProvider('connectionProvider')]
-    public function testOldWriteUrlRedirectsToNew(array $dbConfig): void
+    public function testOldWriteUrlsCannotOpenFormsOrCreatePosts(array $dbConfig): void
     {
         $app = $this->makeGuestBoard($dbConfig);
+        $app->boardService()->create($this->adminAcl(), [
+            'board_key' => 'notice', 'name' => '공지사항', 'perm_write' => 'guest',
+        ]);
+        $factory = new ServerRequestFactory();
 
-        $response = $this->get($app, '/boards/free/write');
+        foreach (['', '/cms'] as $base) {
+            $kernel = Kernel::create($app, dirname(__DIR__, 2) . '/templates', $base);
+            foreach (['free', 'notice'] as $key) {
+                $new = $kernel->handle($factory->createServerRequest('GET', $base . '/boards/' . $key . '/new'));
+                self::assertSame(200, $new->getStatusCode());
+                foreach (['/boards/', '/b/'] as $prefix) {
+                    $url = $base . $prefix . $key . '/write';
+                    $get = $kernel->handle($factory->createServerRequest('GET', $url));
+                    self::assertSame(404, $get->getStatusCode());
+                    self::assertSame('', $get->getHeaderLine('Location'));
+                    $post = $kernel->handle($factory->createServerRequest('POST', $url)->withParsedBody([
+                        'csrf_token' => $_SESSION['csrf_token'],
+                        'title' => '등록되면 안 되는 글', 'content' => '본문',
+                        'author_name' => '손님', 'password' => 'guest-pass-123',
+                    ]));
+                    self::assertSame(404, $post->getStatusCode());
+                    self::assertSame('', $post->getHeaderLine('Location'));
+                }
+            }
+        }
 
-        self::assertSame(301, $response->getStatusCode());
-        self::assertSame('/boards/free/new', $response->getHeaderLine('Location'));
+        self::assertSame(0, (int) $app->db()->selectOne('SELECT COUNT(*) AS n FROM ' . $app->db()->table('posts'))['n']);
     }
 
     #[DataProvider('connectionProvider')]

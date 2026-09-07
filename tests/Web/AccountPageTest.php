@@ -16,7 +16,7 @@ final class AccountPageTest extends WebTestCase
     public function testGuestCannotOpenAccountPage(array $dbConfig): void
     {
         $app = $this->makeApp($dbConfig);
-        self::assertSame(401, $this->get($app, '/account')->getStatusCode());
+        $this->assertLoginRedirect($this->get($app, '/account'), '/account');
     }
 
     #[DataProvider('connectionProvider')]
@@ -144,7 +144,7 @@ final class AccountPageTest extends WebTestCase
         );
         self::assertNull($event['login_identifier']);
         self::assertSame('198.51.100.22', $event['client_ip']);
-        self::assertSame(401, $this->get($app, '/account')->getStatusCode());
+        $this->assertLoginRedirect($this->get($app, '/account'), '/account');
 
         $newId = $app->users()->create('leave@example.com', password_hash('new-password-123', PASSWORD_DEFAULT), '새회원');
         $app->identities()->attach($newId, 'google', 'old-google-uid');

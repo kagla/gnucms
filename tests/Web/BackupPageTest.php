@@ -201,7 +201,6 @@ final class BackupPageTest extends WebTestCase
         self::assertStringContainsString('백업을 삭제했습니다', $afterDelete);
 
         $this->post($app, '/logout', ['csrf_token' => $_SESSION['csrf_token']]);
-        self::assertSame(401, $this->get($app, '/admin/backups/' . $name)->getStatusCode(),
-            '백업 파일은 로그아웃 뒤 직접 주소로 내려받을 수 없어야 한다');
+        $this->assertLoginRedirect($this->get($app, '/admin/backups/' . $name), '/admin/backups/' . $name);
     }
 }

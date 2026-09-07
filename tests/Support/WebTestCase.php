@@ -116,6 +116,15 @@ abstract class WebTestCase extends DatabaseTestCase
         return (string) $response->getBody();
     }
 
+    protected function assertLoginRedirect(ResponseInterface $response, ?string $destination = null, string $base = ''): void
+    {
+        self::assertSame(303, $response->getStatusCode(), $this->body($response));
+        $location = $response->getHeaderLine('Location');
+        self::assertSame($base . '/login', parse_url($location, PHP_URL_PATH));
+        parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+        self::assertSame($destination === null ? [] : ['url' => $destination], $query);
+    }
+
     /** AttachmentService::upload() 가 받는 $_FILES 형태의 배열을 임시 파일로 만든다. */
     protected function fakeUpload(string $name, string $contents): array
     {

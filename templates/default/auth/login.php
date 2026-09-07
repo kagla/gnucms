@@ -15,6 +15,7 @@
             <p>가입 때 보낸 인증 메일의 링크를 열어야 로그인할 수 있어요. 받은편지함과 스팸함을 확인해 주세요.</p>
             <form method="post" action="<?= $this->url('auth.verify.resend') ?>">
               <input type="hidden" name="csrf_token" value="<?= $this->e($csrf_token) ?>">
+              <input type="hidden" name="url" value="<?= $this->e($return_url ?? '') ?>">
               <input type="hidden" name="email" value="<?= $this->e($unverified_email) ?>">
               <?php $this->insert('_turnstile', ['action' => 'verification_resend', 'errors' => $errors]) ?>
               <button class="btn btn-warning btn-sm" type="submit"><?= $this->icon('mail', 15) ?> 인증 메일 다시 보내기</button>
@@ -26,6 +27,7 @@
       <?php if (!$site['password_login_enabled']): ?><div class="alert alert-info alert-soft auth-notice"><span><?= $this->icon('info', 18) ?></span><span>일반 회원 로그인이 중지되어 있습니다. 관리자는 이메일로 계속 로그인할 수 있습니다.</span></div><?php endif ?>
       <form method="post" action="<?= $this->url('auth.login') ?>">
         <input type="hidden" name="csrf_token" value="<?= $this->e($csrf_token) ?>">
+        <input type="hidden" name="url" value="<?= $this->e($return_url ?? '') ?>">
         <fieldset class="fieldset<?php if (array_key_exists('email', $errors)): ?> is-invalid<?php endif ?>">
           <legend class="fieldset-legend">이메일</legend>
           <label class="input input-bordered input-block">

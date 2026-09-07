@@ -98,6 +98,10 @@ daisyUI 는 CDN 으로 읽는다(`layout.php` 의 `<link>`). 이 서버는 compo
   `array_key_exists('email', $errors)` 로 갈라 `validator-hint` 를 낸다.
 - 본문 HTML 은 반드시 `$this->html($content)` 로 낸다(정화 + 사진 축소본).
 - 주소는 `$this->url('라우트', [경로 인자], [쿼리])` 로 만든다. 직접 조립하지 않는다.
+- 글쓰기·게시판·문서 등록은 `/new` 주소를 사용한다. 글쓰기 링크와 폼 action은 `posts.create`로 만들며 실제 주소는 `/boards/{key}/new`다. 옛 `/boards/{key}/write`와 `/b/{key}/write`는 GET·POST 모두 지원하지 않고 `404`를 반환한다.
+- 로그인이 필요한 HTML 요청은 `/login?url=원래주소`로 이동하고, 로그인 후 해당 주소로 돌아간다.
+  복귀 주소는 현재 설치 내부의 경로만 허용하며 쿼리도 보존한다. POST 요청은 작업을 재실행하지 않도록 복귀 주소 없이 로그인 화면으로 보낸다. JSON 요청은 기존 `401` 응답을 유지한다.
+- `auth/login.php`의 `return_url`은 검증된 복귀 주소다. 테마 재정의에서도 `url` hidden 필드와 소셜 로그인 링크의 `url` 쿼리에 이 값을 이스케이프해 전달한다. 비밀번호 오류 화면에서도 값을 보존하며, 소셜 로그인은 각 OAuth state에 복귀 주소를 묶어 완료 후 사용한다.
 
 ## 8. 관리 콘솔
 

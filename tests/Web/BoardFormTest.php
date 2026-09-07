@@ -146,8 +146,8 @@ final class BoardFormTest extends WebTestCase
             'board_key' => 'plain', 'name' => '분류없음', 'perm_write' => 'guest',
         ]);
 
-        $this->get($app, '/boards/plain/write');
-        $response = $this->post($app, '/boards/plain/write', [
+        $this->get($app, '/boards/plain/new');
+        $response = $this->post($app, '/boards/plain/new', [
             'csrf_token'  => $_SESSION['csrf_token'] ?? '',
             'author_name' => '아무개',
             'password'    => 'pass-1234',

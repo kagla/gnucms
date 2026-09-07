@@ -20,19 +20,48 @@ final class OauthFlowTest extends WebTestCase
         $app->users()->create('owner@example.com', password_hash('password123', PASSWORD_DEFAULT), '관리자', true);
         $app->setProviderRegistry(new ProviderRegistry([], [$this->fakeGoogle()]));
 
-        $first = $this->stateFrom($this->get($app, '/auth/google'));
-        $second = $this->stateFrom($this->get($app, '/auth/google'));
+        $first = $this->stateFrom($this->get($app, '/auth/google', ['url' => '/account']));
+        $second = $this->stateFrom($this->get($app, '/auth/google', ['url' => '/notifications']));
         self::assertNotSame($first, $second);
 
-        $completedSecond = $this->get($app, '/auth/google/callback', ['state' => $second, 'code' => 'second']);
+        $completedSecond = $this->get($app, '/auth/google/callback', ['state' => $second, 'code' => 'second', 'url' => '//outside.example']);
         self::assertSame(303, $completedSecond->getStatusCode());
+        self::assertSame('/notifications', $completedSecond->getHeaderLine('Location'));
 
         $completedFirst = $this->get($app, '/auth/google/callback', ['state' => $first, 'code' => 'first']);
         self::assertSame(303, $completedFirst->getStatusCode());
+        self::assertSame('/account', $completedFirst->getHeaderLine('Location'));
+        self::assertSame([], $_SESSION['oauth_state_urls']['google']);
 
         $replayed = $this->get($app, '/auth/google/callback', ['state' => $first, 'code' => 'replay']);
         self::assertSame(403, $replayed->getStatusCode(), $this->body($replayed));
         self::assertSame(2, $app->users()->countAll(), '관리자와 소셜 회원 한 명만 있어야 한다');
+    }
+
+    public function testLoginPageCarriesDestinationIntoSocialLoginAndPendingEmailCompletion(): void
+    {
+        $app = $this->makeApp(['dsn' => 'sqlite::memory:', 'username' => null, 'password' => null], [
+            'app' => ['url' => 'https://community.example.com'],
+        ], 'default');
+        $this->get($app, '/login');
+        $app->users()->create('owner@example.com', password_hash('password123', PASSWORD_DEFAULT), '관리자', true);
+        $app->setProviderRegistry(new ProviderRegistry([], [$this->fakeGoogle()]));
+        $mailer = new CollectingMailer();
+        $app->setMailer($mailer);
+        $destination = '/account?tab=profile';
+        $page = $this->get($app, '/login', ['url' => $destination]);
+        self::assertStringContainsString('/auth/google?' . http_build_query(['url' => $destination]), $this->body($page));
+        $state = $this->stateFrom($this->get($app, '/auth/google', ['url' => $destination]));
+        self::assertSame(200, $this->get($app, '/auth/google/callback', ['state' => $state, 'code' => 'unverified'])->getStatusCode());
+        self::assertSame($destination, $_SESSION['oauth_pending']['return_url']);
+        $sent = $this->post($app, '/auth/email', ['csrf_token' => $_SESSION['csrf_token'], 'email' => 'member@example.com']);
+        self::assertSame(200, $sent->getStatusCode());
+        self::assertCount(1, $mailer->messages);
+        self::assertSame(1, preg_match('~[?&]token=([a-f0-9]+)~', $mailer->messages[0]['body'], $matches));
+        $completed = $this->get($app, '/auth/complete', ['token' => $matches[1], 'url' => '//outside.example']);
+        self::assertSame(303, $completed->getStatusCode());
+        self::assertSame($destination, $completed->getHeaderLine('Location'));
+        self::assertArrayNotHasKey('oauth_pending', $_SESSION);
     }
 
     #[DataProvider('connectionProvider')]

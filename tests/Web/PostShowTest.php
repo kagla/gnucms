@@ -325,13 +325,12 @@ final class PostShowTest extends WebTestCase
     }
 
     /**
-     * perm_read = admin 인 게시판은 게스트에게 401 이어야 한다 — 로그인하면
-     * 될 수도 있다는 뜻. 이 판정은 BoardService::getEntity() -> Acl::assertCanRead()
-     * 에서 나온다.
+     * perm_read = admin 인 게시판은 게스트를 로그인으로 보낸다.
+     * BoardService::getEntity() -> Acl::assertCanRead()의 401 판정을 웹에서 변환한다.
      *
      * @dataProvider connectionProvider
      */
-    public function testPostInAdminOnlyBoardIsDeniedToGuestWith401(array $dbConfig): void
+    public function testPostInAdminOnlyBoardRedirectsGuestToLogin(array $dbConfig): void
     {
         $app = $this->makeApp($dbConfig);
         $acl = $this->adminAcl();
@@ -344,6 +343,6 @@ final class PostShowTest extends WebTestCase
 
         $response = $this->get($app, '/posts/' . $post['id']);
 
-        self::assertSame(401, $response->getStatusCode());
+        $this->assertLoginRedirect($response, '/posts/' . $post['id']);
     }
 }

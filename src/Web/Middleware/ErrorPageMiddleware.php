@@ -6,6 +6,7 @@ namespace GnuCms\Web\Middleware;
 
 use GnuCms\Error\DomainError;
 use GnuCms\View\ViewInterface;
+use GnuCms\Web\LoginRedirect;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -13,6 +14,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 use Slim\Exception\HttpException;
 use Slim\Exception\HttpNotFoundException;
 use Slim\Psr7\Response;
+use Slim\Interfaces\RouteParserInterface;
 use Throwable;
 
 /**
@@ -41,7 +43,8 @@ final class ErrorPageMiddleware implements MiddlewareInterface
     public function __construct(
         ViewInterface $view,
         bool $debug,
-        ?string $logFile
+        ?string $logFile,
+        private RouteParserInterface $routeParser
     ) {
         $this->view = $view;
         $this->debug = $debug;
@@ -91,6 +94,15 @@ final class ErrorPageMiddleware implements MiddlewareInterface
         array $details = []
     ): ResponseInterface {
         if (stripos($request->getHeaderLine('Accept'), 'application/json') === false) {
+            if ($status === 401) {
+                // POST 작업은 로그인 뒤 GET으로 재실행하지 않는다.
+                $url = in_array($request->getMethod(), ['GET', 'HEAD'], true)
+                    ? $request->getUri()->getPath()
+                        . ($request->getUri()->getQuery() === '' ? '' : '?' . $request->getUri()->getQuery())
+                    : null;
+                return (new Response())->withStatus(303)->withHeader('Cache-Control', 'no-store')
+                    ->withHeader('Location', LoginRedirect::loginUrl($this->routeParser, $url));
+            }
             return $this->render($status, $title, $message, $details);
         }
 

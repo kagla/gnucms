@@ -100,7 +100,8 @@ final class Kernel
         $slim->add(new ErrorPageMiddleware(
             $view,
             (bool) $app->config('debug', false),
-            $app->config('log.file') === null ? null : (string) $app->config('log.file')
+            $app->config('log.file') === null ? null : (string) $app->config('log.file'),
+            $slim->getRouteCollector()->getRouteParser()
         ));
         $slim->add(new HtmlContentTypeMiddleware());
         $slim->add(new SessionGuard($app, $view));

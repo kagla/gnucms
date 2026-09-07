@@ -91,13 +91,12 @@ final class AttachmentDownloadTest extends WebTestCase
     }
 
     /**
-     * perm_read = admin 인 게시판의 첨부는 게스트에게 401 이어야 한다 — 로그인하면
-     * 될 수도 있다는 뜻. AttachmentService::download() 가 부르는
-     * BoardService::getEntity() -> Acl::assertCanRead() 에서 나오는 판정이다.
+     * perm_read = admin 인 게시판의 첨부는 게스트를 로그인으로 보낸다.
+     * AttachmentService::download()에서 나오는 401 판정을 웹에서 변환한다.
      *
      * @dataProvider connectionProvider
      */
-    public function testAttachmentInAdminOnlyBoardIsDeniedToGuestWith401(array $dbConfig): void
+    public function testAttachmentInAdminOnlyBoardRedirectsGuestToLogin(array $dbConfig): void
     {
         $app = $this->makeApp($dbConfig);
         $acl = $this->adminAcl();
@@ -115,7 +114,7 @@ final class AttachmentDownloadTest extends WebTestCase
             'attachments' => [$descriptor],
         ]);
 
-        self::assertSame(401, $this->get($app, '/posts/' . $post['id'] . '/files/0')->getStatusCode());
+        $this->assertLoginRedirect($this->get($app, '/posts/' . $post['id'] . '/files/0'), '/posts/' . $post['id'] . '/files/0');
     }
 
     protected function tearDown(): void

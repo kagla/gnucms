@@ -29,7 +29,7 @@ final class CmsPageTest extends WebTestCase
         self::assertStringNotContainsString('href="/content/draft"', $this->body($home));
         self::assertSame(200, $this->get($app, '/content/about')->getStatusCode());
         self::assertSame(404, $this->get($app, '/content/draft')->getStatusCode());
-        self::assertSame(401, $this->get($app, '/admin/content/' . $draftId . '/preview')->getStatusCode());
+        $this->assertLoginRedirect($this->get($app, '/admin/content/' . $draftId . '/preview'), '/admin/content/' . $draftId . '/preview');
         $legacy = $this->get($app, '/page/about');
         self::assertSame(301, $legacy->getStatusCode());
         self::assertSame('/content/about', $legacy->getHeaderLine('Location'));
@@ -524,9 +524,9 @@ final class CmsPageTest extends WebTestCase
         $uses = $this->post($app, '/admin/terms/uses', [
             'csrf_token' => $_SESSION['csrf_token'], 'scope' => 'signup',
         ]);
-        self::assertSame(401, $uses->getStatusCode(), $this->body($uses));
-        self::assertSame(401, $this->get($app, '/admin/terms')->getStatusCode());
-        self::assertSame(401, $this->get($app, '/admin/terms/' . $pageId . '/consents')->getStatusCode());
+        $this->assertLoginRedirect($uses);
+        $this->assertLoginRedirect($this->get($app, '/admin/terms'), '/admin/terms');
+        $this->assertLoginRedirect($this->get($app, '/admin/terms/' . $pageId . '/consents'), '/admin/terms/' . $pageId . '/consents');
 
         // 관리자로 들어와도 표가 없는 요청은 받지 않는다.
         $ownerId = $app->users()->create('owner@example.com', password_hash('owner-password-123', PASSWORD_DEFAULT), '소유자', true);
