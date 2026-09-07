@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.5.0](https://github.com/kagla/gnucms/compare/v0.4.0...v0.5.0) (2026-09-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* main no longer includes plugins/bizppurio or its settings and result endpoints. Disable previous package enablement and remove old package directories when deploying by overlay. Stored credentials, templates and message history remain intact.
+* main no longer includes modules/alimtalk or its operations routes. Disable previous module enablement and remove the old package directory when deploying by overlay. Provider settings, templates and dispatch data are retained.
+* main no longer bundles electronic payment plugins or GnuCms Payment classes. Existing installations should disable these plugins and remove their old package and source directories when deploying by overlay. Stored payment settings and transaction data are retained.
+* main no longer includes the standalone shop or its routes. Existing installations should disable the module and remove its old package directory when deploying by overlay; stored shop data is retained.
+* payment and shop packages use gateway.v2 and direct-PG configuration. Upgrade payment package data to schema 2, enter merchant credentials and adapt any overridden payment/settings templates.
+
+### Features
+
+* add direct INICIS payments and remove payment intermediary ([43df49d](https://github.com/kagla/gnucms/commit/43df49d63e0cced2f895804389fce10b18ca8a7f))
+* add direct Toss Payments integration ([940a80c](https://github.com/kagla/gnucms/commit/940a80c2a306fea5d80d525213a82b14fc1cf329))
+* complete shop storefront and product management ([71ec244](https://github.com/kagla/gnucms/commit/71ec244fa93d8defe9dee718d485d57884bc2c77))
+* redirect guests to login and return to the original page ([81f8d64](https://github.com/kagla/gnucms/commit/81f8d647bd0c6c1055bd4ad5a2431029ec23425f))
+
+
+### Bug Fixes
+
+* apply shared admin UI to direct payment settings ([bf23605](https://github.com/kagla/gnucms/commit/bf236059f740fae0bd8cea0678aa19f446a59f28))
+* distinguish rows in extension lists ([3fe8e76](https://github.com/kagla/gnucms/commit/3fe8e76ace22b38ed457af970d27727e6c8760fc))
+
+
+### Code Refactoring
+
+* exclude complete Bizppurio integration from main ([a47b22f](https://github.com/kagla/gnucms/commit/a47b22f91c5dca51ab44f1ce0126fa9a9ddc26e6))
+* exclude payment plugins from main distribution ([2b1b338](https://github.com/kagla/gnucms/commit/2b1b3383dc7075a181abaf2aef823c17c37544ac))
+* exclude standalone shop from main distribution ([993cb49](https://github.com/kagla/gnucms/commit/993cb49e2ddc195ef27e28095267dadd394becd2))
+* keep Alimtalk operations on the Bizppurio branch ([1f7735e](https://github.com/kagla/gnucms/commit/1f7735e04764d7dc363ccbe93b9b1d7791edce1b))
+
 ## [0.4.0](https://github.com/kagla/gnucms/compare/v0.3.0...v0.4.0) (2026-09-06)
 
 
