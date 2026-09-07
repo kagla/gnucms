@@ -15,7 +15,7 @@ if ($scenario === 'core') {
     $section = $scenario === 'core-list' ? 'plugins' : 'modules';
     $catalog = (new \GnuCms\Extension\Catalog(dirname(__DIR__, 2)))->all();
     $packages = [];
-    foreach ($section === 'plugins' ? ['bizppurio', 'demo-message'] : ['demo-reservation'] as $id) {
+    foreach ($section === 'plugins' ? ['demo-message'] : ['demo-reservation'] as $id) {
         $package = $catalog[$section . '/' . $id];
         $prefix = $package['route_prefix'] ?? '/' . $section . '/' . $id;
         $package += ['enabled' => true, 'selected' => true,
@@ -25,17 +25,12 @@ if ($scenario === 'core') {
         if ($id === 'demo-reservation') $package['public_url'] = $base . '/book';
         $packages[] = $package;
     }
-    // 실제 모듈 개수와 무관하게 홀짝 행과 실행 주소 표시를 검증한다.
-    if ($section === 'modules') $packages[] = array_replace($packages[0], [
-        'key' => 'modules/example', 'id' => 'example', 'name' => '예제 모듈',
-        'entry_url' => $base . '/modules/example/preview', 'public_url' => null,
+    // 실제 패키지 개수와 무관하게 홀짝 행과 실행 주소 표시를 검증한다.
+    $packages[] = array_replace($packages[0], [
+        'key' => $section . '/example', 'id' => 'example', 'name' => '예제 확장',
+        'entry_url' => $base . '/' . $section . '/example/preview', 'public_url' => null,
     ]);
     echo $view->fetch('admin/extensions/index', ['extension_page' => ['title' => $section === 'plugins' ? '플러그인' : '모듈', 'description' => '확장 기능 관리', 'icon' => 'grid'], 'extension_section' => $section, 'extension_error' => null, 'saved' => false, 'packages' => $packages, 'changed_order' => '[]']);
-} elseif ($scenario === 'bizppurio') {
-    echo $view->forExtension('bizppurio', dirname(__DIR__, 2) . '/plugins/bizppurio/templates')->fetch('settings', $common + [
-        'webhook' => null, 'settings' => ['configured' => true, 'enabled' => false, 'account' => 'browser-test', 'account_type' => 'module', 'revision' => str_repeat('a', 32),
-            'senderkey' => bin2hex(random_bytes(20)), 'from' => '0212345678', 'test_phone' => '01000000000'],
-    ]);
 } else {
     $module = $scenario === 'demo-reservation'; $section = $module ? 'modules' : 'plugins';
     echo $view->forExtension($scenario, dirname(__DIR__, 2) . '/' . $section . '/' . $scenario . '/templates')->fetch('preview', $common + [

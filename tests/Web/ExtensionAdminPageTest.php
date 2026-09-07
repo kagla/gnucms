@@ -153,12 +153,12 @@ PHP);
     #[DataProvider('connectionProvider')]
     public function testBundledCmsExcludesShopAndCanDisableItsPreviousEnablement(array $dbConfig): void
     {
-        $app = $this->makeApp($dbConfig, ['extensions' => ['root' => dirname(__DIR__, 2)]], 'default');
+        $app = $this->makeBundledApp($dbConfig);
         $adminId = $app->users()->create('bundled-admin@example.test', '', '관리자', true);
         $this->get($app, '/login');
         $this->sessionUser($adminId);
         $state = new StateStore($app->storageDir() . '/extensions');
-        $remaining = ['plugins/bizppurio'];
+        $remaining = ['plugins/retained'];
         $state->update(static fn (array $enabled): array => $remaining);
         $body = $this->body($this->get($app, '/admin/modules'));
         self::assertStringNotContainsString('작은 쇼핑몰', $body);
@@ -170,7 +170,7 @@ PHP);
         foreach (['/shop', '/shop/orders', '/admin/shop', '/admin/shop/products', '/modules/shop', '/modules/shop/admin'] as $path) {
             self::assertSame(404, $this->get($app, $path)->getStatusCode(), $path);
         }
-        foreach (['/', '/account', '/admin/modules', '/plugins/bizppurio/settings'] as $path) {
+        foreach (['/', '/account', '/admin/modules', '/plugins/retained/preview'] as $path) {
             $response = $this->get($app, $path);
             self::assertSame(200, $response->getStatusCode(), $path);
             $body = $this->body($response);
@@ -189,18 +189,17 @@ PHP);
     #[DataProvider('connectionProvider')]
     public function testBundledCmsExcludesPaymentPluginsAndCanDisablePreviousEnablement(array $dbConfig): void
     {
-        $app = $this->makeApp($dbConfig, ['extensions' => ['root' => dirname(__DIR__, 2)]], 'default');
+        $app = $this->makeBundledApp($dbConfig);
         $adminId = $app->users()->create('payments-removed-admin@example.test', '', '관리자', true);
         $this->get($app, '/login');
         $this->sessionUser($adminId);
         $state = new StateStore($app->storageDir() . '/extensions');
-        $remaining = ['plugins/bizppurio'];
+        $remaining = ['plugins/retained'];
         $providers = ['inicis', 'kcp', 'kspay', 'toss'];
         $payments = array_map(static fn (string $id): string => 'plugins/payment-' . $id, $providers);
         $state->update(static fn (array $enabled): array => $remaining);
         $body = $this->body($this->get($app, '/admin/plugins'));
         self::assertStringNotContainsString('payment-', $body);
-        self::assertStringContainsString('비즈뿌리오', $body);
         self::assertStringContainsString('메시지 형식', $body);
 
         $state->update(static fn (array $enabled): array => [...$enabled, ...$payments]);
@@ -209,7 +208,7 @@ PHP);
             self::assertSame(404, $this->get($app, $path)->getStatusCode(), $path);
             self::assertSame(404, $this->post($app, $path, ['action' => 'install', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode(), $path);
         }
-        foreach (['/admin/plugins', '/admin/modules', '/plugins/bizppurio/settings'] as $path) {
+        foreach (['/admin/plugins', '/admin/modules', '/plugins/retained/preview'] as $path) {
             $response = $this->get($app, $path);
             self::assertSame(200, $response->getStatusCode(), $path);
             self::assertStringNotContainsString('href="/plugins/payment-', $this->body($response));
@@ -224,33 +223,56 @@ PHP);
         self::assertSame($remaining, $state->read());
     }
 
-    #[DataProvider('connectionProvider')]
-    public function testBundledCmsExcludesAlimtalkModuleAndPreservesItsProvider(array $dbConfig): void
+    private function makeBundledApp(array $dbConfig): App
     {
-        $app = $this->makeApp($dbConfig, ['extensions' => ['root' => dirname(__DIR__, 2)]], 'default');
-        $adminId = $app->users()->create('alimtalk-removed-admin@example.test', '', '관리자', true);
+        // 배포되는 패키지 설명과 진입점은 그대로 사용하고, 다른 활성 확장은 독립 예제로 검증한다.
+        // 기존 데모 테스트가 복사해서 로드한 클래스와 충돌하지 않도록 그 데모는 활성화하지 않는다.
+        foreach ((new Catalog(dirname(__DIR__, 2)))->all() as $key => $package) {
+            $manifest = json_decode(file_get_contents($package['directory'] . '/extension.json'), true, 16, JSON_THROW_ON_ERROR);
+            $this->package($key, $manifest, '<?php return require ' . var_export($package['directory'] . '/bootstrap.php', true) . ';');
+        }
+        $this->package('plugins/retained', ['entry_path' => '/preview'], <<<'PHP'
+<?php return static function ($context): void {
+    $context->route('GET', '/preview', static fn ($request, $response) => $response, admin: true);
+};
+PHP);
+        return $this->makeApp($dbConfig, [], 'default');
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testBundledCmsExcludesBizppurioAndMessagingModules(array $dbConfig): void
+    {
+        $app = $this->makeBundledApp($dbConfig);
+        $adminId = $app->users()->create('messaging-removed-admin@example.test', '', '관리자', true);
         $this->get($app, '/login');
         $this->sessionUser($adminId);
         $state = new StateStore($app->storageDir() . '/extensions');
-        $state->update(static fn (array $enabled): array => ['plugins/bizppurio']);
-        self::assertStringNotContainsString('name="enabled[alimtalk]"', $this->body($this->get($app, '/admin/modules')));
+        $state->update(static fn (array $enabled): array => ['plugins/retained']);
+        self::assertStringNotContainsString('bizppurio', $this->body($this->get($app, '/admin/plugins')));
+        $modules = $this->body($this->get($app, '/admin/modules'));
+        foreach (['alimtalk', 'sms'] as $id) self::assertStringNotContainsString('name="enabled[' . $id . ']"', $modules);
 
-        $state->update(static fn (array $enabled): array => [...$enabled, 'modules/alimtalk']);
-        foreach (['home', 'templates', 'send', 'history', 'detail'] as $page) {
-            $path = '/modules/alimtalk/' . $page;
+        $removed = ['plugins/bizppurio', 'modules/alimtalk', 'modules/sms'];
+        $state->update(static fn (array $enabled): array => [...$enabled, ...$removed]);
+        $paths = ['/plugins/bizppurio/settings', '/plugins/bizppurio/result', '/modules/sms/send', '/modules/sms/history', '/modules/sms/detail'];
+        foreach (['home', 'templates', 'send', 'history', 'detail'] as $page) $paths[] = '/modules/alimtalk/' . $page;
+        foreach ($paths as $path) {
             self::assertSame(404, $this->get($app, $path)->getStatusCode(), $path);
             self::assertSame(404, $this->post($app, $path, ['csrf_token' => $_SESSION['csrf_token']])->getStatusCode(), $path);
         }
-        foreach (['/admin/modules', '/admin/plugins', '/plugins/bizppurio/settings'] as $path) {
+        foreach (['/admin/modules', '/admin/plugins', '/plugins/retained/preview'] as $path) {
             $response = $this->get($app, $path);
             self::assertSame(200, $response->getStatusCode(), $path);
-            self::assertStringNotContainsString('href="/modules/alimtalk/', $this->body($response));
+            foreach ($removed as $key) self::assertStringNotContainsString('href="/' . $key . '/', $this->body($response));
         }
-        $response = $this->post($app, '/admin/modules/alimtalk/state', ['enabled' => '0', 'csrf_token' => $_SESSION['csrf_token']]);
-        self::assertSame(303, $response->getStatusCode());
-        self::assertSame(['plugins/bizppurio'], $state->read());
-        self::assertStringNotContainsString('name="enabled[alimtalk]"', $this->body($this->get($app, '/admin/modules')));
-        self::assertSame(404, $this->post($app, '/admin/modules/alimtalk/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
+        foreach ($removed as $key) {
+            self::assertSame(303, $this->post($app, '/admin/' . $key . '/state', ['enabled' => '0', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
+            self::assertSame(404, $this->post($app, '/admin/' . $key . '/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
+        }
+        self::assertSame(['plugins/retained'], $state->read());
+        self::assertStringNotContainsString('bizppurio', $this->body($this->get($app, '/admin/plugins')));
+        $modules = $this->body($this->get($app, '/admin/modules'));
+        foreach (['alimtalk', 'sms'] as $id) self::assertStringNotContainsString('name="enabled[' . $id . ']"', $modules);
     }
 
     #[DataProvider('connectionProvider')]

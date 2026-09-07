@@ -8,7 +8,6 @@ const root = path.resolve(__dirname, '../..');
 const render = (scenario, base) => execFileSync('php', [path.join(__dirname, 'ExtensionAdminFixture.php'), scenario, base], {cwd: root, encoding: 'utf8'});
 const route = scenario => scenario === 'core-modules' ? '/admin/modules'
   : scenario === 'core-list' ? '/admin/plugins'
-  : scenario === 'bizppurio' ? '/plugins/bizppurio/settings'
   : scenario.startsWith('core') ? '/admin/settings' : '/' + (scenario === 'demo-message' ? 'plugins' : 'modules') + '/' + scenario + '/preview';
 
 (async () => {
@@ -84,7 +83,7 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules'
         if (base === '/cms') await page.screenshot({path: '/tmp/gnucms-module-links-' + width + '.png', fullPage: true});
       }
       assert.deepEqual(errors, [], 'module user link');
-      for (const scenario of ['bizppurio', 'demo-message', 'demo-reservation']) {
+      for (const scenario of ['demo-message', 'demo-reservation']) {
         await page.setViewport({width: 1280, height: 960});
         await open(scenario);
         assert.equal(await page.$$eval('.admin-shell', els => els.length), 1, scenario);
@@ -96,7 +95,7 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules'
         const section = scenario === 'demo-reservation' ? 'modules' : 'plugins';
         assert.equal(await page.$eval('.admin-sidebar a[aria-current=page]', el => new URL(el.href).pathname), base + '/admin/' + section);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), scenario + ' desktop width');
-        if (base === '/cms' && scenario === 'bizppurio') await page.screenshot({path: '/tmp/gnucms-extension-admin-desktop.png', fullPage: true});
+        if (base === '/cms' && scenario === 'demo-message') await page.screenshot({path: '/tmp/gnucms-extension-admin-desktop.png', fullPage: true});
         await page.click('[data-theme-toggle]');
         assert.equal(await page.$eval('html', el => el.dataset.themeMode), 'dark');
         const dark = await style('body', ['backgroundColor']);
@@ -115,17 +114,15 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules'
         assert.deepEqual(errors, [], scenario);
         count++;
       }
-      await open('bizppurio');
-      await page.$eval('button[value=save]', button => button.form.requestSubmit(button));
+      await open('demo-message');
+      await page.$eval('#main button[type=submit]', button => button.form.requestSubmit(button));
       await page.waitForFunction(() => document.body.textContent.includes('submitted'));
-      assert.equal(posts.at(-1).url, 'https://gnucms.test' + base + '/plugins/bizppurio/settings');
-      assert.equal(posts.at(-1).data.get('action'), 'save');
-      assert.equal(posts.at(-1).data.get('account'), 'browser-test');
+      assert.equal(posts.at(-1).url, 'https://gnucms.test' + base + '/plugins/demo-message/preview');
+      assert.equal(posts.at(-1).data.get('title'), '주문 안내');
+      assert.equal(posts.at(-1).data.get('body'), '주문이 접수되었습니다.');
       assert.equal(posts.at(-1).data.get('csrf_token'), 'browser-test-csrf');
-      assert.equal(posts.at(-1).data.get('environment'), 'test');
-      assert.equal(posts.at(-1).data.get('password'), '');
       await page.close();
     }
-    console.log(`Extension admin browser checks passed: ${count} pages, core typography/controls, light/dark themes, mobile navigation, tables and settings submission.`);
+    console.log(`Extension admin browser checks passed: ${count} pages, core typography/controls, light/dark themes, mobile navigation, tables and form submission.`);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
