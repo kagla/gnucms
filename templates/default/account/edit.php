@@ -3,6 +3,12 @@
 <?php $this->start('title') ?>회원정보 수정 · <?= $this->e($site['site_name']) ?><?php $this->stop() ?>
 <?php $this->start('body') ?>
 <div class="auth-wrap">
+  <?php if (isset($public_extensions['modules/shop'])): ?>
+    <section class="card auth-card"><div class="card-body">
+      <h2 class="card-title">나의 쇼핑</h2><p>주문과 배송을 확인하고 취소·반품·교환을 신청할 수 있습니다.</p>
+      <div class="card-actions"><a class="btn btn-primary" href="<?= $this->e($public_extensions['modules/shop']['base_url']) ?>/orders">내 주문 확인</a><a class="btn btn-outline" href="<?= $this->e($public_extensions['modules/shop']['url']) ?>">쇼핑하러 가기</a></div>
+    </div></section>
+  <?php endif ?>
   <section class="card auth-card">
     <div class="card-body">
       <div class="auth-head">

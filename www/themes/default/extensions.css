@@ -1,0 +1,82 @@
+/* 확장 운영 화면도 관리 콘솔의 카드·입력·버튼·표 컴포넌트를 사용한다. */
+.extension-admin .extension-panel{margin-bottom:1.25rem;min-width:0}
+.extension-admin .card-title{margin-bottom:.5rem}
+.extension-admin .card-title small{font-size:12px;font-weight:500;color:var(--bc-soft)}
+.extension-admin p{margin-block:.5rem}
+.extension-admin .page-head p{margin-bottom:0}
+.extension-admin .alert{margin-block:0 1rem;overflow-wrap:anywhere}
+.extension-admin .alert ul{list-style:disc;padding-left:1.25rem}
+.extension-admin small{color:var(--bc-soft)}
+.extension-admin .extension-label{display:block;margin:.875rem 0 .375rem;font-size:13.5px;font-weight:700;white-space:normal}
+.extension-admin .extension-label > :is(input,textarea,select){margin-top:.375rem;font-weight:400}
+.extension-admin .extension-label:has(> .checkbox){display:flex;align-items:center;gap:.5rem}
+.extension-admin .extension-label > .checkbox{flex:none;margin:0}
+.extension-admin .form-grid .extension-label{margin:0}
+.extension-admin :is(input,textarea,select){max-width:100%;min-width:0}
+.extension-admin .extension-fieldset{margin-top:1.25rem;padding-top:1rem;border-top:var(--border) solid var(--bc-10)}
+.extension-admin .extension-fieldset .fieldset-legend{padding-top:0}
+.extension-admin .row{display:flex;align-items:flex-end;gap:.75rem;flex-wrap:wrap}
+.extension-admin .row > *{width:auto;max-width:100%;min-width:0}
+.extension-admin .row > .extension-label{flex:1 1 9rem;margin:0}
+.extension-admin .row > input{flex:1 1 12rem}
+.extension-admin .row > .btn{flex:none}
+.extension-admin form:not(.row) > .btn{margin:.875rem .375rem 0 0}
+.extension-admin .row-actions form > .btn{margin:0}
+.extension-admin .stack > * + *{margin-top:1rem}
+.extension-admin .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.extension-admin .form-grid .full{grid-column:1/-1}
+.extension-admin .cols{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:1.25rem;align-items:start}
+.extension-admin .pre,.extension-admin pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
+.extension-admin pre{padding:1rem;margin-block:.75rem;background:var(--color-base-200);border-radius:var(--radius-field)}
+.extension-admin .table-wrap{max-width:100%}
+.extension-admin .table :is(th,td){padding-inline:.75rem;overflow-wrap:anywhere}
+.extension-admin .table .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.extension-admin .table .btn{height:1.875rem;min-height:1.875rem;padding-inline:.625rem;font-size:12px}
+.extension-admin .table td form.row{min-width:12rem}
+.extension-admin .table input[type=number]{width:6rem}
+.extension-admin .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-block:1.25rem}
+.extension-admin .metric{min-width:0;padding:1.125rem;white-space:normal}
+.extension-admin .metric > span{font-size:12px;color:var(--bc-soft)}
+.extension-admin .metric > strong{display:block;font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.extension-admin .metric strong small{font-size:12px;font-weight:500}
+.extension-admin .summary-line{display:flex;justify-content:space-between;gap:1rem;margin-block:.75rem}
+.extension-admin .summary-line.total{padding-top:.75rem;border-top:var(--border) solid var(--bc-10);font-weight:800}
+.extension-admin .claim{padding-block:1rem;border-top:var(--border) solid var(--bc-10)}
+.extension-admin .claim .form-section-title{margin-top:1rem}
+.extension-admin details > summary{cursor:pointer;font-weight:700}
+.extension-admin details > form{margin-top:1rem}
+.extension-admin .highlight{color:var(--color-error);font-weight:700}
+.extension-admin .order-id{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
+.extension-admin .empty{padding-block:3rem;text-align:center}
+.extension-admin .empty h1{font-size:20px}
+.extension-admin .pagination{display:flex;justify-content:center;gap:1rem;margin-top:1rem}
+.extension-admin dl{display:grid;grid-template-columns:8rem minmax(0,1fr);gap:.625rem 1rem;margin-block:1rem}
+.extension-admin dt{font-weight:700;color:var(--bc-mid)}
+.extension-admin dd{overflow-wrap:anywhere}
+.extension-admin .password-field{position:relative}
+.extension-admin .password-field > .input{padding-right:2.75rem}
+.extension-admin .password-eye-off{display:none}
+.extension-admin .password-toggle[aria-pressed=true] .password-eye{display:none}
+.extension-admin .password-toggle[aria-pressed=true] .password-eye-off{display:block}
+.extension-admin .history-filters{display:grid;grid-template-columns:minmax(8rem,.8fr) repeat(2,minmax(0,1fr)) auto;gap:.75rem;align-items:end;margin-bottom:1rem}
+.extension-admin .history-filters > div{min-width:0}
+.extension-admin .history-filters .extension-label{margin-top:0}
+.extension-toolbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.extension-toolbar .settings-tabs{margin-bottom:0;min-width:0;max-width:100%}
+.extension-admin nav:not(.tabs):not(.breadcrumbs):not(.pagination){display:flex;gap:.75rem;flex-wrap:wrap;margin-block:.75rem}
+@media(max-width:800px){
+  .extension-admin .cols{grid-template-columns:1fr}
+  .extension-admin .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px){
+  .extension-admin .form-grid{grid-template-columns:1fr}
+  .extension-admin .extension-panel.card-body{padding:1.25rem}
+  .extension-admin .table .num{text-align:left;white-space:normal}
+  .extension-admin .table td{padding-inline:0}
+  .extension-admin .table td form.row{min-width:0;flex:1}
+  .extension-admin .table td > *{min-width:0}
+  .extension-admin .table td[colspan]::before{display:none}
+  .extension-admin .history-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .extension-admin .history-filters .btn{width:100%}
+  .extension-admin dl{grid-template-columns:6rem minmax(0,1fr)}
+}

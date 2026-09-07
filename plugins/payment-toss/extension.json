@@ -1,0 +1,12 @@
+{
+  "id": "payment-toss",
+  "type": "plugin",
+  "name": "토스페이먼츠 결제",
+  "description": "상점별 API 키로 직접 연결하는 원화 카드·간편결제, 서버 검증, 전체·부분 환불입니다.",
+  "version": "1.0.0",
+  "api": 2,
+  "entry_path": "/settings",
+  "admin_test": false,
+  "requires": [],
+  "optional": []
+}

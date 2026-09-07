@@ -272,5 +272,7 @@ final class Routes
             ]);
             return $response->withHeader('Location', $url)->withStatus(301);
         });
+        // 코어 경로가 등록된 뒤 확장 기본 주소의 충돌을 검사한다.
+        \GnuCms\Extension\AdminRoutes::register($slim, $app);
     }
 }

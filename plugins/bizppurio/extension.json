@@ -1,0 +1,12 @@
+{
+  "id": "bizppurio",
+  "type": "plugin",
+  "name": "비즈뿌리오 알림톡",
+  "description": "알림톡 인증·발송·결과 수신과 공통 발송 서비스를 제공합니다.",
+  "version": "1.0.0",
+  "api": 2,
+  "entry_path": "/settings",
+  "admin_test": false,
+  "requires": [],
+  "optional": []
+}

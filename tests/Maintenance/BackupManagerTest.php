@@ -208,6 +208,32 @@ final class BackupManagerTest extends DatabaseTestCase
         $this->manager->verify($name);
     }
 
+    public function testExtensionDataAndEnabledStateRestoreWithoutExecutionPermits(): void
+    {
+        $schema = new \GnuCms\Extension\PackageSchema($this->db, $this->root);
+        $schema->install('plugins/backup-test', 1, ['ext_saved'], static function (Connection $db): void {
+            $db->execute('CREATE TABLE ' . $db->table('ext_saved') . ' (id INTEGER PRIMARY KEY, message TEXT NOT NULL)');
+            $db->execute('INSERT INTO ' . $db->table('ext_saved') . ' (id, message) VALUES (1, ?)', ['before']);
+        });
+        $state = new \GnuCms\Extension\StateStore($this->root . '/extensions');
+        $state->update(static fn (): array => ['plugins/backup-test']);
+        $permit = new \GnuCms\Extension\RuntimePermit($this->root);
+        $permit->set('plugins/backup-test', 'revision-1');
+        $saved = $this->manager->create();
+        $archive = $this->root . '/backups/manual/' . $saved['name'];
+        $manifest = json_decode($this->archiveContents($archive, 'manifest.json'), true);
+        self::assertArrayHasKey('files/extensions/enabled.json', $manifest['files']);
+        self::assertArrayNotHasKey('files/extensions/state.lock', $manifest['files']);
+        foreach (array_keys($manifest['files']) as $file) self::assertStringNotContainsString('permits', $file);
+        $state->update(static fn (): array => []);
+        $this->db->execute('UPDATE ext_saved SET message = ?', ['after']);
+        $this->manager->restore($saved['name']);
+        $restored = Connection::create($this->config['db']);
+        self::assertSame('before', $restored->selectOne('SELECT message FROM ext_saved')['message']);
+        self::assertSame(['plugins/backup-test'], $state->read());
+        self::assertFalse($permit->allowed('plugins/backup-test', 'revision-1'));
+    }
+
     public function testRejectsAnArchiveWhoseContentsNoLongerMatchTheManifest(): void
     {
         $result = $this->manager->create();

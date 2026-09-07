@@ -113,7 +113,7 @@ $editor_discard_url = $this->url('admin.editor.images.discard') . '?csrf_token='
     editor.ui.addButton('<?= $this->e($gnucmsCap) ?>Images',{label:'사진 올리기',command:'<?= $this->e(GNUCMS_ID) ?>ImageUpload',toolbar:'insert,5'});
   }});
   var editor=CKEDITOR.replace(textarea.id,{
-    language:'ko',height:360,versionCheck:false,resize_minWidth:0,
+    language:'ko',height:<?= max(120, min(800, (int) ($editor_height ?? 360))) ?>,versionCheck:false,resize_minWidth:0,
     /* 글·댓글 편집기와 같게, 엔터는 줄바꿈 하나다. 문단 사이를 벌리려면 엔터를 두 번 친다. */
     enterMode:CKEDITOR.ENTER_BR,shiftEnterMode:CKEDITOR.ENTER_BR,autoParagraph:false,
     contentsCss:[<?= $this->json($this->base . '/vendor/ckeditor4/contents.css') ?>,<?= $this->json($this->base . '/assets/editor-content.css?v=20260902-1') ?>],
@@ -146,7 +146,7 @@ $editor_discard_url = $this->url('admin.editor.images.discard') . '?csrf_token='
     restoreImageUrls(editor);
     editor.updateElement();
     var text=editor.document.getBody().getText().replace(/\u00a0/g,' ').trim();
-    if(!text&&editor.document.find('img').count()===0){event.preventDefault();editor.focus();alert('내용을 입력해 주세요.');return}
+    if(<?= $this->json($editor_required ?? true) ?>&&!text&&editor.document.find('img').count()===0){event.preventDefault();editor.focus();alert('내용을 입력해 주세요.');return}
     committed=true;
   })}
 })();

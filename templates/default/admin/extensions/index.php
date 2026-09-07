@@ -1,0 +1,119 @@
+<?php $this->layout('admin/layout') ?>
+<?php $this->start('title') ?><?= $this->e($extension_page['title']) ?> · <?= $this->e($site['site_name']) ?><?php $this->stop() ?>
+<?php $this->start('admin_section') ?><?= $this->e($extension_section) ?><?php $this->stop() ?>
+<?php $this->start('body') ?>
+<div class="page-head">
+  <div>
+    <h1><?= $this->e($extension_page['title']) ?></h1>
+    <p class="muted"><?= $this->e($extension_page['description']) ?></p>
+    <p class="muted">최근 사용 상태를 변경한 순서로 표시합니다.</p>
+  </div>
+  <?php if ($packages !== []): ?><div class="page-head-actions"><button class="btn btn-primary" type="submit" form="extension-state-form">저장</button></div><?php endif ?>
+</div>
+<?php if ($extension_error !== null): ?>
+<div class="alert alert-error" role="alert"><?= $this->e($extension_error) ?></div>
+<?php elseif ($saved): ?>
+<div class="alert alert-success" role="status">사용 여부를 저장했습니다.</div>
+<?php endif ?>
+<form id="extension-state-form" method="post" action="<?= $this->url('admin.' . $extension_section . '.save') ?>">
+<input type="hidden" name="csrf_token" value="<?= $this->e($csrf_token) ?>">
+<input type="hidden" name="changed_order" value="<?= $this->e($changed_order) ?>">
+<section class="card">
+  <?php if ($packages === []): ?>
+  <div class="card-body">
+    <div class="empty-inline">
+      <span class="empty-icon" aria-hidden="true"><?= $this->icon($extension_page['icon'], 24) ?></span>
+      <?php if ($extension_error !== null): ?>
+      <h2>목록을 불러오지 못했습니다</h2>
+      <p>오류를 확인한 후 다시 시도해 주세요.</p>
+      <?php else: ?>
+      <h2>등록된 <?= $this->e($extension_page['title']) ?>이 없습니다</h2>
+      <p>패키지가 추가되면 이곳에서 사용 여부를 설정할 수 있습니다.</p>
+      <?php endif ?>
+    </div>
+  </div>
+  <?php else: ?>
+  <div class="table-wrap">
+    <table class="table extensions-table">
+      <thead><tr><th scope="col">이름</th><th scope="col">버전</th><th scope="col">사용 상태</th></tr></thead>
+      <tbody>
+      <?php foreach ($packages as $package): ?>
+        <tr>
+          <td data-label="이름">
+            <div class="extension-details">
+            <strong><?= $this->e($package['name']) ?></strong>
+            <p><?= $this->e($package['description']) ?></p>
+            <?php if ($package['public_url'] !== null): ?>
+            <div class="extension-public-entry">
+              <p><strong>사용자 화면:</strong>
+                <a class="link link-hover" href="<?= $this->e($package['public_url']) ?>"><?= $this->e($package['public_url']) ?></a>
+                <a class="btn btn-ghost btn-square btn-xs" href="<?= $this->e($package['public_url']) ?>" target="_blank" rel="noopener noreferrer" title="사용자 화면을 새 창으로 열기" aria-label="<?= $this->e($package['name']) ?> 사용자 화면을 새 창으로 열기"><?= $this->icon('external', 14) ?></a>
+              </p>
+            </div>
+            <?php endif ?>
+            <?php if ($package['entry_url'] !== null): ?>
+            <p><small>실행 주소:
+              <?php if ($package['enabled'] && $package['error'] === null): ?>
+                <a class="link link-hover" href="<?= $this->e($package['entry_url']) ?>"><?= $this->e($package['entry_url']) ?></a>
+                <a class="btn btn-ghost btn-square btn-xs" href="<?= $this->e($package['entry_url']) ?>" target="_blank" rel="noopener noreferrer" title="새 창으로 열기" aria-label="<?= $this->e($package['name']) ?> 새 창으로 열기"><?= $this->icon('external', 14) ?></a>
+              <?php elseif ($package['admin_test'] && $package['error'] === null): ?>
+                <a class="link link-hover" href="<?= $this->url('admin.' . $extension_section . '.test', ['id' => $package['id']]) ?>" title="관리자 테스트로 열기"><?= $this->e($package['entry_url']) ?></a>
+                <a class="btn btn-ghost btn-square btn-xs" href="<?= $this->url('admin.' . $extension_section . '.test', ['id' => $package['id']]) ?>" target="_blank" rel="noopener noreferrer" title="관리자 테스트를 새 창으로 열기" aria-label="<?= $this->e($package['name']) ?> 관리자 테스트를 새 창으로 열기"><?= $this->icon('external', 14) ?></a>
+              <?php else: ?>
+                <span><?= $this->e($package['entry_url']) ?></span>
+              <?php endif ?>
+            </small></p>
+            <?php if ($extension_section === 'plugins' && $package['enabled'] && $package['error'] === null): ?>
+              <div class="row-actions">
+                <a class="btn btn-outline btn-sm" href="<?= $this->e($package['entry_url']) ?>">바로가기</a>
+              </div>
+            <?php elseif (!$package['enabled'] && $package['admin_test'] && $package['error'] === null): ?>
+              <div class="row-actions">
+                <a class="btn btn-outline btn-sm" href="<?= $this->url('admin.' . $extension_section . '.test', ['id' => $package['id']]) ?>">관리자 테스트</a>
+              </div>
+            <?php endif ?>
+            <?php endif ?>
+            <?php if ($package['requires'] !== []): ?><small>필수 확장: <?= $this->e(implode(', ', $package['requires'])) ?></small><?php endif ?>
+            <?php if ($package['optional'] !== []): ?><p><small>선택 확장: <?= $this->e(implode(', ', $package['optional'])) ?></small></p><?php endif ?>
+            </div>
+          </td>
+          <td data-label="버전"><?= $this->e($package['version']) ?></td>
+          <td data-label="사용 상태">
+            <input type="hidden" name="original[<?= $this->e($package['id']) ?>]" value="<?= $package['enabled'] ? '1' : '0' ?>">
+            <input type="hidden" name="enabled[<?= $this->e($package['id']) ?>]" value="0">
+            <label class="extension-state-toggle">
+              <input class="toggle toggle-primary" type="checkbox" role="switch" name="enabled[<?= $this->e($package['id']) ?>]" value="1"<?= $package['selected'] ? ' checked' : '' ?><?= !$package['enabled'] && $package['error'] !== null ? ' disabled' : '' ?> data-extension-id="<?= $this->e($package['id']) ?>" aria-label="<?= $this->e($package['name']) ?> 사용">
+              <span data-enabled-label><?= $package['selected'] ? '사용' : '미사용' ?></span>
+            </label>
+            <?php if ($package['error'] !== null): ?>
+              <p><span class="badge badge-error badge-soft">실행 불가</span> <?= $this->e($package['error']) ?></p>
+            <?php endif ?>
+          </td>
+        </tr>
+      <?php endforeach ?>
+      </tbody>
+    </table>
+  </div>
+  <?php endif ?>
+</section>
+<input type="hidden" name="complete" value="1">
+<?php if ($packages !== []): ?>
+<div class="card-actions form-actions"><button class="btn btn-primary" type="submit">저장</button></div>
+<?php endif ?>
+</form>
+<script>
+(function () {
+  var form = document.getElementById('extension-state-form');
+  if (!form) return;
+  var order = form.elements.namedItem('changed_order');
+  form.addEventListener('change', function (event) {
+    var toggle = event.target;
+    if (!toggle.matches('[data-extension-id]')) return;
+    var id = toggle.getAttribute('data-extension-id');
+    var recent = JSON.parse(order.value);
+    order.value = JSON.stringify([id].concat(recent.filter(function (item) { return item !== id; })));
+    toggle.parentElement.querySelector('[data-enabled-label]').textContent = toggle.checked ? '사용' : '미사용';
+  });
+})();
+</script>
+<?php $this->stop() ?>

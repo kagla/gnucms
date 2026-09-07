@@ -1,0 +1,12 @@
+{
+  "id": "demo-reservation",
+  "type": "module",
+  "name": "데모 · 예약 안내문",
+  "description": "예약 정보로 안내문을 생성하는 관리자 예제입니다. 메시지 플러그인 없이도 동작하며 실제 예약은 저장하지 않습니다.",
+  "version": "1.0.0",
+  "api": 1,
+  "entry_path": "/preview",
+  "admin_test": true,
+  "requires": [],
+  "optional": ["plugins/demo-message"]
+}

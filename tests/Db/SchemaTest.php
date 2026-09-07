@@ -19,7 +19,7 @@ final class SchemaTest extends WebTestCase
     {
         $db = $this->freshDatabase($config);
 
-        self::assertCount(14, Schema::TABLES);
+        self::assertCount(15, Schema::TABLES);
 
         foreach (Schema::TABLES as $table) {
             $this->assertSame(
@@ -36,7 +36,7 @@ final class SchemaTest extends WebTestCase
         $db = $this->freshDatabase($config);
         $db->execute('CREATE TABLE ' . $db->q('mail_settings') . ' (
             setting_key VARCHAR(50) NOT NULL, setting_value TEXT NOT NULL, updated_at VARCHAR(30) NOT NULL)');
-        $db->insert('mail_settings', [
+        $this->insertLegacy($db, 'mail_settings', [
             'setting_key' => 'host', 'setting_value' => 'smtp.example.com',
             'updated_at' => '2026-01-01 00:00:00',
         ]);
@@ -56,8 +56,8 @@ final class SchemaTest extends WebTestCase
         $db = $this->freshDatabase($config);
         $db->execute('CREATE TABLE ' . $db->q('site_state')
             . ' (state_key VARCHAR(50) NOT NULL, state_value VARCHAR(191) NOT NULL)');
-        $db->insert('site_state', ['state_key' => 'first_admin_claimed', 'state_value' => '1']);
-        $db->insert('site_state', ['state_key' => 'consent_footer_defaulted', 'state_value' => '1']);
+        $this->insertLegacy($db, 'site_state', ['state_key' => 'first_admin_claimed', 'state_value' => '1']);
+        $this->insertLegacy($db, 'site_state', ['state_key' => 'consent_footer_defaulted', 'state_value' => '1']);
         $db->execute('UPDATE ' . $db->q('site_settings')
             . ' SET setting_value = ? WHERE setting_key = ?', ['0', 'system.first_admin_claimed']);
         $db->execute('UPDATE ' . $db->q('site_settings')
@@ -292,14 +292,14 @@ final class SchemaTest extends WebTestCase
             . ' SET setting_value = ? WHERE setting_key = ?', ['0', 'system.schema_version']);
 
         $userId = $app->users()->create('a@example.com', password_hash('x', PASSWORD_DEFAULT), 'A', false);
-        $db->insert('user_consents', [
+        $this->insertLegacy($db, 'user_consents', [
             'user_id' => $userId, 'consent_type' => 'terms', 'content_id' => $id,
             'content_updated_at' => '2026-01-01 00:00:00', 'agreed' => 1,
             'agreed_at' => '2026-01-01 00:00:00',
         ]);
         // 옮기기는 한 줄만 되는 게 아니다. 동의 안 함(0) 도 그대로 넘어와야 한다.
         $otherId = $app->users()->create('b@example.com', password_hash('x', PASSWORD_DEFAULT), 'B', false);
-        $db->insert('user_consents', [
+        $this->insertLegacy($db, 'user_consents', [
             'user_id' => $otherId, 'consent_type' => 'terms', 'content_id' => $id,
             'content_updated_at' => '2026-01-01 00:00:00', 'agreed' => 0,
             'agreed_at' => '2026-01-02 00:00:00',
@@ -362,8 +362,9 @@ final class SchemaTest extends WebTestCase
     {
         $app = $this->makeApp($dbConfig);
         $db = $app->db();
-        $db->execute('DROP INDEX ' . $db->index('ux_users_display_name')
-            . ($db->dialect()->name() === 'mysql' ? ' ON ' . $db->table('users') : ''));
+        $db->execute($db->dialect()->name() === 'mysql'
+            ? 'DROP INDEX ' . $db->q('ux_users_display_name') . ' ON ' . $db->q('users')
+            : 'DROP INDEX IF EXISTS ' . $db->q('ux_users_display_name'));
         foreach (['a@example.com', 'b@example.com', 'c@example.com'] as $email) {
             $db->insert('users', [
                 'email' => $email, 'email_verified' => 1, 'password_hash' => 'x', 'display_name' => '홍길동',
@@ -378,6 +379,14 @@ final class SchemaTest extends WebTestCase
         $names = array_column($db->select('SELECT display_name FROM ' . $db->q('users') . ' ORDER BY id ASC'), 'display_name');
         self::assertSame(['홍길동', '홍길동2', '홍길동3'], $names);
         self::assertNotNull($app->users()->findByDisplayName('홍길동2'));
+    }
+
+    /** 자동 증가 ID가 없는 옛 테이블 fixture는 lastInsertId를 요청하지 않는다. */
+    private function insertLegacy(Connection $db, string $table, array $row): void
+    {
+        $db->execute('INSERT INTO ' . $db->q($table) . ' ('
+            . implode(', ', array_map($db->q(...), array_keys($row))) . ') VALUES ('
+            . implode(', ', array_fill(0, count($row), '?')) . ')', array_values($row));
     }
 
     private function assertTableMissing(Connection $db, string $table): void

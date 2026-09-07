@@ -12,6 +12,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Routing\RouteContext;
 use GnuCms\View\View;
+use GnuCms\Web\LoginDestination;
 use GnuCms\Web\LoginRedirect;
 
 final class OauthController
@@ -262,7 +263,8 @@ final class OauthController
 
     private function loginRedirect(ServerRequestInterface $request, ResponseInterface $response, mixed $returnUrl): ResponseInterface
     {
-        $url = LoginRedirect::destination($request, $returnUrl);
+        $remembered = LoginDestination::consume($request);
+        $url = LoginRedirect::destination($request, $returnUrl ?? $remembered);
         return $response->withHeader('Location', $url)->withStatus(303);
     }
 }

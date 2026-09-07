@@ -12,6 +12,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Routing\RouteContext;
 use GnuCms\View\View;
+use GnuCms\Web\LoginDestination;
 use GnuCms\Web\LoginRedirect;
 use Psr\Http\Message\UploadedFileInterface;
 
@@ -83,7 +84,9 @@ final class AuthController
         $this->recordLogin($request, (int) $user['id'], $identifier, 'success');
         $this->storeSession($user);
 
-        return $response->withStatus(303)->withHeader('Location', LoginRedirect::destination($request, $returnUrl));
+        $remembered = LoginDestination::consume($request);
+        return $response->withStatus(303)
+            ->withHeader('Location', LoginRedirect::destination($request, $returnUrl ?? $remembered));
     }
 
     public function registerForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -257,6 +260,7 @@ final class AuthController
     {
         $input = $this->input($request);
         $this->assertCsrf($input);
+        unset($_SESSION['login_destination']);
         unset($_SESSION['user_id'], $_SESSION['session_epoch']);
         session_regenerate_id(true);
 

@@ -19,4 +19,13 @@ final class View
         }
         return $view;
     }
+
+    public static function forExtension(ServerRequestInterface $request, string $name, string $templates): PhpView
+    {
+        $view = self::fromRequest($request);
+        if (!$view instanceof PhpView) {
+            throw new RuntimeException('확장 화면에는 PHP 템플릿 뷰가 필요합니다.');
+        }
+        return $view->forExtension($name, $templates);
+    }
 }
