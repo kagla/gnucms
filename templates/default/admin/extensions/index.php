@@ -34,7 +34,7 @@
   </div>
   <?php else: ?>
   <div class="table-wrap">
-    <table class="table extensions-table">
+    <table class="table table-zebra extensions-table">
       <thead><tr><th scope="col">이름</th><th scope="col">버전</th><th scope="col">사용 상태</th></tr></thead>
       <tbody>
       <?php foreach ($packages as $package): ?>

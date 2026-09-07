@@ -7,6 +7,7 @@ const puppeteer = require(process.env.PUPPETEER_MODULE || 'puppeteer-core');
 const root = path.resolve(__dirname, '../..');
 const render = (scenario, base) => execFileSync('php', [path.join(__dirname, 'ExtensionAdminFixture.php'), scenario, base], {cwd: root, encoding: 'utf8'});
 const route = scenario => scenario === 'core-modules' ? '/admin/modules' : scenario === 'toss-live' ? '/plugins/payment-toss/settings?environment=live'
+  : scenario === 'core-list' ? '/admin/plugins'
   : ['inicis', 'kcp', 'kspay', 'toss'].includes(scenario) ? '/plugins/payment-' + scenario + '/settings'
   : scenario === 'bizppurio' ? '/plugins/bizppurio/settings'
   : scenario.startsWith('alimtalk-') ? '/modules/alimtalk/' + scenario.slice(9)
@@ -37,6 +38,27 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules' : scena
       const button = await style('#main button[type=submit]', ['fontFamily', 'fontSize', 'fontWeight', 'height', 'borderRadius']);
       await open('core-list');
       const heading = await style('h1', ['fontSize', 'fontWeight']);
+      for (const scenario of ['core-list', 'core-modules']) {
+        await open(scenario);
+        for (const width of [1280, 390]) {
+          await page.setViewport({width, height: 960});
+          const colors = [];
+          for (const theme of ['light', 'dark']) {
+            await page.mouse.move(0, 0);
+            const rows = await page.$$eval('.extensions-table tbody tr', els => els.map(el => getComputedStyle(el).backgroundColor));
+            assert.equal(rows.length, 2, scenario + ' populated rows');
+            assert.notEqual(rows[0], rows[1], scenario + ' alternating row backgrounds in ' + theme);
+            assert.ok(!['transparent', 'rgba(0, 0, 0, 0)'].includes(rows[1]), 'even rows have a visible tint');
+            colors.push(rows[1]);
+            assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), scenario + ' table width');
+            if (base === '/cms') await page.screenshot({path: '/tmp/gnucms-' + scenario + '-zebra-' + width + '-' + theme + '.png', fullPage: true});
+            await page.click('[data-theme-toggle]');
+          }
+          assert.notEqual(colors[0], colors[1], 'row tint follows light and dark themes');
+        }
+        assert.deepEqual(errors, [], scenario + ' row striping');
+        count++;
+      }
       await open('core-modules');
       assert.equal(await page.$$eval('.extensions-table .btn-outline', buttons => buttons.length), 0, 'enabled modules use address links without shortcut buttons');
       for (const address of ['/admin/shop', '/modules/alimtalk/home']) {
