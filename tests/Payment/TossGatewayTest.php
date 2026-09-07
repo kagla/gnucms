@@ -12,8 +12,6 @@ use GnuCms\Payment\{Journal, Settings, StreamTransport, TossGateway};
 use GnuCms\Tests\Support\DatabaseTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 
-require_once dirname(__DIR__, 2) . '/modules/shop/autoload.php';
-
 final class TossGatewayTest extends DatabaseTestCase
 {
     private App $app;
@@ -23,7 +21,6 @@ final class TossGatewayTest extends DatabaseTestCase
     private TossGateway $gateway;
     private array $config;
     private array $order;
-    private bool $shopInstalled = false;
 
     private function setupGateway(array $db): void
     {
@@ -79,7 +76,6 @@ final class TossGatewayTest extends DatabaseTestCase
     protected function tearDown(): void
     {
         if (isset($this->app)) {
-            if ($this->shopInstalled) foreach (array_reverse(\GnuCms\Modules\Shop\Schema::TABLES) as $table) $this->app->db()->execute('DROP TABLE IF EXISTS ' . $this->app->db()->table($table));
             foreach (['transactions', 'settings'] as $table) $this->app->db()->execute('DROP TABLE IF EXISTS ' . $this->app->db()->table('pay_toss_' . $table));
             (new Schema($this->app->db()))->drop();
         }
@@ -242,34 +238,6 @@ final class TossGatewayTest extends DatabaseTestCase
             $this->rejected(fn () => $this->gateway->cancel($this->order, 3000, 13000, '환불', 'refund-' . bin2hex(random_bytes(16))));
             self::assertCount($count + ($case === 'response' ? 2 : 1), $this->http->calls);
         }
-    }
-
-    #[DataProvider('connectionProvider')]
-    public function testShopUpgradePreservesOrdersAndReconcilesLongPaymentKeyAndStock(array $db): void
-    {
-        $this->setupGateway($db);
-        $shop = new \GnuCms\Modules\Shop\Service($this->app, ['toss' => $this->gateway]); $shop->install(); $this->shopInstalled = true;
-        $shop->saveSettings(['name' => '상점', 'seller' => '상호', 'owner' => '대표', 'business_number' => '000', 'phone' => '01000000000', 'email' => 'shop@example.test',
-            'address' => '주소', 'return_address' => '반품 주소', 'policy' => '정책', 'shipping' => 3000, 'free_shipping' => 50000, 'environment' => 'test', 'open' => '1']);
-        $id = $shop->catalog->save(['name' => '상품', 'active' => '1', 'price' => 10000, 'stock' => 2]);
-        $p = $shop->catalog->product($id); $variant = $p['variants'][0]['id'];
-        $this->order = $shop->createOrder('buyer', [$variant => 1], ['name' => '구매자', 'phone' => '01000000000', 'email' => 'buyer@example.test', 'postcode' => '00000', 'address' => '주소', 'consent' => '1'], 'toss', bin2hex(random_bytes(16)), 13000);
-        $connection = $this->app->db();
-        if ($connection->dialect()->name() === 'mysql') {
-            $connection->execute('ALTER TABLE ' . $connection->table('shop_orders') . ' MODIFY transaction_id VARCHAR(100) NULL');
-            $connection->execute('ALTER TABLE ' . $connection->table('shop_money') . ' MODIFY reference VARCHAR(100) NOT NULL');
-        }
-        $connection->update('extension_schemas', ['schema_version' => 1], 'package_key = :key', ['key' => 'modules/shop']);
-        self::assertFalse($shop->ready()); $shop->install(); $shop->install(); self::assertTrue($shop->ready());
-        self::assertSame($this->order['id'], $shop->store->get('shop_orders', $this->order['id'])['id']);
-        $payment = $this->approve(); $this->response($payment); $shop->sync($this->order['id']);
-        $stored = $shop->store->get('shop_orders', $this->order['id']);
-        self::assertSame('paid', $stored['status']); self::assertSame($payment['paymentKey'], $stored['transaction_id']);
-        self::assertSame($payment['paymentKey'], $connection->selectOne('SELECT reference FROM ' . $connection->table('shop_money'))['reference']);
-        $full = $this->cancelResult($payment, 13000); $this->response($full); $shop->sync($this->order['id']);
-        self::assertSame('refunded', $shop->store->get('shop_orders', $this->order['id'])['status']);
-        self::assertSame(2, (int) $shop->store->get('shop_variants', $variant)['stock']);
-        self::assertSame(0, (int) $connection->selectOne('SELECT SUM(amount) AS total FROM ' . $connection->table('shop_money'))['total']);
     }
 
     public function testTransportLimitsTossMethodsAndPaths(): void

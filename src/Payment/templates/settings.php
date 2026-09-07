@@ -2,11 +2,11 @@
 <?php $this->start('title') ?><?= $this->e($label) ?> 결제 설정 · <?= $this->e($site['site_name']) ?><?php $this->stop() ?>
 <?php $this->start('admin_section') ?>plugins<?php $this->stop() ?>
 <?php $this->start('extension_body') ?>
-<?php $this->insert('admin/_extension_header', ['section' => 'plugins', 'heading' => $label . ' 결제 설정', 'description' => '상점 코드와 인증 정보를 등록하고 환경별 결제 실행을 관리합니다.', 'actions' => [['url' => ($public_extensions['modules/shop']['admin_url'] ?? $this->base . '/admin/shop'), 'label' => '쇼핑몰 관리']]]) ?>
+<?php $this->insert('admin/_extension_header', ['section' => 'plugins', 'heading' => $label . ' 결제 설정', 'description' => '상점 코드와 인증 정보를 등록하고 환경별 결제 실행을 관리합니다.']) ?>
 <nav class="tabs tabs-border settings-tabs" aria-label="결제 환경">
 <?php foreach (['test' => '테스트 환경', 'live' => '운영 환경'] as $env => $envLabel): ?><a class="tab<?= $environment === $env ? ' tab-active' : '' ?>" href="<?= $this->e($this->base . '/' . $key) ?>/settings?environment=<?= $env ?>"<?= $environment === $env ? ' aria-current="page"' : '' ?>><?= $this->e($envLabel) ?></a><?php endforeach ?>
 </nav>
-<?php if (!$integration_ready): ?><div class="alert alert-warning" role="status"><span>직접 연동 준비 중입니다. 결제창·승인·조회 규격 확인이 끝나기 전에는 쇼핑몰에서 이 결제사를 선택할 수 없습니다.</span></div><?php endif ?>
+<?php if (!$integration_ready): ?><div class="alert alert-warning" role="status"><span>직접 연동 준비 중입니다. 결제창·승인·조회 규격 확인이 끝나기 전에는 이 결제사의 API 실행을 허용할 수 없습니다.</span></div><?php endif ?>
 <?php foreach ($errors as $error): ?><div class="alert alert-error" role="alert"><span><?= $this->e($error) ?></span></div><?php endforeach ?>
 <?php if ($notice): ?><div class="alert alert-success" role="status"><span><?= $this->e($notice) ?></span></div><?php endif ?>
 <?php if (!$ready): ?>

@@ -84,7 +84,6 @@
                 <li><a href="<?= $this->url('notifications.index') ?>"><?= $this->icon('bell', 17) ?> 알림</a></li>
                 <?php if ($current_user['is_admin']): ?><li><a href="<?= $this->url('admin.index') ?>"><?= $this->icon('cog', 17) ?> 관리 콘솔</a></li><?php endif ?>
                 <li><a href="<?= $this->url('account.edit') ?>"><?= $this->icon('user', 17) ?> 회원정보 수정</a></li>
-                <?php if (isset($public_extensions['modules/shop'])): ?><li><a href="<?= $this->e($public_extensions['modules/shop']['base_url']) ?>/orders"><?= $this->icon('gift', 17) ?> 내 주문</a></li><?php endif ?>
                 <?php if ($current_user['is_admin']): ?><li><a href="<?= $this->url('admin.login_history') ?>"><?= $this->icon('history', 17) ?> 로그인 기록</a></li><?php endif ?>
                 <li>
                   <form method="post" action="<?= $this->url('auth.logout') ?>">
@@ -259,7 +258,6 @@
         <?php foreach ($site_menu as $item): ?><li><a href="<?= $this->url('content.show', ['slug' => $item['slug']]) ?>"><?= $this->icon('document', 18) ?> <?= $this->e($item['title']) ?></a></li><?php endforeach ?>
         <?php if (!$current_user['is_guest']): ?>
           <li class="menu-title">내 활동</li>
-          <?php if (isset($public_extensions['modules/shop'])): ?><li><a href="<?= $this->e($public_extensions['modules/shop']['base_url']) ?>/orders"><?= $this->icon('gift', 18) ?> 내 주문</a></li><?php endif ?>
           <li><a href="<?= $this->url('notifications.index') ?>"><?= $this->icon('bell', 18) ?> 알림<?php if ($unread_notifications > 0): ?> <span class="badge badge-primary badge-sm"><?= $this->e($unread_notifications) ?></span><?php endif ?></a></li>
           <li><a href="<?= $this->url('account.edit') ?>"><?= $this->icon('user', 18) ?> 회원정보 수정</a></li>
           <?php if ($current_user['is_admin']): ?><li><a href="<?= $this->url('admin.login_history') ?>"><?= $this->icon('history', 18) ?> 로그인 기록</a></li><?php endif ?>

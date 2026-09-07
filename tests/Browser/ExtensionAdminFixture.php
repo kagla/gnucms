@@ -16,12 +16,14 @@ if ($scenario === 'core') {
     $section = $scenario === 'core-list' ? 'plugins' : 'modules';
     $catalog = (new \GnuCms\Extension\Catalog(dirname(__DIR__, 2)))->all();
     $packages = [];
-    foreach ($section === 'plugins' ? ['bizppurio', 'payment-toss'] : ['shop', 'alimtalk'] as $id) {
+    foreach ($section === 'plugins' ? ['bizppurio', 'payment-toss'] : ['demo-reservation', 'alimtalk'] as $id) {
         $package = $catalog[$section . '/' . $id];
         $prefix = $package['route_prefix'] ?? '/' . $section . '/' . $id;
         $package += ['enabled' => true, 'selected' => true,
             'entry_url' => $base . \GnuCms\Extension\RoutePrefix::path($package['admin_route_prefix'] ?? $prefix, $package['entry_path']),
             'public_url' => $package['public_path'] === null ? null : $base . \GnuCms\Extension\RoutePrefix::path($prefix, $package['public_path'])];
+        // 공개 주소가 있는 모듈도 표시할 수 있는지 확인하는 예제 데이터다.
+        if ($id === 'demo-reservation') $package['public_url'] = $base . '/book';
         $packages[] = $package;
     }
     echo $view->fetch('admin/extensions/index', ['extension_page' => ['title' => $section === 'plugins' ? '플러그인' : '모듈', 'description' => '확장 기능 관리', 'icon' => 'grid'], 'extension_section' => $section, 'extension_error' => null, 'saved' => false, 'packages' => $packages, 'changed_order' => '[]']);

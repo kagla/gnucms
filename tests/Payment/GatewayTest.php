@@ -12,8 +12,6 @@ use GnuCms\Payment\{InicisGateway, KcpGateway, KspayGateway, Journal, Settings, 
 use GnuCms\Tests\Support\DatabaseTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 
-require_once dirname(__DIR__, 2) . '/modules/shop/autoload.php';
-
 final class GatewayTest extends DatabaseTestCase
 {
     private App $app;
@@ -23,7 +21,6 @@ final class GatewayTest extends DatabaseTestCase
     private InicisGateway $gateway;
     private array $config;
     private array $order;
-    private bool $shopInstalled = false;
 
     private function setupGateway(array $db): void
     {
@@ -70,7 +67,6 @@ final class GatewayTest extends DatabaseTestCase
     protected function tearDown(): void
     {
         if (isset($this->app)) {
-            if ($this->shopInstalled) foreach (array_reverse(\GnuCms\Modules\Shop\Schema::TABLES) as $table) $this->app->db()->execute('DROP TABLE IF EXISTS ' . $this->app->db()->table($table));
             foreach (array_keys(Settings::PROVIDERS) as $id) foreach (['transactions', 'settings'] as $table) $this->app->db()->execute('DROP TABLE IF EXISTS ' . $this->app->db()->table('pay_' . $id . '_' . $table));
             (new Schema($this->app->db()))->drop();
         }
@@ -227,34 +223,6 @@ final class GatewayTest extends DatabaseTestCase
         $this->response($payment); $this->gateway->confirmRefund($this->order, $key, $payment['tid'] . '-full');
         $this->response($payment); $verified = $this->gateway->fetch($this->order);
         self::assertTrue($verified['valid']); self::assertSame(0, $verified['open_cancellations']); self::assertSame(13000, $verified['cancelled']);
-    }
-
-    #[DataProvider('connectionProvider')]
-    public function testDirectGatewayApprovalAndRefundUpdateShopMoneyAndStockExactlyOnce(array $db): void
-    {
-        $this->setupGateway($db);
-        $shop = new \GnuCms\Modules\Shop\Service($this->app, ['inicis' => $this->gateway]);
-        $shop->install(); $this->shopInstalled = true;
-        $shop->saveSettings(['name' => '테스트 상점', 'seller' => '상호', 'owner' => '대표', 'business_number' => '000', 'phone' => '01000000000', 'email' => 'shop@example.test',
-            'address' => '주소', 'return_address' => '반품 주소', 'policy' => '정책', 'shipping' => 3000, 'free_shipping' => 50000, 'environment' => 'test', 'open' => '1']);
-        $productId = $shop->catalog->save(['name' => '상품', 'description' => '상품 설명', 'price' => 10000, 'stock' => 2, 'active' => '1']);
-        $variant = $shop->catalog->product($productId)['variants'][0]['id'];
-        $this->order = $shop->createOrder('test-buyer', [$variant => 1], ['name' => '구매자', 'phone' => '01000000000', 'email' => 'buyer@example.test', 'postcode' => '00000', 'address' => '주소', 'consent' => '1'], 'inicis', bin2hex(random_bytes(16)), 13000);
-        $payment = $this->approve();
-        $this->response($payment); $paid = $shop->sync($this->order['id']);
-        self::assertSame('paid', $paid['status']);
-        $this->response($payment); $shop->sync($this->order['id']);
-        $this->response($payment);
-        $this->response(['resultCode' => '00', 'cancelDate' => '20260906', 'cancelTime' => '140000']);
-        $cancelled = array_replace($payment, ['transactionStatus' => 'CANCEL', 'cancelDate' => '20260906', 'cancelTime' => '140000']);
-        $this->response($cancelled);
-        $refundId = $shop->claims->refund($this->order['id'], ['request_key' => bin2hex(random_bytes(16)), 'reason' => '취소'], 'admin');
-        $this->response($cancelled); $refunded = $shop->sync($this->order['id']);
-        self::assertSame('refunded', $refunded['status']); self::assertSame(13000, (int) $refunded['refunded']);
-        self::assertSame('succeeded', $shop->store->get('shop_refunds', $refundId)['status']);
-        self::assertSame(2, (int) $shop->store->get('shop_variants', $variant)['stock']);
-        $entries = $this->app->db()->select('SELECT amount FROM ' . $this->app->db()->table('shop_money') . ' WHERE order_id = ?', [$this->order['id']]);
-        self::assertCount(2, $entries); self::assertSame(0, array_sum(array_column($entries, 'amount')));
     }
 
     public function testTransportOnlyAllowsDocumentedPgHttpsDestinations(): void

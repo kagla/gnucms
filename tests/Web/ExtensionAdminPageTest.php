@@ -151,6 +151,42 @@ PHP);
     }
 
     #[DataProvider('connectionProvider')]
+    public function testBundledCmsExcludesShopAndCanDisableItsPreviousEnablement(array $dbConfig): void
+    {
+        $app = $this->makeApp($dbConfig, ['extensions' => ['root' => dirname(__DIR__, 2)]], 'default');
+        $adminId = $app->users()->create('bundled-admin@example.test', '', '관리자', true);
+        $this->get($app, '/login');
+        $this->sessionUser($adminId);
+        $state = new StateStore($app->storageDir() . '/extensions');
+        $payments = ['plugins/payment-inicis', 'plugins/payment-kcp', 'plugins/payment-kspay', 'plugins/payment-toss'];
+        $state->update(static fn (array $enabled): array => $payments);
+        $body = $this->body($this->get($app, '/admin/modules'));
+        self::assertStringNotContainsString('작은 쇼핑몰', $body);
+        self::assertStringNotContainsString('name="enabled[shop]"', $body);
+        self::assertStringContainsString('알림톡', $body);
+
+        // 이전 설치의 사용 설정이 남아 있어도 제거한 모듈은 실행되지 않는다.
+        $state->update(static fn (array $enabled): array => [...$enabled, 'modules/shop']);
+        foreach (['/shop', '/shop/orders', '/admin/shop', '/admin/shop/products', '/modules/shop', '/modules/shop/admin'] as $path) {
+            self::assertSame(404, $this->get($app, $path)->getStatusCode(), $path);
+        }
+        foreach (['/', '/account', '/admin/modules', ...array_map(static fn (string $key): string => '/' . $key . '/settings', $payments)] as $path) {
+            $response = $this->get($app, $path);
+            self::assertSame(200, $response->getStatusCode(), $path);
+            $body = $this->body($response);
+            self::assertStringNotContainsString('작은 쇼핑몰', $body);
+            self::assertStringNotContainsString('쇼핑몰 관리', $body);
+            self::assertStringNotContainsString('href="/shop', $body);
+            self::assertStringNotContainsString('href="/admin/shop', $body);
+            self::assertStringNotContainsString('내 주문', $body);
+        }
+        $response = $this->post($app, '/admin/modules/shop/state', ['enabled' => '0', 'csrf_token' => $_SESSION['csrf_token']]);
+        self::assertSame(303, $response->getStatusCode());
+        self::assertSame($payments, $state->read());
+        self::assertStringNotContainsString('name="enabled[shop]"', $this->body($this->get($app, '/admin/modules')));
+    }
+
+    #[DataProvider('connectionProvider')]
     public function testPublicAddressIsVisibleWithAndWithoutAnAdminEntry(array $dbConfig): void
     {
         $bootstrap = <<<'PHP'

@@ -4,10 +4,11 @@
 
 - 설정: `/plugins/payment-kspay/settings`
 - 서버 계약: `gateway.v2` (`GnuCms\Payment\Gateway`)
+- 주문 처리·결제창 표시·결과 수신은 이 계약을 사용하는 별도 모듈에서 구현한다. `main`에는 작은 쇼핑몰 모듈을 포함하지 않는다.
 - 결제 설정: MID, pgapi 인증키
 - 리셀러 코드는 가맹점 등록용이다. 결제 요청에는 PG가 발급한 상점 코드를 사용한다.
 - 인증 정보와 요청 처리 기록은 암호화한다. 카드번호·인증 토큰·PG 응답 원문은 저장하지 않는다.
 - 패키지 스키마 2에서 거래 요청 기록 테이블을 추가한다. 관리자에서 데이터 설치/갱신이 필요하다.
 - 복원 후 API 실행은 정지된다. 결제사와 거래를 대조한 뒤 다시 허용한다.
 
-[쇼핑몰 운영 문서](../../docs/shop.md) · [공식 연동 문서](https://paydev.ksnet.co.kr/kspay/webfep/doc)
+[공식 연동 문서](https://paydev.ksnet.co.kr/kspay/webfep/doc)

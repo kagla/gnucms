@@ -61,7 +61,7 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules' : scena
       }
       await open('core-modules');
       assert.equal(await page.$$eval('.extensions-table .btn-outline', buttons => buttons.length), 0, 'enabled modules use address links without shortcut buttons');
-      for (const address of ['/admin/shop', '/modules/alimtalk/home']) {
+      for (const address of ['/modules/demo-reservation/preview', '/modules/alimtalk/home']) {
         assert.equal(await page.$$eval('.extensions-table a', (links, address) => links.filter(link => link.getAttribute('href') === address).length, base + address), 2, 'module address and new-window icon remain available');
       }
       for (const width of [1280, 390]) {
@@ -75,8 +75,8 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules' : scena
             adjacent: iconBounds.left >= linkBounds.right && iconBounds.top < linkBounds.bottom && iconBounds.bottom > linkBounds.top,
             visible: el.getBoundingClientRect().width > 0};
         });
-        assert.equal(entry.address, base + '/shop');
-        assert.equal(entry.button, base + '/shop');
+        assert.equal(entry.address, base + '/book');
+        assert.equal(entry.button, base + '/book');
         assert.ok(entry.text.includes('사용자 화면:') && !entry.text.includes('사용자 화면 열기'));
         assert.equal(entry.target, '_blank');
         assert.ok(entry.label.includes('새 창으로 열기') && entry.icon && entry.adjacent, 'new-window icon must sit beside the public address');
