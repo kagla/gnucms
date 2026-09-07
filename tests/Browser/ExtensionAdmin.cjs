@@ -9,7 +9,6 @@ const render = (scenario, base) => execFileSync('php', [path.join(__dirname, 'Ex
 const route = scenario => scenario === 'core-modules' ? '/admin/modules'
   : scenario === 'core-list' ? '/admin/plugins'
   : scenario === 'bizppurio' ? '/plugins/bizppurio/settings'
-  : scenario.startsWith('alimtalk-') ? '/modules/alimtalk/' + scenario.slice(9)
   : scenario.startsWith('core') ? '/admin/settings' : '/' + (scenario === 'demo-message' ? 'plugins' : 'modules') + '/' + scenario + '/preview';
 
 (async () => {
@@ -60,7 +59,7 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules'
       }
       await open('core-modules');
       assert.equal(await page.$$eval('.extensions-table .btn-outline', buttons => buttons.length), 0, 'enabled modules use address links without shortcut buttons');
-      for (const address of ['/modules/demo-reservation/preview', '/modules/alimtalk/home']) {
+      for (const address of ['/modules/demo-reservation/preview', '/modules/example/preview']) {
         assert.equal(await page.$$eval('.extensions-table a', (links, address) => links.filter(link => link.getAttribute('href') === address).length, base + address), 2, 'module address and new-window icon remain available');
       }
       for (const width of [1280, 390]) {
@@ -85,7 +84,7 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules'
         if (base === '/cms') await page.screenshot({path: '/tmp/gnucms-module-links-' + width + '.png', fullPage: true});
       }
       assert.deepEqual(errors, [], 'module user link');
-      for (const scenario of ['bizppurio', 'demo-message', 'demo-reservation', 'alimtalk-home', 'alimtalk-templates', 'alimtalk-send', 'alimtalk-history', 'alimtalk-detail']) {
+      for (const scenario of ['bizppurio', 'demo-message', 'demo-reservation']) {
         await page.setViewport({width: 1280, height: 960});
         await open(scenario);
         assert.equal(await page.$$eval('.admin-shell', els => els.length), 1, scenario);
@@ -94,7 +93,7 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules'
         const field = '#main input.input';
         if (await page.$(field)) assert.deepEqual(await style(field, Object.keys(input)), input, scenario + ' input');
         if (await page.$('#main button.btn-primary')) assert.deepEqual(await style('#main button.btn-primary', Object.keys(button)), button, scenario + ' button');
-        const section = scenario.startsWith('alimtalk-') || scenario === 'demo-reservation' ? 'modules' : 'plugins';
+        const section = scenario === 'demo-reservation' ? 'modules' : 'plugins';
         assert.equal(await page.$eval('.admin-sidebar a[aria-current=page]', el => new URL(el.href).pathname), base + '/admin/' + section);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), scenario + ' desktop width');
         if (base === '/cms' && scenario === 'bizppurio') await page.screenshot({path: '/tmp/gnucms-extension-admin-desktop.png', fullPage: true});
@@ -111,7 +110,7 @@ const route = scenario => scenario === 'core-modules' ? '/admin/modules'
         await page.keyboard.press('Escape');
         assert.equal(await page.$eval('#admin-drawer', el => el.checked), false);
         await page.waitForFunction(() => document.querySelector('.admin-sidebar').getBoundingClientRect().right <= 1);
-        if (base === '/cms' && scenario === 'alimtalk-history') await page.screenshot({path: '/tmp/gnucms-extension-admin-mobile.png', fullPage: true});
+        if (base === '/cms' && scenario === 'demo-reservation') await page.screenshot({path: '/tmp/gnucms-extension-admin-mobile.png', fullPage: true});
         await page.click('[data-theme-toggle]');
         assert.deepEqual(errors, [], scenario);
         count++;

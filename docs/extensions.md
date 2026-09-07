@@ -77,7 +77,7 @@ return $view->render($response, 'page', $data);
 
 템플릿은 `admin/extension`을 레이아웃으로 지정하고 `title`, `admin_section` (`plugins` 또는 `modules`), `extension_body` 블록을 채운다. 추가 JavaScript는 `scripts` 블록을 사용한다. 자산의 내용 해시 URL, 사이트 설정, 로그인 사용자, 공통 아이콘을 그대로 재사용한다. 관리자 화면에서는 공통 레이아웃에 따라 사이트 추적·광고 코드를 실행하지 않는다.
 
-탐색 순서는 선택 테마의 `extensions/<이름>/`, 패키지 템플릿, 사이트 공통 템플릿, 코어의 `src/Extension/templates/` 공통 확장 조각이다. 기존 테마에 `admin/extension`이 없어도 코어 조각이 해당 테마의 `admin/layout`을 사용한다. 배치용 `extensions.css`는 테마 자산으로 불러오며 선택 테마에 없으면 기본 자산을 사용한다. 화면 전체를 복사하지 않아도 개별 조각만 재정의할 수 있다. 제공하는 이름은 `bizppurio`, `alimtalk`, `demo-message`, `demo-reservation`이다. 예를 들어 `extensions/bizppurio/settings.php`를 재정의할 수 있다. 공통 관리자 레이아웃을 재정의하는 테마는 `admin/extension`이 사용하는 블록을 함께 유지한다.
+탐색 순서는 선택 테마의 `extensions/<이름>/`, 패키지 템플릿, 사이트 공통 템플릿, 코어의 `src/Extension/templates/` 공통 확장 조각이다. 기존 테마에 `admin/extension`이 없어도 코어 조각이 해당 테마의 `admin/layout`을 사용한다. 배치용 `extensions.css`는 테마 자산으로 불러오며 선택 테마에 없으면 기본 자산을 사용한다. 화면 전체를 복사하지 않아도 개별 조각만 재정의할 수 있다. 제공하는 이름은 `bizppurio`, `demo-message`, `demo-reservation`이다. 예를 들어 `extensions/bizppurio/settings.php`를 재정의할 수 있다. 공통 관리자 레이아웃을 재정의하는 테마는 `admin/extension`이 사용하는 블록을 함께 유지한다.
 
 기본 패키지 루트는 GNUCMS 루트다. 특수 배치·테스트에서는 설정의 `extensions.root`로
 `plugins/`, `modules/`를 포함하는 상위 디렉터리의 절대 경로를 지정할 수 있다.
@@ -226,5 +226,5 @@ SQLite 설치 전 스냅숏은 `storage/backups/extensions/`에 보존하며 관
 코어 구조 판이며 각 패키지의 스키마 판과 독립적이다. 운영 서버에서 Composer를 실행할
 필요 없이 패키지 파일과 의존성을 완성본으로 배포한다.
 
-실제 구현 예시는 [비즈뿌리오 플러그인](../plugins/bizppurio/README.md)과
-[알림톡 운영 모듈](../modules/alimtalk/README.md)을 참고한다.
+실제 구현 예시는 [비즈뿌리오 플러그인](../plugins/bizppurio/README.md)을 참고한다.
+이를 사용하는 비즈뿌리오 알림톡 운영 모듈은 `feat/bizppurio-messaging` 브랜치에 별도로 보관한다.

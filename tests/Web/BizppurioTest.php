@@ -18,51 +18,10 @@ use Slim\Psr7\Factory\ServerRequestFactory;
 
 require_once dirname(__DIR__, 2) . '/plugins/bizppurio/autoload.php';
 
-final class AlimtalkTest extends WebTestCase
+final class BizppurioTest extends WebTestCase
 {
     private string $root;
     private App $app;
-
-    public function testControllerSendsOnlyConfirmedSnapshotAndRejectsActionsInAnotherEnvironment(): void
-    {
-        require_once dirname(__DIR__, 2) . '/modules/alimtalk/src/Controller.php';
-        $before = $_SESSION ?? [];
-        $calls = [];
-        $services = [
-            'ready' => static fn (): bool => true,
-            'status' => static fn (): array => ['configured' => true, 'enabled' => true, 'api_verified' => true,
-                'account_type' => 'web', 'account' => 'test-account', 'test_only' => true, 'test_phone' => '01000000000'],
-            'templates' => static fn (): array => [],
-            'preview' => static fn (): array => ['environment' => 'test', 'template_id' => 'template', 'revision' => 'revision',
-                'config_revision' => 'settings', 'message' => '안내입니다.', 'buttons' => []],
-            'send' => static function (array $input) use (&$calls): array { $calls[] = $input; return ['id' => 'dispatch']; },
-            'detail' => static fn (): array => ['environment' => 'live'],
-            'retry' => static function () use (&$calls): void { $calls[] = 'retry'; },
-            'refresh-result' => static function () use (&$calls): void { $calls[] = 'refresh'; },
-        ];
-        $controller = new \GnuCms\Modules\Alimtalk\Controller($services);
-        $slim = \Slim\Factory\AppFactory::create();
-        foreach (['send', 'detail'] as $page) {
-            $slim->post('/' . $page, static fn ($request, $response) => $controller->handle($page, $request, $response));
-        }
-        $slim->addRoutingMiddleware();
-        $slim->add(new \GnuCms\Web\Middleware\ViewMiddleware(\GnuCms\Tests\Support\AdminViewFixture::view()));
-        $post = static fn (string $page, array $body) => $slim->handle((new ServerRequestFactory())->createServerRequest('POST', '/' . $page)->withParsedBody($body));
-        try {
-            self::assertSame(200, $post('send', ['action' => 'preview', 'phone' => '01000000000', 'variables' => ['이름' => '원본']])->getStatusCode());
-            $token = array_key_last($_SESSION['alimtalk_previews']);
-            self::assertSame(303, $post('send', ['action' => 'send', 'confirmation' => $token, 'phone' => '01011111111', 'variables' => ['이름' => '변조']])->getStatusCode());
-            self::assertSame('01000000000', $calls[0]['phone']);
-            self::assertSame(['이름' => '원본'], $calls[0]['variables']);
-            self::assertSame($token, $calls[0]['idempotency_key']);
-            foreach (['retry', 'refresh-result'] as $action) {
-                self::assertSame(404, $post('detail', ['action' => $action, 'id' => 'live-dispatch', 'environment' => 'test'])->getStatusCode());
-            }
-            self::assertCount(1, $calls);
-        } finally {
-            $_SESSION = $before;
-        }
-    }
 
     private function setupApp(array $config, ?FakeTransport $http = null): Service
     {
@@ -70,7 +29,7 @@ final class AlimtalkTest extends WebTestCase
         $config['prefix'] = 'aw' . bin2hex(random_bytes(4)) . '_';
         $this->app = $this->makeApp($config, ['storage' => ['dir' => $this->root], 'auth' => ['secret' => bin2hex(random_bytes(32))]]);
         $manager = new Manager(new Catalog(dirname(__DIR__, 2)), new StateStore($this->root . '/extensions'));
-        $manager->setEnabledMany(['plugins/bizppurio' => true, 'modules/alimtalk' => true]);
+        $manager->setEnabledMany(['plugins/bizppurio' => true]);
         return new Service($this->app, $http ?? new FakeTransport());
     }
 
@@ -102,7 +61,7 @@ final class AlimtalkTest extends WebTestCase
     {
         $service = $this->setupApp($config);
         self::assertFalse($service->ready());
-        $this->assertLoginRedirect($this->get($this->app, '/modules/alimtalk/home'), '/modules/alimtalk/home');
+        $this->assertLoginRedirect($this->get($this->app, '/plugins/bizppurio/settings'), '/plugins/bizppurio/settings');
         $this->signIn(false);
         self::assertSame(403, $this->get($this->app, '/plugins/bizppurio/settings')->getStatusCode());
         $this->signIn(true);
@@ -112,39 +71,18 @@ final class AlimtalkTest extends WebTestCase
         $response = $this->post($this->app, '/plugins/bizppurio/settings', ['action' => 'install', 'csrf_token' => $_SESSION['csrf_token']]);
         self::assertSame(200, $response->getStatusCode());
         self::assertTrue($service->ready());
-        foreach (['/plugins/bizppurio/settings', '/modules/alimtalk/templates', '/modules/alimtalk/send', '/modules/alimtalk/history'] as $path) {
-            $request = (new ServerRequestFactory())->createServerRequest('GET', '/cms' . $path);
-            $response = Kernel::create($this->app, dirname(__DIR__, 2) . '/templates', '/cms')->handle($request);
-            self::assertSame(200, $response->getStatusCode());
-            self::assertStringContainsString('action="/cms' . $path . '"', $this->body($response));
-            self::assertSame('no-store', $response->getHeaderLine('Cache-Control'));
-        }
+        self::assertStringNotContainsString('href="/modules/alimtalk/', $this->body($response));
+        $request = (new ServerRequestFactory())->createServerRequest('GET', '/cms/plugins/bizppurio/settings');
+        $response = Kernel::create($this->app, dirname(__DIR__, 2) . '/templates', '/cms')->handle($request);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('action="/cms/plugins/bizppurio/settings"', $this->body($response));
+        self::assertStringNotContainsString('href="/cms/modules/alimtalk/', $this->body($response));
+        self::assertSame('no-store', $response->getHeaderLine('Cache-Control'));
         self::assertSame(404, $this->get($this->app, '/admin/plugins/bizppurio/test')->getStatusCode());
     }
 
     #[DataProvider('connectionProvider')]
-    public function testPreviewIsEscapedAndCannotSendWithoutServerConfirmation(array $config): void
-    {
-        $service = $this->setupApp($config);
-        $service->install();
-        $service->settings->save('test', ['account' => 'test-account', 'password' => bin2hex(random_bytes(20)), 'senderkey' => bin2hex(random_bytes(20)),
-            'from' => '0212345678', 'test_phone' => '01000000000']);
-        $template = $service->templates->save('test', ['code' => 'hello', 'name' => '<b>안내</b>', 'message' => '#{이름}님 안내입니다.']);
-        $this->signIn(true);
-        $response = $this->post($this->app, '/modules/alimtalk/send', ['action' => 'preview', 'environment' => 'test', 'csrf_token' => $_SESSION['csrf_token'],
-            'template_id' => $template['id'], 'revision' => $template['revision'], 'phone' => '01000000000', 'variables' => ['이름' => '<script>alert(1)</script>']]);
-        self::assertSame(200, $response->getStatusCode());
-        self::assertStringContainsString('&lt;script&gt;', $this->body($response));
-        self::assertStringNotContainsString('<script>alert(1)</script>', $this->body($response));
-        self::assertStringContainsString('name="confirmation"', $this->body($response));
-        self::assertSame(0, $service->history(['environment' => 'test'])['total']);
-        $response = $this->post($this->app, '/modules/alimtalk/send', ['action' => 'send', 'environment' => 'test', 'csrf_token' => $_SESSION['csrf_token'], 'confirmation' => 'not-a-confirmation']);
-        self::assertSame(422, $response->getStatusCode());
-        self::assertSame(0, $service->history(['environment' => 'test'])['total']);
-    }
-
-    #[DataProvider('connectionProvider')]
-    public function testWebAccountSettingsAndSendPageExposeVerificationAndPortalEntry(array $config): void
+    public function testWebAccountSettingsRequireVerificationBeforeEnablingSending(array $config): void
     {
         $service = $this->setupApp($config);
         $service->install();
@@ -157,17 +95,11 @@ final class AlimtalkTest extends WebTestCase
         self::assertStringContainsString('value="enable" disabled', $this->body($response));
         self::assertSame('web', $service->status('test')['account_type']);
         self::assertSame(422, $this->post($this->app, '/plugins/bizppurio/settings', ['action' => 'enable', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
-        $response = $this->get($this->app, '/modules/alimtalk/send');
-        self::assertSame(200, $response->getStatusCode());
-        self::assertStringContainsString('GNUCMS 웹발송', $this->body($response));
-        self::assertStringContainsString('웹발송 계정', $this->body($response));
-        self::assertStringContainsString('href="https://www.bizppurio.com/" target="_blank" rel="noopener noreferrer"', $this->body($response));
         self::assertSame(0, $service->history(['environment' => 'test'])['total']);
         $service->connect('test');
         $service->settings->setEnabled('test', true);
-        $response = $this->get($this->app, '/modules/alimtalk/send');
-        self::assertStringContainsString('API 인증: 확인 완료', $this->body($response));
-        self::assertStringContainsString('발송 허용', $this->body($response));
+        self::assertTrue($service->status('test')['api_verified']);
+        self::assertTrue($service->status('test')['enabled']);
     }
 
     #[DataProvider('connectionProvider')]

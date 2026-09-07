@@ -2,7 +2,7 @@
 <?php $this->start('title') ?>비즈뿌리오 알림톡 설정 · <?= $this->e($site['site_name']) ?><?php $this->stop() ?>
 <?php $this->start('admin_section') ?>plugins<?php $this->stop() ?>
 <?php $this->start('extension_body') ?>
-<?php $this->insert('admin/_extension_header', ['section' => 'plugins', 'heading' => '비즈뿌리오 알림톡 설정', 'description' => '발송 계정과 발신프로필, 환경별 발송 허용을 관리합니다.', 'actions' => [['url' => $base . '/modules/alimtalk/home?environment=' . $environment, 'label' => '알림톡 운영']]]) ?>
+<?php $this->insert('admin/_extension_header', ['section' => 'plugins', 'heading' => '비즈뿌리오 알림톡 설정', 'description' => '발송 계정과 발신프로필, 환경별 발송 허용을 관리합니다.']) ?>
 <nav class="tabs tabs-border settings-tabs" aria-label="알림톡 계정 환경">
 <?php foreach (['test' => '검수 환경', 'live' => '운영 환경'] as $env => $label): ?><a class="tab<?= $environment === $env ? ' tab-active' : '' ?>" href="?environment=<?= $env ?>"<?= $environment === $env ? ' aria-current="page"' : '' ?>><?= $this->e($label) ?></a><?php endforeach ?>
 </nav>
@@ -40,7 +40,6 @@
 <form method="post" action="<?= $this->e($base) ?>/plugins/bizppurio/settings"><input type="hidden" name="csrf_token" value="<?= $this->e($csrf_token) ?>"><input type="hidden" name="environment" value="<?= $this->e($environment) ?>">
 <button class="btn btn-primary" name="action" value="connect">인증 연결 확인</button><button name="action" value="webhook" class="secondary btn">결과 수신 경로 표시</button>
 <?php if ($settings['enabled']): ?><button name="action" value="disable" class="secondary btn">신규 발송 정지</button><?php else: ?><button class="btn btn-primary" name="action" value="enable"<?= ($settings['account_type'] ?? '') === 'web' && empty($settings['api_verified']) ? ' disabled' : '' ?>>이 환경의 발송 허용</button><?php endif ?></form>
-<p><a class="link" href="<?= $this->e($base) ?>/modules/alimtalk/send?environment=<?= $this->e($environment) ?>">GNUCMS 웹발송 화면 열기</a></p>
 <?php if ($webhook !== null): ?><label class="extension-label" for="webhook">비즈뿌리오에 등록할 결과 수신 경로</label><textarea class="textarea textarea-bordered textarea-block" id="webhook" rows="4" readonly><?= $this->e($webhook) ?></textarea><small>인증값이 포함된 경로입니다. 업체 등록용으로만 사용하고 공개하지 마세요.</small><?php endif ?>
 </section><?php endif ?>
 <?php endif ?><section class="card card-body extension-panel"><h2 class="card-title">비즈뿌리오 사이트 웹발송</h2><p>웹발송 계정으로 비즈뿌리오 사이트에 로그인한 뒤 메시지전송 메뉴에서 발송할 수 있습니다. 사이트에서 보낸 내역은 GNUCMS 발송 이력에 자동으로 가져오지 않습니다.</p><a class="link" href="https://www.bizppurio.com/" target="_blank" rel="noopener noreferrer">비즈뿌리오 사이트 열기 (새 창)</a></section>

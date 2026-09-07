@@ -163,7 +163,7 @@ PHP);
         $body = $this->body($this->get($app, '/admin/modules'));
         self::assertStringNotContainsString('작은 쇼핑몰', $body);
         self::assertStringNotContainsString('name="enabled[shop]"', $body);
-        self::assertStringContainsString('알림톡', $body);
+        self::assertStringContainsString('예약 안내문', $body);
 
         // 이전 설치의 사용 설정이 남아 있어도 제거한 모듈은 실행되지 않는다.
         $state->update(static fn (array $enabled): array => [...$enabled, 'modules/shop']);
@@ -194,7 +194,7 @@ PHP);
         $this->get($app, '/login');
         $this->sessionUser($adminId);
         $state = new StateStore($app->storageDir() . '/extensions');
-        $remaining = ['modules/alimtalk', 'plugins/bizppurio'];
+        $remaining = ['plugins/bizppurio'];
         $providers = ['inicis', 'kcp', 'kspay', 'toss'];
         $payments = array_map(static fn (string $id): string => 'plugins/payment-' . $id, $providers);
         $state->update(static fn (array $enabled): array => $remaining);
@@ -209,7 +209,7 @@ PHP);
             self::assertSame(404, $this->get($app, $path)->getStatusCode(), $path);
             self::assertSame(404, $this->post($app, $path, ['action' => 'install', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode(), $path);
         }
-        foreach (['/admin/plugins', '/admin/modules', '/plugins/bizppurio/settings', '/modules/alimtalk/home'] as $path) {
+        foreach (['/admin/plugins', '/admin/modules', '/plugins/bizppurio/settings'] as $path) {
             $response = $this->get($app, $path);
             self::assertSame(200, $response->getStatusCode(), $path);
             self::assertStringNotContainsString('href="/plugins/payment-', $this->body($response));
@@ -222,6 +222,35 @@ PHP);
         self::assertStringNotContainsString('payment-', $this->body($this->get($app, '/admin/plugins')));
         self::assertSame(404, $this->post($app, '/admin/plugins/payment-inicis/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
         self::assertSame($remaining, $state->read());
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testBundledCmsExcludesAlimtalkModuleAndPreservesItsProvider(array $dbConfig): void
+    {
+        $app = $this->makeApp($dbConfig, ['extensions' => ['root' => dirname(__DIR__, 2)]], 'default');
+        $adminId = $app->users()->create('alimtalk-removed-admin@example.test', '', '관리자', true);
+        $this->get($app, '/login');
+        $this->sessionUser($adminId);
+        $state = new StateStore($app->storageDir() . '/extensions');
+        $state->update(static fn (array $enabled): array => ['plugins/bizppurio']);
+        self::assertStringNotContainsString('name="enabled[alimtalk]"', $this->body($this->get($app, '/admin/modules')));
+
+        $state->update(static fn (array $enabled): array => [...$enabled, 'modules/alimtalk']);
+        foreach (['home', 'templates', 'send', 'history', 'detail'] as $page) {
+            $path = '/modules/alimtalk/' . $page;
+            self::assertSame(404, $this->get($app, $path)->getStatusCode(), $path);
+            self::assertSame(404, $this->post($app, $path, ['csrf_token' => $_SESSION['csrf_token']])->getStatusCode(), $path);
+        }
+        foreach (['/admin/modules', '/admin/plugins', '/plugins/bizppurio/settings'] as $path) {
+            $response = $this->get($app, $path);
+            self::assertSame(200, $response->getStatusCode(), $path);
+            self::assertStringNotContainsString('href="/modules/alimtalk/', $this->body($response));
+        }
+        $response = $this->post($app, '/admin/modules/alimtalk/state', ['enabled' => '0', 'csrf_token' => $_SESSION['csrf_token']]);
+        self::assertSame(303, $response->getStatusCode());
+        self::assertSame(['plugins/bizppurio'], $state->read());
+        self::assertStringNotContainsString('name="enabled[alimtalk]"', $this->body($this->get($app, '/admin/modules')));
+        self::assertSame(404, $this->post($app, '/admin/modules/alimtalk/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
     }
 
     #[DataProvider('connectionProvider')]
