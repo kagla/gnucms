@@ -96,6 +96,9 @@ final class Routes
         $slim->post('/admin/settings/social', [$cms, 'oauth']);
         $slim->post('/admin/settings/social/{provider:google|naver|kakao}/secret', [$cms, 'oauthSecret'])
             ->setName('admin.settings.oauth.secret');
+        $payment = new \GnuCms\Payment\SettingsController($app->paymentSettings());
+        $slim->get('/admin/settings/payment', [$payment, 'handle'])->setName('admin.settings.payment');
+        $slim->post('/admin/settings/payment', [$payment, 'handle']);
         $slim->get('/admin/settings/maintenance', [$cms, 'maintenance'])->setName('admin.settings.maintenance');
         $slim->post('/admin/uploads/gc', [$cms, 'uploadsGc'])->setName('admin.uploads.gc');
         $backups = new BackupController($app);
