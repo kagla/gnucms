@@ -110,7 +110,7 @@ created ──알림톡 접수 성공──▶ waiting ──고객 결제 승�
 `GnuCms\Plugins\Bizppurio\*` → `GnuCms\Messaging\*`로 네임스페이스만 바꾸고 다음을 조정한다.
 
 - `Schema`: DDL을 코어 `Schema::migrateMessaging()`으로 옮긴다. `PackageSchema` 의존을 없앤다.
-- `Settings`: `ready()`는 코어 테이블 존재로 판단한다. 실행 허용은 `GnuCms\Support\RuntimePermit`(`storage/runtime/permits/messaging-{env}`)을 쓴다.
+- `MessagingService::ready()`는 항상 참이다(코어 스키마가 테이블을 보장). 실행 허용은 `GnuCms\Support\RuntimePermit`(`storage/extensions-runtime/permits/messaging-{env}`)을 쓴다.
 - `MessagingService`(신규, 기존 `bootstrap.php`의 서비스 클로저를 메서드로): `ready()`, `status(string $env)`, `templates(string $action, array $input)`, `preview(array $input)`, `send(array $input)`, `history(array $filter)`, `detail(string $id)`, `retry(string $id)`, `refreshResult(string $id)`, `purge()`, 문자용 `textPreview`/`textSend`/`textHistory`/`textDetail`/`textRetry`/`textRefreshResult`/`textPurge`. 입력·반환 계약은 플러그인 README의 서비스 표와 같다.
 - `SettingsController`: 라우트 `/admin/settings/messaging`(GET/POST), `/admin/settings/messaging/password`(POST JSON), `/admin/settings/messaging/verify`(POST), `/admin/settings/messaging/permit`(POST). 결과 URL 표시는 `/messaging/bizppurio/result?environment=…&token=…`.
 - 웹훅: `Routes.php`에서 `ExternalRequests`로 `POST /messaging/bizppurio/result`와 이전 주소 `POST /plugins/bizppurio/result`를 같은 검증기·처리기에 연결한다.
@@ -125,15 +125,15 @@ created ──알림톡 접수 성공──▶ waiting ──고객 결제 승�
 | `/modules/alimtalk/templates`, `…/templates/remote` | `/admin/messaging/templates`, `/admin/messaging/templates/remote` |
 | `/modules/alimtalk/send` | `/admin/messaging/send` |
 | `/modules/alimtalk/history`, `…/detail` | `/admin/messaging/history`, `/admin/messaging/history/{id}` |
-| `/modules/alimtalk/retry`, `…/refresh`, `…/purge` | `/admin/messaging/history/{id}/retry`, `…/refresh`, `/admin/messaging/purge` |
-| `/modules/sms/*` | `/admin/messaging/sms/send`, `/admin/messaging/sms/history`, `/admin/messaging/sms/history/{id}`, `…/retry`, `…/refresh`, `/admin/messaging/sms/purge` |
+| `/modules/alimtalk/retry`, `…/refresh`, `…/purge` | `/admin/messaging/history/{id}` POST `action=retry|refresh-result`, `/admin/messaging/history` POST `action=purge` |
+| `/modules/sms/*` | `/admin/messaging/sms/send`, `/admin/messaging/sms/history`, `/admin/messaging/sms/history/{id}` POST `action=retry|refresh-result`, `/admin/messaging/sms/history` POST `action=purge` |
 
 템플릿은 `templates/default/admin/messaging/*.php`로 옮기고 `admin/layout`을 직접 쓴다(`admin/extension` 레이아웃 불필요). 세션 미리보기 확인값(10분·10개) 규칙은 그대로다.
 
 ### `src/Payment/` (결제 엔진 이관)
 
 - 가져오는 파일: `Gateway`, `DirectGateway`, `InicisGateway`, `Journal`, `CallbackToken`, `ExecutionLock`, `Transport`, `StreamTransport`, `ProviderConfig`, `Settings`, `SettingsController`, `templates/settings.php`(→ `templates/default/admin/payment_settings.php`).
-- `Settings::PROVIDERS`는 `['inicis' => 'KG이니시스']`만 남긴다. `ready()`는 코어 테이블 존재. 실행 허용은 `RuntimePermit`(`storage/runtime/permits/payment-inicis-{env}`).
+- `Settings::PROVIDERS`는 `['inicis' => 'KG이니시스']`만 남긴다. `ready()`는 코어 테이블 존재. 실행 허용은 `RuntimePermit`(`storage/extensions-runtime/permits/payment-inicis-{env}`).
 - `SettingsController` 라우트: `/admin/settings/payment`(GET/POST), `/admin/settings/payment/permit`(POST).
 - `Gateway` 계약은 그대로다. 이니톡 결제는 `order = ['id', 'number', 'total', 'order_name', 'environment', 'provider' => 'inicis', 'transaction_id']`, `customer = ['name', 'phone', 'email' => '']` 형태로 호출한다. `Journal`이 `pay_inicis_transactions`에 주문 id별 상태를 보관한다.
 
@@ -255,7 +255,7 @@ CLI `bin/initalk.php`: `expire`(만료 처리), `sync`(최근 7일 `checkout_sta
 
 - 새 설치: `Schema::create()`가 모든 테이블을 만든다.
 - 업그레이드(`Schema::migrateAll()` v23): 새 테이블 생성. `extension_schemas`에 `plugins/bizppurio` 또는 `plugins/payment-inicis` 등록이 있으면 해당 테이블을 그대로 두고(구조가 같음) 등록 행을 삭제한다. `storage/extensions/enabled.json`에 `plugins/bizppurio`, `plugins/payment-inicis`, `modules/alimtalk`, `modules/sms`가 있으면 제거한다. 배포본에 남은 이전 패키지 폴더는 삭제하도록 문서화하고, 남아 있어도 확장 관리자가 코어 예약 경로 충돌로 실행하지 않는다.
-- 실행 허용값은 `storage/runtime/permits/`에 두며 백업에서 제외하고 복원 시 해제한다(`BackupManager`의 제외 목록과 복원 후 처리 갱신). SQLite 자동 복원도 같다.
+- 실행 허용값은 `storage/extensions-runtime/permits/`에 두며 백업에서 제외하고 복원 시 해제한다(`BackupManager`의 제외 목록과 복원 후 처리 갱신). SQLite 자동 복원도 같다.
 - 백업 v2는 `Schema::TABLES` 기준이므로 새 테이블이 자동 포함된다. MySQL 덤프 목록도 같은 상수를 쓴다.
 - 코어 `Schema::VERSION`은 23으로 올린다. 제품 버전은 Release Please가 정한다(MINOR).
 

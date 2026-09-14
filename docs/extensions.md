@@ -226,5 +226,4 @@ SQLite 설치 전 스냅숏은 `storage/backups/extensions/`에 보존하며 관
 코어 구조 판이며 각 패키지의 스키마 판과 독립적이다. 운영 서버에서 Composer를 실행할
 필요 없이 패키지 파일과 의존성을 완성본으로 배포한다.
 
-외부 연동의 구현 예시인 비즈뿌리오 플러그인과 알림톡·문자 운영 모듈은
-`feat/bizppurio-messaging` 브랜치에 함께 보관한다. `main`에는 해당 패키지를 포함하지 않는다.
+외부 연동 구현 예시로는 코어의 알림톡·문자 발송(`src/Messaging/`, [docs/messaging.md](messaging.md))과 결제 콜백(`src/Payment/`)을 참고한다. 세션 없는 외부 POST는 `GnuCms\Web\Middleware\ExternalRequests`, 실행 허용값은 `GnuCms\Support\RuntimePermit`을 쓴다.
