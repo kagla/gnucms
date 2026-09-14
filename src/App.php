@@ -130,6 +130,9 @@ final class App
 
     private ?AdminService $adminService = null;
 
+    private ?\GnuCms\Payment\Settings $paymentSettings = null;
+    private ?\GnuCms\Payment\InicisGateway $inicisGateway = null;
+
     private ?CmsRepository $cms = null;
 
     private ?CmsService $cmsService = null;
@@ -545,6 +548,22 @@ final class App
             );
         }
         return $this->mailSettingsService;
+    }
+
+    public function paymentSettings(): \GnuCms\Payment\Settings
+    {
+        return $this->paymentSettings ??= new \GnuCms\Payment\Settings($this, 'inicis');
+    }
+
+    public function inicisGateway(): \GnuCms\Payment\InicisGateway
+    {
+        return $this->inicisGateway ??= new \GnuCms\Payment\InicisGateway($this->paymentSettings());
+    }
+
+    /** 테스트에서 모의 전송기를 가진 게이트웨이로 바꾼다. */
+    public function setInicisGateway(\GnuCms\Payment\InicisGateway $gateway): void
+    {
+        $this->inicisGateway = $gateway;
     }
 
     public function sendMailTest(): void

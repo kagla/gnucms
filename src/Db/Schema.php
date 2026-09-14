@@ -18,6 +18,7 @@ final class Schema
         'site_settings', 'contents', 'consent_uses', 'consents_given', 'notifications',
         'password_attempts', 'login_events', 'write_rate_limits',
         'extension_schemas',
+        'pay_inicis_settings', 'pay_inicis_transactions',
     ];
 
     private const INDEXES = [
@@ -58,7 +59,7 @@ final class Schema
      * 코드가 요구하는 스키마 판. 컬럼을 늘릴 때마다 하나씩 올린다.
      * DB 에 적힌 값이 이 값보다 낮으면 ensureCurrent() 가 마이그레이션을 돌린다.
      */
-    public const VERSION = '22';
+    public const VERSION = '23';
 
     /**
      * DB 에 적어 두는 도장. 판 번호 뒤에 이 파일의 내용 해시를 붙인다.
@@ -131,6 +132,7 @@ final class Schema
         $this->migrateWriteRateLimits();
         $this->migrateProfileImages();
         $this->migrateExtensionSchemas();
+        $this->migratePayment();
         $stamp = $this->stamp();
         $this->ensureSiteSetting('system.schema_version', $stamp);
         $this->db->execute(
@@ -172,6 +174,31 @@ final class Schema
             table_names {TEXT} NOT NULL,
             state VARCHAR(16) NOT NULL
         ){SUFFIX}'];
+    }
+
+    private function paymentStatements(): array
+    {
+        return [
+            'CREATE TABLE pay_inicis_settings (id VARCHAR(32) PRIMARY KEY, payload {TEXT} NOT NULL){SUFFIX}',
+            'CREATE TABLE pay_inicis_transactions (id VARCHAR(32) PRIMARY KEY, payload {TEXT} NOT NULL){SUFFIX}',
+        ];
+    }
+
+    /** 결제 플러그인 판 2와 같은 구조. 플러그인으로 설치한 테이블은 그대로 승계한다. */
+    public function migratePayment(): void
+    {
+        foreach ($this->paymentStatements() as $sql) {
+            preg_match('/^CREATE TABLE (\w+)/', $sql, $m);
+            if (!$this->tableExists($m[1])) $this->db->execute($this->expand($sql));
+        }
+        $this->adoptExtensionTables('plugins/payment-inicis');
+    }
+
+    /** 플러그인 시절 extension_schemas에 등록된 테이블을 코어 소유로 옮긴다. 데이터는 그대로다. */
+    private function adoptExtensionTables(string $packageKey): void
+    {
+        if (!$this->tableExists('extension_schemas')) return;
+        $this->db->delete('extension_schemas', 'package_key = :key', ['key' => $packageKey]);
     }
 
     /** 기존 게시판 설치에 회원 테이블만 안전하게 추가한다. */
@@ -546,7 +573,7 @@ final class Schema
             $this->consentUseStatements(), $this->consentsGivenStatements(),
             $this->notificationStatements(),
             $this->passwordThrottleStatements(), $this->loginEventStatements(),
-            $this->writeRateLimitStatements(), $this->extensionSchemaStatements());
+            $this->writeRateLimitStatements(), $this->extensionSchemaStatements(), $this->paymentStatements());
     }
 
     private function accountStatements(): array
