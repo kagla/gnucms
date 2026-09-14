@@ -19,6 +19,7 @@ final class Schema
         'password_attempts', 'login_events', 'write_rate_limits',
         'extension_schemas',
         'pay_inicis_settings', 'pay_inicis_transactions',
+        'bp_settings', 'bp_templates', 'bp_dispatches', 'bp_attempts', 'bp_receipts',
     ];
 
     private const INDEXES = [
@@ -30,6 +31,7 @@ final class Schema
         'ux_consent_uses', 'ix_consent_uses_content', 'ux_consents_given', 'ix_consents_given_content',
         'ix_login_events_user', 'ix_login_events_ip', 'ix_login_events_time',
         'ux_write_rate_limits',
+        'bp_list', 'bp_tries', 'bp_results',
     ];
 
     /** @var Connection */
@@ -133,6 +135,7 @@ final class Schema
         $this->migrateProfileImages();
         $this->migrateExtensionSchemas();
         $this->migratePayment();
+        $this->migrateMessaging();
         $stamp = $this->stamp();
         $this->ensureSiteSetting('system.schema_version', $stamp);
         $this->db->execute(
@@ -192,6 +195,44 @@ final class Schema
             if (!$this->tableExists($m[1])) $this->db->execute($this->expand($sql));
         }
         $this->adoptExtensionTables('plugins/payment-inicis');
+    }
+
+    private function messagingStatements(): array
+    {
+        return [
+            'CREATE TABLE bp_settings (environment VARCHAR(8) PRIMARY KEY, revision VARCHAR(32) NOT NULL, payload {TEXT} NOT NULL){SUFFIX}',
+            'CREATE TABLE bp_templates (id VARCHAR(32) PRIMARY KEY, environment VARCHAR(8) NOT NULL, code VARCHAR(30) NOT NULL,
+                revision VARCHAR(32) NOT NULL, payload {TEXT} NOT NULL, enabled SMALLINT NOT NULL, UNIQUE (environment, code)){SUFFIX}',
+            'CREATE TABLE bp_dispatches (id VARCHAR(32) PRIMARY KEY, environment VARCHAR(8) NOT NULL, config_revision VARCHAR(32) NOT NULL,
+                idempotency_key VARCHAR(64) NOT NULL UNIQUE, request_hash VARCHAR(64) NOT NULL, template_id VARCHAR(32) NOT NULL,
+                template_name VARCHAR(100) NOT NULL, channel VARCHAR(8) NOT NULL DEFAULT \'at\', payload {TEXT} NOT NULL,
+                phone_mask VARCHAR(30) NOT NULL, phone_hash VARCHAR(64) NOT NULL, submission VARCHAR(16) NOT NULL, delivery VARCHAR(16) NOT NULL,
+                created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL, retry_at BIGINT NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0){SUFFIX}',
+            'CREATE TABLE bp_attempts (id VARCHAR(32) PRIMARY KEY, dispatch_id VARCHAR(32) NOT NULL, sequence_no INTEGER NOT NULL,
+                refkey VARCHAR(32) NOT NULL UNIQUE, messagekey VARCHAR(128) NOT NULL, submission VARCHAR(16) NOT NULL, result_code VARCHAR(16) NOT NULL,
+                http_status INTEGER NOT NULL, created_at BIGINT NOT NULL){SUFFIX}',
+            'CREATE TABLE bp_receipts (id VARCHAR(64) PRIMARY KEY, dispatch_id VARCHAR(32) NOT NULL, attempt_id VARCHAR(32) NOT NULL,
+                message_id VARCHAR(128) NOT NULL, message_key VARCHAR(128) NOT NULL, media VARCHAR(16) NOT NULL, result_code VARCHAR(16) NOT NULL,
+                event_at BIGINT NOT NULL, received_at BIGINT NOT NULL, matched SMALLINT NOT NULL){SUFFIX}',
+            'CREATE INDEX bp_list ON bp_dispatches (created_at)',
+            'CREATE INDEX bp_tries ON bp_attempts (dispatch_id)',
+            'CREATE INDEX bp_results ON bp_receipts (dispatch_id)',
+        ];
+    }
+
+    /** 비즈뿌리오 플러그인 판 2와 같은 구조. 판 1 테이블에는 channel 컬럼과 인덱스를 보충한다. */
+    public function migrateMessaging(): void
+    {
+        if (!$this->tableExists('bp_settings')) {
+            foreach ($this->messagingStatements() as $sql) $this->db->execute($this->expand($sql));
+        } else {
+            $this->addColumnIfMissing('bp_dispatches', 'channel', "VARCHAR(8) NOT NULL DEFAULT 'at'");
+            foreach (['bp_list' => 'CREATE INDEX bp_list ON bp_dispatches (created_at)', 'bp_tries' => 'CREATE INDEX bp_tries ON bp_attempts (dispatch_id)',
+                'bp_results' => 'CREATE INDEX bp_results ON bp_receipts (dispatch_id)'] as $index => $sql) {
+                $this->createIndexIfMissing($index, $sql);
+            }
+        }
+        $this->adoptExtensionTables('plugins/bizppurio');
     }
 
     /** 플러그인 시절 extension_schemas에 등록된 테이블을 코어 소유로 옮긴다. 데이터는 그대로다. */
@@ -573,7 +614,7 @@ final class Schema
             $this->consentUseStatements(), $this->consentsGivenStatements(),
             $this->notificationStatements(),
             $this->passwordThrottleStatements(), $this->loginEventStatements(),
-            $this->writeRateLimitStatements(), $this->extensionSchemaStatements(), $this->paymentStatements());
+            $this->writeRateLimitStatements(), $this->extensionSchemaStatements(), $this->paymentStatements(), $this->messagingStatements());
     }
 
     private function accountStatements(): array

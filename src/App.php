@@ -132,6 +132,7 @@ final class App
 
     private ?\GnuCms\Payment\Settings $paymentSettings = null;
     private ?\GnuCms\Payment\InicisGateway $inicisGateway = null;
+    private ?\GnuCms\Messaging\MessagingService $messaging = null;
 
     private ?CmsRepository $cms = null;
 
@@ -564,6 +565,17 @@ final class App
     public function setInicisGateway(\GnuCms\Payment\InicisGateway $gateway): void
     {
         $this->inicisGateway = $gateway;
+    }
+
+    public function messaging(): \GnuCms\Messaging\MessagingService
+    {
+        return $this->messaging ??= new \GnuCms\Messaging\MessagingService($this);
+    }
+
+    /** 테스트에서 모의 HTTP 전송기를 가진 서비스로 바꾼다. */
+    public function setMessaging(\GnuCms\Messaging\MessagingService $service): void
+    {
+        $this->messaging = $service;
     }
 
     public function sendMailTest(): void
