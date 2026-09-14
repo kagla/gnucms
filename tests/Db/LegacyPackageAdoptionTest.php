@@ -79,6 +79,29 @@ final class LegacyPackageAdoptionTest extends DatabaseTestCase
         self::assertSame($schema->stamp(), $schema->storedStamp());
     }
 
+    /**
+     * migrateMessaging()는 예전에는 bp_settings 유무만 보고 나머지 4개 bp_* 표를 통째로
+     * 만들거나 통째로 건너뛰었다. bp_settings만 옮겨오고 나머지 표가 없는 설치(부분 승계,
+     * 예: 예전 백업 복원 순서 문제)에서는 나머지 표가 영영 생기지 않았다. 표마다 개별로
+     * tableExists()를 확인해야 한다.
+     */
+    #[DataProvider('connectionProvider')]
+    public function testMigrationCreatesRemainingMessagingTablesWhenOnlySettingsExists(array $config): void
+    {
+        $db = $this->legacyDatabase($config);
+        foreach (['bp_templates', 'bp_dispatches', 'bp_attempts', 'bp_receipts'] as $table) {
+            $db->execute('DROP TABLE ' . $db->table($table));
+        }
+        $schema = new Schema($db);
+        $schema->migrateAll();
+        self::assertSame('encrypted-settings', $db->selectOne('SELECT payload FROM ' . $db->table('bp_settings') . " WHERE environment = 'test'")['payload']);
+        foreach (['bp_templates', 'bp_dispatches', 'bp_attempts', 'bp_receipts'] as $table) {
+            self::assertSame([], $db->select('SELECT * FROM ' . $db->table($table)), $table . ' must exist and be empty');
+        }
+        self::assertSame([], $db->select('SELECT channel FROM ' . $db->table('bp_dispatches')));
+        self::assertSame($schema->stamp(), $schema->storedStamp());
+    }
+
     #[DataProvider('connectionProvider')]
     public function testUpgraderRetiresAbsorbedPackagesFromEnabledState(array $config): void
     {

@@ -220,18 +220,18 @@ final class Schema
         ];
     }
 
-    /** 비즈뿌리오 플러그인 판 2와 같은 구조. 판 1 테이블에는 channel 컬럼과 인덱스를 보충한다. */
+    /** 비즈뿌리오 플러그인 판 2와 같은 구조. 표마다 있을 때만 건너뛰므로 일부만 옮겨온 설치도 나머지를 채운다. */
     public function migrateMessaging(): void
     {
-        if (!$this->tableExists('bp_settings')) {
-            foreach ($this->messagingStatements() as $sql) $this->db->execute($this->expand($sql));
-        } else {
-            $this->addColumnIfMissing('bp_dispatches', 'channel', "VARCHAR(8) NOT NULL DEFAULT 'at'");
-            foreach (['bp_list' => 'CREATE INDEX bp_list ON bp_dispatches (created_at)', 'bp_tries' => 'CREATE INDEX bp_tries ON bp_attempts (dispatch_id)',
-                'bp_results' => 'CREATE INDEX bp_results ON bp_receipts (dispatch_id)'] as $index => $sql) {
-                $this->createIndexIfMissing($index, $sql);
+        foreach ($this->messagingStatements() as $sql) {
+            if (preg_match('/^CREATE TABLE (\w+)/', $sql, $m)) {
+                if (!$this->tableExists($m[1])) $this->db->execute($this->expand($sql));
+            } elseif (preg_match('/^CREATE INDEX (\w+)/', $sql, $m)) {
+                $this->createIndexIfMissing($m[1], $sql);
             }
         }
+        // 판 1 테이블(bp_dispatches)에는 channel 컬럼이 없었다. 방금 새로 만들었으면 이미 있어 그냥 지나간다.
+        $this->addColumnIfMissing('bp_dispatches', 'channel', "VARCHAR(8) NOT NULL DEFAULT 'at'");
         $this->adoptExtensionTables('plugins/bizppurio');
     }
 
