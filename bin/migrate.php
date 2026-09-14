@@ -20,6 +20,7 @@ declare(strict_types=1);
 
 use GnuCms\Db\Connection;
 use GnuCms\Db\Schema;
+use GnuCms\Db\SchemaUpgrader;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -49,6 +50,10 @@ try {
     echo "  ✓ 테이블 생성(없을 때만)\n";
     $schema->migrateAll();
     echo "  ✓ 스키마 갱신 (판 " . Schema::VERSION . ")\n";
+    // 도장·백업 비교 없이, 코어로 흡수된 패키지의 사용 상태만 정리한다(run()의 나머지 경로는 쓰지 않는다).
+    $storageDir = rtrim((string) ($config['storage']['dir'] ?? dirname(__DIR__) . '/storage'), '/');
+    (new SchemaUpgrader($db, $storageDir))->retireLegacyPackages();
+    echo "  ✓ 코어로 흡수된 패키지의 사용 상태 정리\n";
 } catch (Throwable $e) {
     fwrite(STDERR, "실패: " . $e->getMessage() . "\n");
     exit(1);

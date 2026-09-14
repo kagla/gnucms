@@ -7,6 +7,7 @@ namespace GnuCms\Tests\Db;
 use GnuCms\Db\Connection;
 use GnuCms\Db\Schema;
 use GnuCms\Db\SchemaUpgrader;
+use GnuCms\Extension\Catalog;
 use GnuCms\Extension\PackageSchema;
 use GnuCms\Extension\StateStore;
 use GnuCms\Tests\Support\DatabaseTestCase;
@@ -83,7 +84,7 @@ final class LegacyPackageAdoptionTest extends DatabaseTestCase
     {
         $db = $this->legacyDatabase($config);
         $store = new StateStore($this->root . '/extensions');
-        $store->update(static fn (): array => ['plugins/bizppurio', 'modules/alimtalk', 'modules/sms', 'plugins/payment-inicis', 'plugins/demo-message']);
+        $store->update(static fn (): array => [...Catalog::ABSORBED, 'plugins/demo-message']);
         (new SchemaUpgrader($db, $this->root, null, static function (): void {}))->run();
         self::assertSame(['plugins/demo-message'], $store->read());
     }

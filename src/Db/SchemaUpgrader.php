@@ -184,14 +184,18 @@ final class SchemaUpgrader
         return ['deleted' => $name];
     }
 
-    /** 코어로 흡수한 패키지의 사용 상태를 지운다. 상태 파일이 없으면 만들지 않는다. */
-    private function retireLegacyPackages(): void
+    /**
+     * 코어로 흡수한 패키지의 사용 상태를 지운다. 상태 파일이 없으면 만들지 않는다.
+     * run()이 부르는 이력 갱신 경로 외에, bin/migrate.php처럼 도장·백업 없이
+     * 빈 DB에도 동작해야 하는 CLI 경로가 직접 부를 수 있도록 공개해 둔다.
+     */
+    public function retireLegacyPackages(): void
     {
         $directory = $this->storageDir . '/extensions';
         if (!is_file($directory . '/enabled.json')) {
             return;
         }
-        $legacy = ['plugins/bizppurio', 'plugins/payment-inicis', 'modules/alimtalk', 'modules/sms'];
+        $legacy = \GnuCms\Extension\Catalog::ABSORBED;
         try {
             $store = new \GnuCms\Extension\StateStore($directory);
             if (array_intersect($store->read(), $legacy) === []) {
