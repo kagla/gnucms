@@ -264,7 +264,7 @@ $result = $app->messaging()->sendText([
 네트워크 테스트는 주입한 `HttpTransport`로 수행하며 실제 계정에 발송하지 않는다.
 
 비밀번호 눈 아이콘의 실제 브라우저 회귀 검증은 개발 환경에 Chrome과 puppeteer-core가
-있는 경우 `node tests/Browser/AlimtalkPasswordToggle.cjs`로 실행한다. 별도 설치 경로는
+있는 경우 `node tests/Browser/MessagingPasswordToggle.cjs`로 실행한다. 별도 설치 경로는
 `PUPPETEER_MODULE`·`CHROME_BIN`으로 지정한다. 설정 HTML을 직접 렌더링하고 모든 HTTP
 요청을 모의 처리해 테스트/운영 환경·하위 경로의 조회 주소와 표시·숨김을 확인한다.
 
