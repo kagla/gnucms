@@ -103,10 +103,13 @@ final class Routes
         $messagingSettings = new \GnuCms\Messaging\SettingsController($app);
         $slim->get('/admin/settings/messaging', [$messagingSettings, 'handle'])->setName('admin.settings.messaging');
         $slim->post('/admin/settings/messaging', [$messagingSettings, 'handle']);
-        // 임시 라우트: 6번 작업에서 실제 운영 화면 라우트로 교체한다
-        foreach (['admin.messaging.templates' => '/admin/messaging/templates', 'admin.messaging.send' => '/admin/messaging/send',
-            'admin.messaging.sms.send' => '/admin/messaging/sms/send'] as $name => $path) {
-            $slim->get($path, static fn ($request, $response) => $response->withStatus(404))->setName($name);
+        $messagingOps = new \GnuCms\Web\Controller\MessagingController($app);
+        $slim->get('/admin/messaging', [$messagingOps, 'index'])->setName('admin.messaging');
+        foreach (['admin.messaging.templates' => ['/admin/messaging/templates', 'templates'], 'admin.messaging.send' => ['/admin/messaging/send', 'send'],
+            'admin.messaging.history' => ['/admin/messaging/history', 'history'], 'admin.messaging.detail' => ['/admin/messaging/history/{id:[a-f0-9]{32}}', 'detail'],
+            'admin.messaging.sms.send' => ['/admin/messaging/sms/send', 'sms-send'], 'admin.messaging.sms.history' => ['/admin/messaging/sms/history', 'sms-history'],
+            'admin.messaging.sms.detail' => ['/admin/messaging/sms/history/{id:[a-f0-9]{32}}', 'sms-detail']] as $name => [$path, $page]) {
+            $slim->map(['GET', 'POST'], $path, static fn ($request, $response, array $args) => $messagingOps->handle($page, $request, $response, $args))->setName($name);
         }
         $slim->get('/admin/settings/maintenance', [$cms, 'maintenance'])->setName('admin.settings.maintenance');
         $slim->post('/admin/uploads/gc', [$cms, 'uploadsGc'])->setName('admin.uploads.gc');
