@@ -14,6 +14,9 @@ use Throwable;
 
 final class Manager
 {
+    /** Catalog::ABSORBED 키를 켜려 하거나 실행 목록에 남아 있을 때 보여줄 안내문. 두 곳에서 같은 문구를 쓴다. */
+    private const ABSORBED_MESSAGE = '코어로 흡수된 패키지입니다. 배포본에서 폴더를 삭제해 주세요.';
+
     private array $runtimeErrors = [];
     private array $services = [];
     private array $navigation = [];
@@ -71,6 +74,9 @@ final class Manager
                 if (!is_bool($enabled)) {
                     throw DomainError::validation(['extension' => '사용 여부를 확인해 주세요.']);
                 }
+                if ($enabled && in_array($key, Catalog::ABSORBED, true)) {
+                    throw DomainError::validation(['extension' => self::ABSORBED_MESSAGE]);
+                }
                 if (!isset($packages[$key]) && !in_array($key, $active, true)) {
                     throw DomainError::notFound('확장을 찾을 수 없습니다.');
                 }
@@ -107,6 +113,10 @@ final class Manager
         $this->navigation = [];
         $packages = $this->catalog->all();
         $active = $this->state->read();
+        foreach (array_intersect($active, Catalog::ABSORBED) as $key) {
+            $this->runtimeErrors[$key] = self::ABSORBED_MESSAGE;
+        }
+        $active = array_values(array_diff($active, Catalog::ABSORBED));
         $order = [];
         foreach ($active as $key) {
             try {

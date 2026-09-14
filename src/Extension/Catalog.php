@@ -12,6 +12,9 @@ final class Catalog
 {
     public const API_VERSION = 2;
 
+    /** 코어로 흡수되어 더 이상 별도 패키지로 실행하지 않는 키. 배포본에 폴더가 남아 있어도 사용을 막는다. */
+    public const ABSORBED = ['plugins/bizppurio', 'plugins/payment-inicis', 'modules/alimtalk', 'modules/sms'];
+
     public function __construct(private string $root)
     {
     }

@@ -10,7 +10,9 @@ use GnuCms\Extension\Manager;
 use GnuCms\Extension\StateStore;
 use GnuCms\Tests\Support\ExtensionFixtures;
 use GnuCms\Tests\Support\WebTestCase;
+use GnuCms\Web\Kernel;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Slim\Psr7\Factory\ServerRequestFactory;
 
 final class ExtensionAdminPageTest extends WebTestCase
 {
@@ -142,6 +144,57 @@ PHP);
         self::assertStringContainsString('확장 사용 상태를 읽을 수 없습니다.', $this->body($response));
     }
 
+    /**
+     * plugins/bizppurio 폴더가 배포본에 그대로 남아 있고 이전 상태 파일이 활성으로
+     * 기억하고 있는 경우를 흉내 낸다. Catalog::ABSORBED로 걸러지지 않으면 이 leftover
+     * 패키지가 자기 bootstrap.php에서 등록한 ExternalRequests 미들웨어가 코어보다 먼저
+     * 실행되어(뒤에 add()한 미들웨어가 먼저 처리) /plugins/bizppurio/result 를 가로채고,
+     * 준비되지 않은 설정 탓에 503로 답한다 — 실제로는 코어 웹훅이 토큰 불일치를 403으로
+     * 답해야 한다.
+     */
+    #[DataProvider('connectionProvider')]
+    public function testLeftoverAbsorbedPackageFolderIsHiddenBlockedAndDoesNotShadowCoreWebhook(array $dbConfig): void
+    {
+        $key = 'plugins/bizppurio';
+        $this->package($key, [], <<<'PHP'
+<?php
+return static function ($context): void {
+    $context->externalPost('/result', static function ($request): bool {
+        throw \GnuCms\Error\DomainError::serviceUnavailable('레거시 플러그인 설정이 준비되지 않았습니다.');
+    }, static function ($request, $response) {
+        $response->getBody()->write('{"legacy":true}');
+        return $response;
+    });
+};
+PHP);
+        $app = $this->makeApp($dbConfig, [], 'default');
+        $state = new StateStore($app->storageDir() . '/extensions');
+        // 예전 배포에서 이미 켜 둔 상태를 흉내 낸다.
+        $state->update(static fn (array $enabled): array => [...$enabled, $key]);
+        $adminId = $app->users()->create('absorbed-admin@example.test', '', '관리자', true);
+        $this->get($app, '/login');
+        $this->sessionUser($adminId);
+
+        // (a) 관리자 목록의 사용 상태 칸에 흡수 안내가 뜬다.
+        $body = $this->body($this->get($app, '/admin/plugins'));
+        self::assertStringContainsString('실행 불가', $body);
+        self::assertStringContainsString('코어로 흡수된 패키지입니다. 배포본에서 폴더를 삭제해 주세요.', $body);
+
+        // (b) 웹훅은 leftover 패키지가 아니라 코어가 처리하며, 잘못된 토큰은 403이다(503 아님).
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/plugins/bizppurio/result?'
+            . http_build_query(['environment' => 'test', 'token' => 'bad-token']))
+            ->withHeader('Content-Type', 'application/json');
+        $request->getBody()->write('{}');
+        $response = Kernel::create($app, dirname(__DIR__, 2) . '/templates', '')->handle($request);
+        self::assertSame(403, $response->getStatusCode());
+        self::assertSame('{"accepted":false}', (string) $response->getBody());
+
+        // (c) 다시 켜는 조작은 거부된다.
+        $response = $this->post($app, '/admin/plugins/bizppurio/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']]);
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame([$key], $state->read());
+    }
+
     private function sessionUser(int $id): void
     {
         session_start();
@@ -219,7 +272,8 @@ PHP);
         }
         self::assertSame($remaining, $state->read());
         self::assertStringNotContainsString('payment-', $this->body($this->get($app, '/admin/plugins')));
-        self::assertSame(404, $this->post($app, '/admin/plugins/payment-inicis/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
+        // payment-inicis는 Catalog::ABSORBED라서 폴더가 없어도 "찾을 수 없음"이 아니라 흡수 안내로 거부한다.
+        self::assertSame(422, $this->post($app, '/admin/plugins/payment-inicis/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
         self::assertSame($remaining, $state->read());
     }
 
@@ -269,7 +323,8 @@ PHP);
         }
         foreach ($removed as $key) {
             self::assertSame(303, $this->post($app, '/admin/' . $key . '/state', ['enabled' => '0', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
-            self::assertSame(404, $this->post($app, '/admin/' . $key . '/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
+            // Catalog::ABSORBED 키는 폴더가 없어도 "찾을 수 없음"이 아니라 흡수 안내로 거부한다.
+            self::assertSame(422, $this->post($app, '/admin/' . $key . '/state', ['enabled' => '1', 'csrf_token' => $_SESSION['csrf_token']])->getStatusCode());
         }
         self::assertSame(['plugins/retained'], $state->read());
         self::assertStringNotContainsString('bizppurio', $this->body($this->get($app, '/admin/plugins')));

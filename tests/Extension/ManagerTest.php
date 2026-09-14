@@ -377,6 +377,34 @@ PHP);
         self::assertSame(2, json_decode(file_get_contents($file), true)['version']);
     }
 
+    /**
+     * plugins/bizppurio 등은 코어로 흡수됐다. 배포본에 예전 폴더가 남아 있고 예전 상태
+     * 파일이 그 키를 활성으로 기억해도, boot()는 순서 계산·bootstrap.php 로딩 전에 걸러
+     * runtimeErrors에 안내를 남겨야 하며(사용 상태 화면이 이를 보여준다), 다시 켜는 조작은
+     * 검증 오류로 거부해야 한다.
+     */
+    public function testAbsorbedPackagesAreSkippedAtBootAndRefusedOnEnable(): void
+    {
+        $key = Catalog::ABSORBED[0];
+        $this->package($key, [], '<?php file_put_contents(__DIR__ . "/loaded.marker", "1"); throw new RuntimeException("leftover absorbed package must not run");');
+        // 예전 배포에서 이미 켜 둔 상태를 흉내 낸다 — setEnabled()로는 더 이상 켤 수 없다.
+        $this->state->update(static fn (array $enabled): array => [...$enabled, $key]);
+        $this->manager->boot(new App([]), AppFactory::create());
+        self::assertSame('코어로 흡수된 패키지입니다. 배포본에서 폴더를 삭제해 주세요.', $this->manager->packages()[$key]['error']);
+        self::assertFileDoesNotExist($this->extensionRoot . '/' . $key . '/loaded.marker');
+        try {
+            $this->manager->setEnabled($key, true);
+            self::fail('Enabling an absorbed package must be refused');
+        } catch (DomainError $e) {
+            self::assertSame(422, $e->status());
+            self::assertSame('코어로 흡수된 패키지입니다. 배포본에서 폴더를 삭제해 주세요.', $e->details()['extension']);
+        }
+        self::assertSame([$key], $this->state->read());
+        // 끄는 조작은 여전히 허용한다 — 흡수된 패키지도 이미 켜져 있으면 정리할 수 있어야 한다.
+        $this->manager->setEnabled($key, false);
+        self::assertSame([], $this->state->read());
+    }
+
     public function testInvalidHistoryIsNotSilentlyDiscarded(): void
     {
         mkdir($this->extensionRoot . '/storage/extensions', 0700, true);
