@@ -10,9 +10,13 @@ use GnuCms\App;
 final class Service
 {
     public readonly Settings $settings;
+    public readonly Events $events;
+    public readonly Requests $requests;
 
     public function __construct(public readonly App $app)
     {
         $this->settings = new Settings($app);
+        $this->events = new Events($app->db());
+        $this->requests = new Requests($app, $this->events);
     }
 }
