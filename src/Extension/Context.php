@@ -6,6 +6,7 @@ namespace GnuCms\Extension;
 
 use GnuCms\App;
 use GnuCms\Error\DomainError;
+use GnuCms\Web\Csrf;
 use InvalidArgumentException;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -123,11 +124,6 @@ final class Context
 
     public static function assertCsrf(ServerRequestInterface $request): void
     {
-        $input = $request->getParsedBody();
-        $given = is_array($input) ? ($input['csrf_token'] ?? null) : null;
-        $expected = $_SESSION['csrf_token'] ?? null;
-        if (!is_string($given) || !is_string($expected) || $expected === '' || !hash_equals($expected, $given)) {
-            throw DomainError::forbidden('요청을 확인할 수 없습니다. 다시 시도해 주세요.');
-        }
+        Csrf::assert($request);
     }
 }

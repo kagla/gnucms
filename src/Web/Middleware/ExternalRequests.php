@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GnuCms\Extension;
+namespace GnuCms\Web\Middleware;
 
 use GnuCms\Error\DomainError;
 use Psr\Http\Message\ResponseInterface;

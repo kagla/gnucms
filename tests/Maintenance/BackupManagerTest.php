@@ -217,7 +217,7 @@ final class BackupManagerTest extends DatabaseTestCase
         });
         $state = new \GnuCms\Extension\StateStore($this->root . '/extensions');
         $state->update(static fn (): array => ['plugins/backup-test']);
-        $permit = new \GnuCms\Extension\RuntimePermit($this->root);
+        $permit = new \GnuCms\Support\RuntimePermit($this->root);
         $permit->set('plugins/backup-test', 'revision-1');
         $saved = $this->manager->create();
         $archive = $this->root . '/backups/manual/' . $saved['name'];

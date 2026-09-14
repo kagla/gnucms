@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GnuCms\Extension;
+namespace GnuCms\Support;
 
 use GnuCms\Error\DomainError;
 

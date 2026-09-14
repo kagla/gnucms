@@ -6,6 +6,7 @@ namespace GnuCms\Extension;
 
 use GnuCms\App;
 use GnuCms\Error\DomainError;
+use GnuCms\Web\Middleware\ExternalRequests;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\App as SlimApp;

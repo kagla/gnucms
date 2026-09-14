@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace GnuCms\Tests\Extension;
 
-use GnuCms\Extension\ExternalRequests;
+use GnuCms\Web\Middleware\ExternalRequests;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;

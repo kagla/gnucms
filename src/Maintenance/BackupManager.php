@@ -199,7 +199,7 @@ final class BackupManager
             if (($manifest['database']['prefix'] ?? '') !== $this->db->prefix()) {
                 throw new RuntimeException('현재 설정과 DB 테이블 접두사가 다른 백업은 자동 복원할 수 없습니다.');
             }
-            (new \GnuCms\Extension\RuntimePermit($this->storageDir))->revokeAll();
+            (new \GnuCms\Support\RuntimePermit($this->storageDir))->revokeAll();
             $this->restoreSqliteArchive($path, $manifest);
 
             return ['restored' => basename($path), 'safety_backup' => (string) $safety['name']];
