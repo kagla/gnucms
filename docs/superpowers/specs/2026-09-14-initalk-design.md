@@ -133,7 +133,7 @@ created ──알림톡 접수 성공──▶ waiting ──고객 결제 승�
 ### `src/Payment/` (결제 엔진 이관)
 
 - 가져오는 파일: `Gateway`, `DirectGateway`, `InicisGateway`, `Journal`, `CallbackToken`, `ExecutionLock`, `Transport`, `StreamTransport`, `ProviderConfig`, `Settings`, `SettingsController`, `templates/settings.php`(→ `templates/default/admin/payment_settings.php`).
-- `Settings::PROVIDERS`는 `['inicis' => 'KG이니시스']`만 남긴다. `ready()`는 코어 테이블 존재. 실행 허용은 `RuntimePermit`(`storage/extensions-runtime/permits/payment-inicis-{env}`).
+- `Settings::PROVIDERS`는 `['inicis' => 'KG이니시스']`만 남긴다. `Settings`에는 `ready()`가 없다 — 실행 가능 여부는 `available(string $environment)`/`requireEnabled(string $environment)`이 판단하며, 설정이 저장되어 있고 그 판(revision)에 대해 `RuntimePermit`(`storage/extensions-runtime/permits/payment-inicis-{env}`)이 허용됐을 때만 실행한다. 코어 테이블 존재 자체는 실행 조건이 아니다(코어 스키마가 항상 보장).
 - `SettingsController` 라우트: `/admin/settings/payment`(GET/POST), `/admin/settings/payment/permit`(POST).
 - `Gateway` 계약은 그대로다. 이니톡 결제는 `order = ['id', 'number', 'total', 'order_name', 'environment', 'provider' => 'inicis', 'transaction_id']`, `customer = ['name', 'phone', 'email' => '']` 형태로 호출한다. `Journal`이 `pay_inicis_transactions`에 주문 id별 상태를 보관한다.
 
@@ -254,7 +254,7 @@ CLI `bin/initalk.php`: `expire`(만료 처리), `sync`(최근 7일 `checkout_sta
 ## 13. 설치·업그레이드·백업·복원
 
 - 새 설치: `Schema::create()`가 모든 테이블을 만든다.
-- 업그레이드(`Schema::migrateAll()` v23): 새 테이블 생성. `extension_schemas`에 `plugins/bizppurio` 또는 `plugins/payment-inicis` 등록이 있으면 해당 테이블을 그대로 두고(구조가 같음) 등록 행을 삭제한다. `storage/extensions/enabled.json`에 `plugins/bizppurio`, `plugins/payment-inicis`, `modules/alimtalk`, `modules/sms`가 있으면 제거한다. 배포본에 남은 이전 패키지 폴더는 삭제하도록 문서화하고, 남아 있어도 확장 관리자가 코어 예약 경로 충돌로 실행하지 않는다.
+- 업그레이드(`Schema::migrateAll()` v23): 새 테이블 생성. `extension_schemas`에 `plugins/bizppurio` 또는 `plugins/payment-inicis` 등록이 있으면 해당 테이블을 그대로 두고(구조가 같음) 등록 행을 삭제한다. `storage/extensions/enabled.json`에 `plugins/bizppurio`, `plugins/payment-inicis`, `modules/alimtalk`, `modules/sms`(= `Catalog::ABSORBED`)가 있으면 제거한다. 배포본에 남은 이전 패키지 폴더는 삭제하도록 문서화한다. 지우지 않고 남아 있어도(또는 지우기 전 재기동해도) 코어 예약 경로 충돌이 아니라 `Catalog::ABSORBED` 검사로 막는다: `Manager::boot()`는 순서 계산·`bootstrap.php` 로딩 전에 그 키를 걸러 실행하지 않고 사용 상태 화면에 흡수 안내를 보여주며, `Manager::setEnabledMany()`도 그 키를 다시 켜는 조작을 `DomainError::validation`으로 거부한다.
 - 실행 허용값은 `storage/extensions-runtime/permits/`에 두며 백업에서 제외하고 복원 시 해제한다(`BackupManager`의 제외 목록과 복원 후 처리 갱신). SQLite 자동 복원도 같다.
 - 백업 v2는 `Schema::TABLES` 기준이므로 새 테이블이 자동 포함된다. MySQL 덤프 목록도 같은 상수를 쓴다.
 - 코어 `Schema::VERSION`은 23으로 올린다. 제품 버전은 Release Please가 정한다(MINOR).
