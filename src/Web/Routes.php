@@ -21,6 +21,7 @@ use GnuCms\Web\Controller\NotificationController;
 use GnuCms\Web\Controller\AvatarController;
 use GnuCms\Web\Controller\SeoController;
 use GnuCms\Web\Controller\BackupController;
+use GnuCms\Web\Middleware\ExternalRequests;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\App as SlimApp;
@@ -99,6 +100,14 @@ final class Routes
         $payment = new \GnuCms\Payment\SettingsController($app->paymentSettings());
         $slim->get('/admin/settings/payment', [$payment, 'handle'])->setName('admin.settings.payment');
         $slim->post('/admin/settings/payment', [$payment, 'handle']);
+        $messagingSettings = new \GnuCms\Messaging\SettingsController($app);
+        $slim->get('/admin/settings/messaging', [$messagingSettings, 'handle'])->setName('admin.settings.messaging');
+        $slim->post('/admin/settings/messaging', [$messagingSettings, 'handle']);
+        // 임시 라우트: 6번 작업에서 실제 운영 화면 라우트로 교체한다
+        foreach (['admin.messaging.templates' => '/admin/messaging/templates', 'admin.messaging.send' => '/admin/messaging/send',
+            'admin.messaging.sms.send' => '/admin/messaging/sms/send'] as $name => $path) {
+            $slim->get($path, static fn ($request, $response) => $response->withStatus(404))->setName($name);
+        }
         $slim->get('/admin/settings/maintenance', [$cms, 'maintenance'])->setName('admin.settings.maintenance');
         $slim->post('/admin/uploads/gc', [$cms, 'uploadsGc'])->setName('admin.uploads.gc');
         $backups = new BackupController($app);
@@ -275,6 +284,18 @@ final class Routes
             ]);
             return $response->withHeader('Location', $url)->withStatus(301);
         });
+        // 비즈뿌리오 결과 웹훅. 세션·CSRF·HTML 없이 토큰(과 선택적 IP)으로만 인증한다. 이전 플러그인 주소도 받는다.
+        $messaging = $app->messaging();
+        $webhook = [
+            static fn (ServerRequestInterface $request): bool => $messaging->results->authenticate($request),
+            static function (ServerRequestInterface $request, ResponseInterface $response) use ($messaging): ResponseInterface {
+                $messaging->results->receive($request->getQueryParams()['environment'], $request->getParsedBody());
+                $response->getBody()->write('{"accepted":true}');
+                return $response;
+            },
+            65536, 'application/json',
+        ];
+        $slim->add(new ExternalRequests(['/messaging/bizppurio/result' => $webhook, '/plugins/bizppurio/result' => $webhook], $slim->getBasePath()));
         // 코어 경로가 등록된 뒤 확장 기본 주소의 충돌을 검사한다.
         \GnuCms\Extension\AdminRoutes::register($slim, $app);
     }

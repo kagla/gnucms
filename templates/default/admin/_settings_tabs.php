@@ -4,6 +4,7 @@
   <a class="tab<?= $active === 'security' ? ' tab-active' : '' ?>"<?= $active === 'security' ? ' aria-current="page"' : '' ?> href="<?= $this->url('admin.settings.security') ?>">보안</a>
   <a class="tab<?= $active === 'oauth' ? ' tab-active' : '' ?>"<?= $active === 'oauth' ? ' aria-current="page"' : '' ?> href="<?= $this->url('admin.settings.oauth') ?>">소셜 로그인</a>
   <a class="tab<?= $active === 'mail' ? ' tab-active' : '' ?>"<?= $active === 'mail' ? ' aria-current="page"' : '' ?> href="<?= $this->url('admin.mail') ?>">메일</a>
+  <a class="tab<?= $active === 'messaging' ? ' tab-active' : '' ?>"<?= $active === 'messaging' ? ' aria-current="page"' : '' ?> href="<?= $this->url('admin.settings.messaging') ?>">알림톡·문자</a>
   <a class="tab<?= $active === 'payment' ? ' tab-active' : '' ?>"<?= $active === 'payment' ? ' aria-current="page"' : '' ?> href="<?= $this->url('admin.settings.payment') ?>">결제</a>
   <a class="tab<?= $active === 'maintenance' ? ' tab-active' : '' ?>"<?= $active === 'maintenance' ? ' aria-current="page"' : '' ?> href="<?= $this->url('admin.settings.maintenance') ?>">시스템·유지보수</a>
 </nav>

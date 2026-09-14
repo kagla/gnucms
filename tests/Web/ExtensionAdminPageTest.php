@@ -254,7 +254,9 @@ PHP);
 
         $removed = ['plugins/bizppurio', 'modules/alimtalk', 'modules/sms'];
         $state->update(static fn (array $enabled): array => [...$enabled, ...$removed]);
-        $paths = ['/plugins/bizppurio/settings', '/plugins/bizppurio/result', '/modules/sms/send', '/modules/sms/history', '/modules/sms/detail'];
+        // /plugins/bizppurio/result 는 코어로 이관된 뒤 확장 활성화 여부와 무관하게 항상 열려 있는 웹훅 주소다
+        // (이전 플러그인 주소 호환). 그 동작은 MessagingSettingsTest 에서 확인한다.
+        $paths = ['/plugins/bizppurio/settings', '/modules/sms/send', '/modules/sms/history', '/modules/sms/detail'];
         foreach (['home', 'templates', 'send', 'history', 'detail'] as $page) $paths[] = '/modules/alimtalk/' . $page;
         foreach ($paths as $path) {
             self::assertSame(404, $this->get($app, $path)->getStatusCode(), $path);
