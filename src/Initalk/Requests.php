@@ -198,7 +198,8 @@ final class Requests
         if (!Status::canRefund($request['status'])) throw DomainError::validation(['status' => '결제 완료 상태에서만 환불할 수 있습니다.']);
         if ($refundedTotal < $request['refunded_amount'] || $refundedTotal > $request['amount']) throw DomainError::validation(['refund' => '환불 누적액을 확인해 주세요.']);
         if ($refundedTotal === $request['amount']) return $this->transition($id, [Status::PAID], Status::REFUNDED, ['refunded_amount' => $refundedTotal], $actor, 'refund', $note);
-        $this->db()->update('initalk_requests', ['refunded_amount' => $refundedTotal, 'updated_at' => Clock::timestamp()], 'id = :id AND status = :status', ['id' => $id, 'status' => Status::PAID]);
+        $changed = $this->db()->update('initalk_requests', ['refunded_amount' => $refundedTotal, 'updated_at' => Clock::timestamp()], 'id = :id AND status = :status', ['id' => $id, 'status' => Status::PAID]);
+        if ($changed !== 1) throw DomainError::validation(['status' => '상태가 변경되었습니다. 새로고침 후 확인해 주세요.']);
         $this->events->record($id, 'refund', $actor, $note);
         return $this->find($id);
     }
@@ -211,7 +212,8 @@ final class Requests
             return $this->transition($id, [Status::EXPIRED], Status::CREATED, ['expires_at' => $expiresAt], $actor, 'extended', '결제기한 연장');
         }
         if (!Status::canPay($request['status'])) throw DomainError::validation(['status' => '기한을 연장할 수 없는 상태입니다.']);
-        $this->db()->update('initalk_requests', ['expires_at' => $expiresAt, 'updated_at' => Clock::timestamp()], 'id = :id', ['id' => $id]);
+        $changed = $this->db()->update('initalk_requests', ['expires_at' => $expiresAt, 'updated_at' => Clock::timestamp()], 'id = :id AND status IN (:s0, :s1)', ['id' => $id, 's0' => Status::CREATED, 's1' => Status::WAITING]);
+        if ($changed !== 1) throw DomainError::validation(['status' => '상태가 변경되었습니다. 새로고침 후 확인해 주세요.']);
         $this->events->record($id, 'extended', $actor, '결제기한 연장');
         return $this->find($id);
     }

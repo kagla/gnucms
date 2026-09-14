@@ -143,7 +143,8 @@ final class RequestsTest extends DatabaseTestCase
         self::assertSame(str_repeat('d', 32), $after['last_dispatch_id']);
         $this->requests->recordDispatch($r['id'], str_repeat('e', 32), 2, 'rejected', '운영자');
         self::assertSame(Status::WAITING, $this->requests->find($r['id'])['status']);
-        self::assertSame('dispatch_failed', end($this->app->initalk()->events->forRequest($r['id']))['type']);
+        $events = $this->app->initalk()->events->forRequest($r['id']);
+        self::assertSame('dispatch_failed', end($events)['type']);
         // 만료: 결제창을 연 지 30분이 안 된 건은 보호한다.
         Clock::freeze('2026-09-15 04:30:00');
         $this->requests->touchCheckout($r['id'], bin2hex(random_bytes(16)));
@@ -166,6 +167,7 @@ final class RequestsTest extends DatabaseTestCase
         self::assertSame(5800, $partial['refunded_amount']);
         $full = $this->requests->applyRefund($r['id'], 15800, '운영자', '전액 환불');
         self::assertSame(Status::REFUNDED, $full['status']);
+        $this->rejected(fn () => $this->requests->extend($r['id'], 24, '운영자'), 'status');
         $this->requests->setReview($r['id'], true, 'system', '조회 불일치');
         self::assertSame(1, $this->requests->find($r['id'])['needs_review']);
         // 개인정보 정리: 90일 지난 종료 건만
@@ -178,5 +180,8 @@ final class RequestsTest extends DatabaseTestCase
         self::assertSame('', $purged['buyer_name']);
         self::assertSame('플로럴 핸드크림 30ml', $purged['product_name']);
         self::assertSame(0, $this->requests->search(['environment' => 'test', 'phone' => '01023457891'], 1)['total']);
+        $cancelled = $this->requests->create($this->input(['phone' => '01099998888']), 'test', 48, 1, '운영자');
+        $this->requests->cancel($cancelled['id'], '운영자');
+        $this->rejected(fn () => $this->requests->applyRefund($cancelled['id'], 15800, '운영자', '환불'), 'status');
     }
 }
