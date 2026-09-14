@@ -101,6 +101,7 @@ final class SchemaUpgrader
                     $backup = $this->backup($stored);
                 }
                 ($this->migrate)();
+                $this->retireLegacyPackages();
                 $this->upsertSetting('system.schema_upgraded_at', Clock::now());
                 $this->upsertSetting('system.schema_backup', $backup ?? '');
                 @unlink($this->failurePath());
@@ -181,6 +182,26 @@ final class SchemaUpgrader
         }
 
         return ['deleted' => $name];
+    }
+
+    /** 코어로 흡수한 패키지의 사용 상태를 지운다. 상태 파일이 없으면 만들지 않는다. */
+    private function retireLegacyPackages(): void
+    {
+        $directory = $this->storageDir . '/extensions';
+        if (!is_file($directory . '/enabled.json')) {
+            return;
+        }
+        $legacy = ['plugins/bizppurio', 'plugins/payment-inicis', 'modules/alimtalk', 'modules/sms'];
+        try {
+            $store = new \GnuCms\Extension\StateStore($directory);
+            if (array_intersect($store->read(), $legacy) === []) {
+                return;
+            }
+            $store->update(static fn (array $enabled): array => array_values(array_diff($enabled, $legacy)));
+        } catch (DomainError $e) {
+            // 손상된 상태 파일은 확장 관리 화면이 안내한다. 스키마 갱신을 막지 않는다.
+            ($this->log)('[schema-upgrade] 확장 사용 상태를 정리하지 못했습니다: ' . $e->getMessage());
+        }
     }
 
     /** SQLite 면 VACUUM INTO 로 일관된 복사본을 만들고 경로를 돌려준다. 다른 DB 는 null. */
