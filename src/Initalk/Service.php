@@ -12,11 +12,13 @@ final class Service
     public readonly Settings $settings;
     public readonly Events $events;
     public readonly Requests $requests;
+    public readonly Notifier $notifier;
 
     public function __construct(public readonly App $app)
     {
         $this->settings = new Settings($app);
         $this->events = new Events($app->db());
         $this->requests = new Requests($app, $this->events);
+        $this->notifier = new Notifier($app, $this->settings, $this->requests);
     }
 }
