@@ -86,13 +86,17 @@ final class PackageSchema
         }
     }
 
-    /** 백업은 활성 여부나 패키지 PHP를 읽지 않는다. 실패한 설치의 실제 테이블도 포함한다. */
+    /**
+     * 백업은 활성 여부나 패키지 PHP를 읽지 않는다. 실패한 설치의 실제 테이블도 포함한다.
+     * 플러그인 시절 등록한 테이블이 코어로 흡수돼 Schema::TABLES에 들어간 경우는 코어 백업에
+     * 이미 포함되므로 건너뛴다 — assertTable()의 이름 충돌 검사에 걸려 백업을 막으면 안 된다.
+     */
     public function backupTables(): array
     {
         $tables = [];
         if (!$this->exists('extension_schemas')) return [];
         foreach ($this->db->select('SELECT * FROM ' . $this->db->table('extension_schemas')) as $row) {
-            foreach (self::decodeTables($row['table_names']) as $table) {
+            foreach (self::decodeTables($row['table_names'], true) as $table) {
                 if ($this->exists($table)) $tables[] = $table;
                 elseif ($row['state'] === 'ready') throw DomainError::serviceUnavailable('설치된 확장 테이블이 없어 백업을 중단했습니다.');
             }
@@ -109,12 +113,18 @@ final class PackageSchema
         };
     }
 
-    private static function decodeTables(string $encoded): array
+    /** @param bool $skipCore 코어 표(Schema::TABLES)로 흡수된 이름은 목록에서 빼고 통과시킨다(백업 전용). */
+    private static function decodeTables(string $encoded, bool $skipCore = false): array
     {
         $tables = json_decode($encoded, true);
         if (!is_array($tables) || !array_is_list($tables)) throw DomainError::internal('확장 테이블 등록 정보가 손상되었습니다.');
-        foreach ($tables as $table) self::assertTable($table);
-        return $tables;
+        $result = [];
+        foreach ($tables as $table) {
+            if ($skipCore && is_string($table) && in_array($table, Schema::TABLES, true)) continue;
+            self::assertTable($table);
+            $result[] = $table;
+        }
+        return $result;
     }
 
     private static function assertTable(mixed $table): void

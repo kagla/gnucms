@@ -52,4 +52,32 @@ final class PackageSchemaTest extends DatabaseTestCase
             }
         }
     }
+
+    /**
+     * 플러그인 시절 bp_settings 등을 등록한 레지스트리 행이 코어 스키마 업그레이드로
+     * Schema::TABLES에 흡수된 뒤에도 backupTables()는 그 이름을 건너뛰어야 한다(이미 코어
+     * 백업에 포함됨). assertTable()의 이름 충돌 검사에 걸려 백업 전체를 막으면 안 된다.
+     */
+    #[DataProvider('connectionProvider')]
+    public function testBackupTablesIgnoresRegistryRowsNamingCoreTables(array $config): void
+    {
+        $config['prefix'] = 'ex' . bin2hex(random_bytes(4)) . '_';
+        $db = Connection::create($config);
+        (new Schema($db))->create();
+        $root = sys_get_temp_dir() . '/gnucms-schema-' . bin2hex(random_bytes(5));
+        $schema = new PackageSchema($db, $root);
+        try {
+            // 코어로 흡수되기 전 플러그인(plugins/bizppurio)이 남긴 레지스트리 행을 흉내 낸다.
+            $db->execute('INSERT INTO ' . $db->table('extension_schemas') . ' (package_key, schema_version, table_names, state) VALUES (?, ?, ?, ?)',
+                ['plugins/bizppurio', 1, json_encode(['bp_settings', 'bp_templates']), 'ready']);
+            self::assertSame([], $schema->backupTables());
+        } finally {
+            $db->execute('DELETE FROM ' . $db->table('extension_schemas') . " WHERE package_key = 'plugins/bizppurio'");
+            (new Schema($db))->drop();
+            if (is_dir($root)) {
+                foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST) as $file) $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+                rmdir($root);
+            }
+        }
+    }
 }
