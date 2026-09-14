@@ -20,6 +20,7 @@ final class Schema
         'extension_schemas',
         'pay_inicis_settings', 'pay_inicis_transactions',
         'bp_settings', 'bp_templates', 'bp_dispatches', 'bp_attempts', 'bp_receipts',
+        'initalk_requests', 'initalk_events', 'initalk_batches', 'initalk_ledger',
     ];
 
     private const INDEXES = [
@@ -32,6 +33,7 @@ final class Schema
         'ix_login_events_user', 'ix_login_events_ip', 'ix_login_events_time',
         'ux_write_rate_limits',
         'bp_list', 'bp_tries', 'bp_results',
+        'ux_initalk_number', 'ux_initalk_token', 'ix_initalk_status', 'ix_initalk_created', 'ix_initalk_phone', 'ix_initalk_expires', 'ix_initalk_batch', 'ix_initalk_events', 'ix_initalk_ledger_at', 'ix_initalk_ledger_request',
     ];
 
     /** @var Connection */
@@ -61,7 +63,7 @@ final class Schema
      * 코드가 요구하는 스키마 판. 컬럼을 늘릴 때마다 하나씩 올린다.
      * DB 에 적힌 값이 이 값보다 낮으면 ensureCurrent() 가 마이그레이션을 돌린다.
      */
-    public const VERSION = '23';
+    public const VERSION = '24';
 
     /**
      * DB 에 적어 두는 도장. 판 번호 뒤에 이 파일의 내용 해시를 붙인다.
@@ -136,6 +138,7 @@ final class Schema
         $this->migrateExtensionSchemas();
         $this->migratePayment();
         $this->migrateMessaging();
+        $this->migrateInitalk();
         $stamp = $this->stamp();
         $this->ensureSiteSetting('system.schema_version', $stamp);
         $this->db->execute(
@@ -233,6 +236,59 @@ final class Schema
         // 판 1 테이블(bp_dispatches)에는 channel 컬럼이 없었다. 방금 새로 만들었으면 이미 있어 그냥 지나간다.
         $this->addColumnIfMissing('bp_dispatches', 'channel', "VARCHAR(8) NOT NULL DEFAULT 'at'");
         $this->adoptExtensionTables('plugins/bizppurio');
+    }
+
+    private function initalkStatements(): array
+    {
+        return [
+            'CREATE TABLE initalk_requests (
+                id VARCHAR(32) PRIMARY KEY, number VARCHAR(20) NOT NULL, url_token VARCHAR(40) NOT NULL,
+                environment VARCHAR(8) NOT NULL, status VARCHAR(16) NOT NULL,
+                product_name VARCHAR(30) NOT NULL, product_detail VARCHAR(150) NOT NULL DEFAULT \'\',
+                buyer_name VARCHAR(30) NOT NULL, phone {TEXT} NOT NULL, phone_hash VARCHAR(64) NOT NULL, phone_mask VARCHAR(16) NOT NULL,
+                amount INTEGER NOT NULL, expires_at BIGINT NOT NULL, batch_id VARCHAR(32) NULL,
+                dispatch_count INTEGER NOT NULL DEFAULT 0, last_dispatch_id VARCHAR(32) NULL, last_dispatched_at BIGINT NULL,
+                checkout_started_at BIGINT NULL, config_revision VARCHAR(32) NOT NULL DEFAULT \'\',
+                paid_at BIGINT NULL, transaction_id VARCHAR(40) NOT NULL DEFAULT \'\', refunded_amount INTEGER NOT NULL DEFAULT 0,
+                needs_review SMALLINT NOT NULL DEFAULT 0, created_by INTEGER NOT NULL DEFAULT 0,
+                created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL, status_changed_at BIGINT NOT NULL
+            ){SUFFIX}',
+            'CREATE UNIQUE INDEX ux_initalk_number ON initalk_requests (number)',
+            'CREATE UNIQUE INDEX ux_initalk_token ON initalk_requests (url_token)',
+            'CREATE INDEX ix_initalk_status ON initalk_requests (status)',
+            'CREATE INDEX ix_initalk_created ON initalk_requests (created_at)',
+            'CREATE INDEX ix_initalk_phone ON initalk_requests (phone_hash)',
+            'CREATE INDEX ix_initalk_expires ON initalk_requests (expires_at)',
+            'CREATE INDEX ix_initalk_batch ON initalk_requests (batch_id)',
+            'CREATE TABLE initalk_events (
+                id {AUTO_PK}, request_id VARCHAR(32) NOT NULL, type VARCHAR(32) NOT NULL,
+                actor VARCHAR(100) NOT NULL, note {TEXT} NOT NULL, created_at BIGINT NOT NULL
+            ){SUFFIX}',
+            'CREATE INDEX ix_initalk_events ON initalk_events (request_id, id)',
+            'CREATE TABLE initalk_batches (
+                id VARCHAR(32) PRIMARY KEY, filename VARCHAR(200) NOT NULL, total INTEGER NOT NULL,
+                created INTEGER NOT NULL, failed INTEGER NOT NULL, errors {TEXT} NOT NULL,
+                created_by INTEGER NOT NULL DEFAULT 0, created_at BIGINT NOT NULL
+            ){SUFFIX}',
+            'CREATE TABLE initalk_ledger (
+                id VARCHAR(64) PRIMARY KEY, request_id VARCHAR(32) NOT NULL, kind VARCHAR(16) NOT NULL,
+                amount INTEGER NOT NULL, at BIGINT NOT NULL, reference VARCHAR(100) NOT NULL, created_at BIGINT NOT NULL
+            ){SUFFIX}',
+            'CREATE INDEX ix_initalk_ledger_at ON initalk_ledger (at)',
+            'CREATE INDEX ix_initalk_ledger_request ON initalk_ledger (request_id)',
+        ];
+    }
+
+    /** 이니톡 결제 테이블. 없는 것만 만들고 인덱스는 존재 검사 후 만든다. */
+    public function migrateInitalk(): void
+    {
+        foreach ($this->initalkStatements() as $sql) {
+            if (preg_match('/^CREATE TABLE (\w+)/', $sql, $m)) {
+                if (!$this->tableExists($m[1])) $this->db->execute($this->expand($sql));
+            } elseif (preg_match('/^CREATE (?:UNIQUE )?INDEX (\w+)/', $sql, $m)) {
+                $this->createIndexIfMissing($m[1], $sql);
+            }
+        }
     }
 
     /** 플러그인 시절 extension_schemas에 등록된 테이블을 코어 소유로 옮긴다. 데이터는 그대로다. */
@@ -614,7 +670,7 @@ final class Schema
             $this->consentUseStatements(), $this->consentsGivenStatements(),
             $this->notificationStatements(),
             $this->passwordThrottleStatements(), $this->loginEventStatements(),
-            $this->writeRateLimitStatements(), $this->extensionSchemaStatements(), $this->paymentStatements(), $this->messagingStatements());
+            $this->writeRateLimitStatements(), $this->extensionSchemaStatements(), $this->paymentStatements(), $this->messagingStatements(), $this->initalkStatements());
     }
 
     private function accountStatements(): array

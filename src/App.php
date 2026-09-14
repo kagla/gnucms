@@ -133,6 +133,7 @@ final class App
     private ?\GnuCms\Payment\Settings $paymentSettings = null;
     private ?\GnuCms\Payment\InicisGateway $inicisGateway = null;
     private ?\GnuCms\Messaging\MessagingService $messaging = null;
+    private ?\GnuCms\Initalk\Service $initalk = null;
 
     private ?CmsRepository $cms = null;
 
@@ -576,6 +577,11 @@ final class App
     public function setMessaging(\GnuCms\Messaging\MessagingService $service): void
     {
         $this->messaging = $service;
+    }
+
+    public function initalk(): \GnuCms\Initalk\Service
+    {
+        return $this->initalk ??= new \GnuCms\Initalk\Service($this);
     }
 
     public function sendMailTest(): void

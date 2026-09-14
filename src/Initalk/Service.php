@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GnuCms\Initalk;
+
+use GnuCms\App;
+
+/** 이니톡 결제 도메인 객체 조립. 생성자에서 쓰기·외부 통신을 하지 않는다. */
+final class Service
+{
+    public readonly Settings $settings;
+
+    public function __construct(public readonly App $app)
+    {
+        $this->settings = new Settings($app);
+    }
+}
