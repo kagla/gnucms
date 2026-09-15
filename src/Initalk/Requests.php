@@ -124,10 +124,10 @@ final class Requests
         if ($phone !== '') { $where[] = 'phone_hash = ?'; $params[] = Phone::hash($phone, $this->secret); }
         foreach (['buyer_name', 'product_name'] as $key) {
             $value = is_string($filter[$key] ?? null) ? trim($filter[$key]) : '';
-            if ($value !== '') { $where[] = $key . ' LIKE ?'; $params[] = '%' . addcslashes($value, '%_\\') . '%'; }
+            if ($value !== '') { $where[] = $key . " LIKE ? ESCAPE '!'"; $params[] = '%' . self::likeLiteral($value) . '%'; }
         }
         $number = is_string($filter['number'] ?? null) ? trim($filter['number']) : '';
-        if ($number !== '') { $where[] = 'number LIKE ?'; $params[] = addcslashes($number, '%_\\') . '%'; }
+        if ($number !== '') { $where[] = "number LIKE ? ESCAPE '!'"; $params[] = self::likeLiteral($number) . '%'; }
         $amount = is_scalar($filter['amount'] ?? null) ? str_replace(',', '', (string) $filter['amount']) : '';
         if (preg_match('/^\d{1,9}$/D', $amount)) { $where[] = 'amount = ?'; $params[] = (int) $amount; }
         if (isset(Status::LABELS[$filter['status'] ?? ''])) { $where[] = 'status = ?'; $params[] = $filter['status']; }
@@ -141,6 +141,13 @@ final class Requests
         $page = max(1, $page);
         $rows = $this->db()->select('SELECT * FROM ' . $table . $sql . ' ORDER BY created_at DESC, number DESC LIMIT ' . self::PER_PAGE . ' OFFSET ' . (($page - 1) * self::PER_PAGE), $params);
         return ['items' => array_map(fn (array $row): array => $this->decode($row, false), $rows), 'total' => $total, 'page' => $page, 'per_page' => self::PER_PAGE];
+    }
+
+    /** 검색값의 %_ 를 글자 그대로 찾게 한다. 이스케이프 문자는 두 DB가 문자열 리터럴로 똑같이 읽는 '!'를 쓴다
+     *  — 백슬래시는 SQLite가 ESCAPE '\\' 를, MySQL이 ESCAPE '\' 를 거부해 한 표기로 맞출 수 없다. */
+    private static function likeLiteral(string $value): string
+    {
+        return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value);
     }
 
     /** 달력에 있는 YYYY-MM-DD 인가. 화면 필터와 매출 기간이 같은 규칙을 쓴다. */

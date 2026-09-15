@@ -131,6 +131,21 @@ final class RequestsTest extends DatabaseTestCase
         self::assertStringNotContainsString('01023457891', json_encode($all['items']));
     }
 
+    /** #17 검색값의 LIKE 와일드카드(%_)는 두 DB 모두에서 글자 그대로 찾는다. */
+    #[DataProvider('connectionProvider')]
+    public function testSearchTreatsWildcardsInTheQueryAsLiterals(array $config): void
+    {
+        $this->setupApp($config);
+        $this->requests->create($this->input(['product_name' => '수강료 50% 할인']), 'test', 48, 1, '운영자');
+        $this->requests->create($this->input(['product_name' => '수강료 5000원']), 'test', 48, 1, '운영자');
+        $this->requests->create($this->input(['buyer_name' => 'A_B']), 'test', 48, 1, '운영자');
+        $this->requests->create($this->input(['buyer_name' => 'AxB']), 'test', 48, 1, '운영자');
+        self::assertSame(2, $this->requests->search(['environment' => 'test', 'product_name' => '수강료'], 1)['total']);
+        self::assertSame(1, $this->requests->search(['environment' => 'test', 'product_name' => '50%'], 1)['total']);
+        self::assertSame(1, $this->requests->search(['environment' => 'test', 'buyer_name' => 'A_B'], 1)['total']);
+        self::assertSame(2, $this->requests->search(['environment' => 'test', 'buyer_name' => 'A'], 1)['total']);
+    }
+
     /** #5 달력에 없는 날짜는 예외가 아니라 무시한다(정규식에 안 맞는 값과 같게). */
     #[DataProvider('connectionProvider')]
     public function testSearchIgnoresImpossibleDates(array $config): void

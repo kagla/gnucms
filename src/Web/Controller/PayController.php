@@ -50,6 +50,8 @@ final class PayController
         $config = $this->app->initalk()->settings->read();
         return View::fromRequest($request)->render($response->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer'), 'pay/' . $template,
             $data + ['store_name' => $config['store_name'], 'support_phone' => $config['support_phone'], 'errors' => [],
+                // 로그인한 전체 관리자에게만 요청 상세로 가는 링크를 하나 더 보여 준다(고객에게는 아무 흔적이 없다).
+                'admin' => $this->app->guestAcl()->isGlobalAdmin(),
                 'time' => static fn ($timestamp): string => $timestamp === null ? '' : (new \DateTimeImmutable('@' . (int) $timestamp))->setTimezone(new \DateTimeZone('Asia/Seoul'))->format('Y년 m월 d일 H:i')]);
     }
 

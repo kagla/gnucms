@@ -2,6 +2,7 @@
 <?php $this->start('title') ?>결제 · <?= $this->e($store_name) ?><?php $this->stop() ?>
 <?php $this->start('body') ?>
 <?php $r = $request; ?>
+<?php if ($admin): ?><p class="pay-hint"><a href="<?= $this->url('admin.initalk.request', ['id' => $r['id']]) ?>">관리자: 요청 상세 보기</a></p><?php endif ?>
 <?php foreach ($errors as $error): ?><p class="pay-alert" role="alert"><?= $this->e($error) ?></p><?php endforeach ?>
 <?php if ($failed && $state === 'open'): ?><p class="pay-alert" role="alert">결제가 완료되지 않았습니다. 다시 시도해 주세요.</p><?php endif ?>
 <?php if ($state === 'open' || $state === 'unavailable'): ?>

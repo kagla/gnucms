@@ -39,7 +39,7 @@ $r = $request; $remaining = $r['amount'] - $r['refunded_amount'];
 <dt>TID</dt><dd><?= $this->e($r['transaction_id']) ?></dd>
 </dl>
 <label class="extension-label" for="initalk-pay-url">결제 링크</label><div class="initalk-link"><input class="input input-bordered input-block" id="initalk-pay-url" readonly value="<?= $this->e($pay_url) ?>"><button type="button" class="btn btn-sm" data-copy="initalk-pay-url">복사</button></div>
-<div class="initalk-qr"><img src="<?= $this->url('admin.initalk.request.qr', ['id' => $r['id']]) ?>" alt="결제 링크 QR 코드" width="180" height="180"><p class="muted">대면 결제: 고객이 QR을 찍으면 같은 결제 페이지가 열립니다. <a class="link" href="<?= $this->url('admin.initalk.request.qr', ['id' => $r['id']]) ?>" target="_blank" rel="noopener">새 창에서 크게 보기</a></p></div>
+<div class="initalk-qr"><img src="<?= $this->url('admin.initalk.request.qr', ['id' => $r['id']]) ?>" alt="결제 링크 QR 코드" width="180" height="180"><p class="muted">대면 결제: 고객이 QR을 찍으면 같은 결제 페이지가 열립니다. <a class="link" href="<?= $this->url('admin.initalk.request.qr', ['id' => $r['id']]) ?>" target="_blank" rel="noopener">새 창에서 크게 보기</a> · <a class="link" href="<?= $this->url('admin.initalk.request.qr', ['id' => $r['id']]) ?>" download="<?= $this->e($r['number']) ?>.svg">SVG 저장</a></p></div>
 </section>
 <section class="card card-body extension-panel"><h2 class="card-title">작업</h2>
 <?php if (\GnuCms\Initalk\Status::canSend($r['status'])): ?><form method="post" action="<?= $this->url('admin.initalk.request.send', ['id' => $r['id']]) ?>"><input type="hidden" name="csrf_token" value="<?= $this->e($csrf_token) ?>"><button class="btn btn-primary"><?= $r['status'] === 'expired' ? '기한 연장 후 알림톡 발송' : ($r['dispatch_count'] > 0 ? '알림톡 재발송' : '알림톡 발송') ?></button></form><?php endif ?>

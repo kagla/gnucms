@@ -302,6 +302,8 @@ final class InitalkAdminTest extends WebTestCase
         self::assertStringStartsWith('<svg', $this->body($svg));
         $detail = $this->body($this->get($this->app, '/admin/initalk/requests/' . $request['id']));
         self::assertStringContainsString('qr.svg', $detail);
+        // #8 QR은 새 창으로 크게 보거나 SVG로 저장할 수 있다.
+        self::assertStringContainsString('download="' . $request['number'] . '.svg"', $detail);
         self::assertSame(404, $this->get($this->app, '/admin/initalk/requests/' . str_repeat('0', 32) . '/qr.svg')->getStatusCode());
         // #4 미결 상태의 확인 필요 건에는 복구 절차를 안내한다.
         self::assertStringNotContainsString('결제 내역이 없으면 취소 후 새 요청을 만드세요', $detail);
@@ -333,5 +335,7 @@ final class InitalkAdminTest extends WebTestCase
         self::assertSame(422, $this->get($this->app, '/admin/initalk/sales', ['from' => '2026-01-01', 'until' => '2026-06-30'])->getStatusCode());
         self::assertSame(422, $this->get($this->app, '/admin/initalk/sales', ['from' => '2026-13-01', 'until' => '2026-13-05'])->getStatusCode());
         self::assertSame(422, $this->get($this->app, '/admin/initalk/sales', ['from' => '2026-02-30', 'until' => '2026-03-01'])->getStatusCode());
+        // #16 배열로 들어온 기간 값은 화면에서 문자열로 바뀌지 않는다(경고 없이 무시).
+        self::assertSame(200, $this->get($this->app, '/admin/initalk/sales', ['from' => ['x'], 'until' => ['y'], 'month' => ['z']])->getStatusCode());
     }
 }

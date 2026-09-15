@@ -162,6 +162,32 @@ final class PayTest extends WebTestCase
         self::assertNull($after['paid_at']);
     }
 
+    /** #7 관리자가 결제 페이지를 열면 요청 상세로 가는 링크만 하나 더 보인다. */
+    #[DataProvider('connectionProvider')]
+    public function testAdminSeesALinkToTheRequestDetail(array $config): void
+    {
+        $this->setupApp($config);
+        $r = $this->makeRequest();
+        $path = '/pay/' . $r['url_token'];
+        self::assertStringNotContainsString('관리자: 요청 상세 보기', $this->body($this->handle('GET', $path)));
+        $id = $this->app->users()->create('admin@example.test', '', '운영자', true);
+        session_start();
+        $_SESSION['user_id'] = $id;
+        $_SESSION['session_epoch'] = 0;
+        session_write_close();
+        $asAdmin = $this->handle('GET', $path);
+        self::assertSame(200, $asAdmin->getStatusCode());
+        $html = $this->body($asAdmin);
+        self::assertStringContainsString('관리자: 요청 상세 보기', $html);
+        self::assertStringContainsString('/cms/admin/initalk/requests/' . $r['id'], $html);
+        self::assertSame('no-store', $asAdmin->getHeaderLine('Cache-Control'));
+        self::assertSame('no-referrer', $asAdmin->getHeaderLine('Referrer-Policy'));
+        session_start();
+        unset($_SESSION['user_id'], $_SESSION['session_epoch']);
+        session_write_close();
+        self::assertStringNotContainsString('관리자: 요청 상세 보기', $this->body($this->handle('GET', $path)));
+    }
+
     /** #4 승인이 미확정으로 남은 뒤의 재시도는 고객에게 무엇을 해야 하는지 알려 준다. */
     #[DataProvider('connectionProvider')]
     public function testRetryAfterAFailedApprovalTellsTheCustomerToAskTheStore(array $config): void
