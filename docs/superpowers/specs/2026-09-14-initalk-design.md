@@ -146,7 +146,7 @@ created ──알림톡 접수 성공──▶ waiting ──고객 결제 승�
 | `RequestNumber` | 일별 순번 채번 |
 | `Requests` | 생성(`create(array $input, int $adminId)`), 검색(`search(array $filter, int $page)`), 상태 카운트(`counts()`), 상세(`find`, `findByToken`), 고객 이력(`customerSummary(string $phone)`: 거래횟수·총액·최근거래일), 전이(`cancel`, `expire(int $limit)`, `markPaid`, `applyRefund`), 개인정보 정리(`purge()`) |
 | `Notifier` | 요청 → 템플릿 변수 치환 입력 구성 → `MessagingService::send()` 호출(멱등키 `initalk:{id}:{dispatch_count+1}`) → `waiting` 전이·이벤트. 재발송·기한 연장 포함. 선택 건 일괄 발송은 건별 호출 후 결과 요약 |
-| `Checkout` | `start(request, device)` → `checkout_started_at` 기록 후 `Gateway::checkout()`; `complete(request, callback)` → `ExecutionLock` 안에서 `complete()`+`fetch()`+`markPaid`+원장; `sync(request)` → `fetch()`로 상태·환불 대조; `refund(request, amount, reason, adminId)` → `Gateway::cancel()`+원장. 같은 환불 요청 키의 재제출은 `DirectGateway::cancel()`의 로컬 기록으로 중복 전송을 막고, 조건 불일치 422나 원장 중복 시 `sync()`의 PG 조회로 대조한다 |
+| `Checkout` | `start(request, device)` → `Gateway::checkout()` 이 결제창을 내준 뒤에만 `checkout_started_at` 기록; `complete(request, callback)` → `ExecutionLock` 안에서 `complete()`+`fetch()`+`markPaid`+원장; `sync(request)` → `fetch()`로 상태·환불 대조; `refund(request, amount, reason, adminId)` → `Gateway::cancel()`+원장. 같은 환불 요청 키의 재제출은 `DirectGateway::cancel()`의 로컬 기록으로 중복 전송을 막고, 조건 불일치 422나 원장 중복 시 `sync()`의 PG 조회로 대조한다. `sync()`는 보류로 남은 환불 신청을 PG 조회의 같은 금액 취소에 연결(`confirmRefund`)하고, 대조가 끝나면 `needs_review`를 내린다. `closeUnprocessedRefund(request, key)`는 2시간이 지난 미처리 신청을 `confirmUnprocessedRefund`로 닫는다 |
 | `CsvImport` | 업로드 파싱(UTF-8·BOM·CP949 자동 변환), 행 검증, 미리보기 토큰(세션, 10분), 확정 시 `Requests::create` 반복 + `initalk_batches` 기록 |
 | `Sales` | 기간별 승인·환불·순매출 집계, 월별 합계, 지급예정일별 정산 캘린더, CSV 내보내기 행 생성. 원천은 `initalk_ledger` |
 | `Events` | 이벤트 기록·조회 |
@@ -154,7 +154,7 @@ created ──알림톡 접수 성공──▶ waiting ──고객 결제 승�
 
 컨트롤러: `InitalkAdminController`(관리자 전부), `PayController`(공개 결제 페이지·시작·복귀·콜백 처리기). 콜백 검증기는 `CallbackToken::verify()`.
 
-CLI `bin/initalk.php`: `expire`(만료 처리), `sync`(최근 7일 `checkout_started_at`이 있는 미결·`needs_review` 건 조회), `purge`(개인정보 정리). 기존 `bin/*.php`와 같은 인자 규약(`--config=`).
+CLI `bin/initalk.php`: `expire`(만료 처리), `sync`(창 안에 `checkout_started_at`이 있는 미결·기한만료 건과 창 안에서 표시된 `needs_review` 건 조회), `purge`(개인정보 정리). 기존 `bin/*.php`와 같은 인자 규약(`--config=`). 실행할 때마다 웹 커널과 같은 경로로 스키마를 맞추고, `sync`는 조회 실패가 있으면 종료코드 1로 끝낸다.
 
 ### `src/Support/QrCode.php`
 
@@ -209,7 +209,7 @@ CLI `bin/initalk.php`: `expire`(만료 처리), `sync`(최근 7일 `checkout_sta
 - 이니톡 결제가 제공하는 변수: `상점명`, `구매자명`, `요청일`(`M월 D일`), `상품명`, `금액`(천 단위 구분), `결제기한`(`YYYY년 MM월 DD일 HH:mm`), `고객센터`, `결제토큰`, `주문번호`. 템플릿은 이 중 일부만 써도 된다.
 - 설정에서 템플릿을 저장할 때 서버가 검증한다: 템플릿이 존재하고 사용 가능 상태, 본문·버튼 변수가 제공 변수 집합의 부분집합, `#{결제토큰}`을 URL에 포함한 WL 버튼이 1개 이상. 하나라도 어긋나면 저장을 거부한다.
 - 발송은 `Notifier`가 요청 저장 트랜잭션 커밋 후 `MessagingService::send()`를 호출한다. 결과(`submission`/`delivery`)는 `bp_*`가 보관하고 요청에는 `last_dispatch_id`·`dispatch_count`·`last_dispatched_at`만 요약한다. 상세에서 발송 상세(`/admin/messaging/history/{id}`)로 연결한다.
-- 발송 정지(메시징 실행 허용 해제)나 템플릿 미설정이면 발송 버튼을 비활성화하고 서버도 거부한다. 생성 자체는 막지 않는다.
+- 발송 정지(메시징 실행 허용 해제)나 템플릿 미설정이면 서버가 이유를 담은 메시지로 거부한다(버튼은 화면에서 끄지 않는다 — 정지 여부는 요청 시점에만 확실하다). 생성 자체는 막지 않는다.
 
 ## 8. CSV 일괄등록
 
@@ -230,7 +230,7 @@ CLI `bin/initalk.php`: `expire`(만료 처리), `sync`(최근 7일 `checkout_sta
 - 원천은 `initalk_ledger`(승인·환불 확정값). 승인은 `markPaid` 시, 환불은 `applyRefund` 또는 `sync`가 PG 조회에서 확인한 취소를 반영할 때 기록한다. `sync`가 이미 기록된 환불(`reference` 동일)을 다시 넣지 않는다.
 - 매출 화면: 기간 선택(월 선택 기본 이번 달, 또는 시작~끝 90일 이내). 일별 행: 승인 건수·금액, 환불 건수·금액, 순매출. 합계 행. 환경 필터(test/live, 기본 live).
 - 정산 캘린더: 지급예정일 = 승인일 + `initalk.settlement_days`. 지급예정일별 순매출 합계를 월 달력에 표시한다. 실제 PG 정산과 다를 수 있음을 화면과 문서에 명시한다. 명세서·PG 정산서 자동 수집은 하지 않는다.
-- CSV 내보내기: 일별 표 + 건별 원장(주문번호·상품명·구매자명·승인/환불·금액·시각·TID). 휴대폰은 마스킹 값.
+- CSV 내보내기: 원장 한 줄씩 내보내는 평면 파일이다(`일시,주문번호,상품명,구매자명,휴대폰,구분,금액,참조`, 환불은 음수 금액). 휴대폰은 마스킹 값. 일별 표는 화면에만 있다.
 
 ## 11. 보안
 
@@ -239,17 +239,18 @@ CLI `bin/initalk.php`: `expire`(만료 처리), `sync`(최근 7일 `checkout_sta
 - 비밀정보(비즈뿌리오 비밀번호·KAPI 키·이니시스 SignKey/HashKey/INIAPI Key·구매자 휴대폰)는 `SecretCipher`(`auth.secret`)로 암호화한다. 카드번호·인증 토큰·PG 응답 원문·발송 본문 원문을 로그에 남기지 않는다.
 - 결제 링크 토큰은 160비트 난수. 토큰 조회는 `url_token` 인덱스로만 하고 주문 id는 URL에 쓰지 않는다(콜백 `id`는 HMAC `state`와 함께).
 - 결제 페이지·콜백 응답 `Cache-Control: no-store`, `Referrer-Policy: no-referrer`. `start`는 같은 요청에 대해 10초 안에 다시 오면 거부한다(중복 결제창).
-- 콜백·환불·발송·만료 처리는 `ExecutionLock`(storage 파일 잠금)으로 직렬화하고, 상태 전이는 조건부 `UPDATE`다.
+- 콜백·환불·발송·만료 처리는 `ExecutionLock::run()`(storage 파일 공유 잠금) 안에서 돈다. 이 잠금은 서로를 막지 않고 백업·복원·설정 변경(배타 잠금)만 배제한다.
+  동시 실행의 안전은 잠금이 아니라 상태 전이의 조건부 `UPDATE … WHERE status IN (…)` 과 결제 저널(`Journal::change()`)의 행 잠금 트랜잭션이 보장한다.
 - 서버 접근 로그에서 웹훅 URL의 쿼리(토큰)를 제외하는 설정을 `docs/initalk.md`에 안내한다.
 - 이니시스 콜백 IDC·승인 URL 호스트 검증, 망취소, 금액·주문번호·수단 검증은 기존 `InicisGateway` 로직을 그대로 쓴다.
 
 ## 12. 오류 처리
 
 - 알림톡: 인증 실패·호출 제한으로 명확히 거절되면 요청 상태를 유지하고 이벤트를 남기며 상세에서 재시도한다. 접수 불명확 건은 자동 재발송하지 않고 결과 재요청을 안내한다. 도달 실패(`7xxx`)는 이벤트 + 재발송 가능 표시.
-- 결제 승인: 응답 유실·검증 실패는 게이트웨이가 망취소를 시도하고 예외를 던진다. 콜백 처리기는 5xx `DomainError`면 `needs_review`를 켜고 이벤트를 남긴 뒤 결제 페이지로 보낸다(고객에게는 "결제 확인 중, 상점에 문의"). 관리자는 `sync`로 확정한다.
-- 환불: `Journal`의 보류·대조·2시간 미처리 종료 규약을 그대로 쓴다. 불확정 환불은 상세에 표시하고 `sync`로 대조한다.
+- 결제 승인: 응답 유실·검증 실패는 게이트웨이가 망취소를 시도하고 예외를 던진다. 콜백 처리기는 5xx `DomainError`면 `needs_review`를 켜고 이벤트를 남긴 뒤 결제 페이지로 보낸다(고객에게는 "결제 확인 중, 상점에 문의"). 관리자는 `sync`로 확정한다. 승인이 미확정으로 남은 요청은 고객이 다시 시도해도 게이트웨이가 막으므로("이전 결제 요청의 결과를 확인하는 중입니다"), 상세의 안내대로 대조 → 결제 내역이 없으면 결제전 취소 후 새 요청을 만든다.
+- 환불: `Journal`의 보류·대조·2시간 미처리 종료 규약을 그대로 쓴다. 보류 중인 신청은 상세의 **보류 중인 환불 신청** 표에 뜨고, **결제 상태 조회**(`sync`)가 같은 금액의 PG 취소를 찾으면 연결한다. PG에 취소가 없으면 신청 2시간 뒤부터 **미처리 종료**로 닫을 수 있고, 그래야 새 환불을 다시 받는다.
 - CSV: 파싱·인코딩 오류는 파일 단위, 값 오류는 행 단위로 보고한다. 확정 중 생성 실패는 배치 `errors`에 남기고 계속 진행한다.
-- 실행 허용 해제(메시징 발송 정지, 결제 API 정지) 상태에서는 해당 버튼을 비활성화하고 서버도 `DomainError::validation`으로 거부한다. 결제 페이지는 결제 API 정지 시 "지금은 결제할 수 없습니다"를 낸다.
+- 실행 허용 해제(메시징 발송 정지, 결제 API 정지) 상태에서는 서버가 `DomainError::validation`으로 거부하고 이유를 화면에 보여 준다(버튼을 화면에서 끄지는 않는다). 결제 페이지는 결제 API 정지 시 "지금은 결제할 수 없습니다"를 낸다.
 - 만료 처리 중 개별 실패는 나머지 건을 계속 처리하고 오류를 로그에 남긴다.
 
 ## 13. 설치·업그레이드·백업·복원
