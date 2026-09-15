@@ -146,7 +146,7 @@ created ──알림톡 접수 성공──▶ waiting ──고객 결제 승�
 | `RequestNumber` | 일별 순번 채번 |
 | `Requests` | 생성(`create(array $input, int $adminId)`), 검색(`search(array $filter, int $page)`), 상태 카운트(`counts()`), 상세(`find`, `findByToken`), 고객 이력(`customerSummary(string $phone)`: 거래횟수·총액·최근거래일), 전이(`cancel`, `expire(int $limit)`, `markPaid`, `applyRefund`), 개인정보 정리(`purge()`) |
 | `Notifier` | 요청 → 템플릿 변수 치환 입력 구성 → `MessagingService::send()` 호출(멱등키 `initalk:{id}:{dispatch_count+1}`) → `waiting` 전이·이벤트. 재발송·기한 연장 포함. 선택 건 일괄 발송은 건별 호출 후 결과 요약 |
-| `Checkout` | `start(request, device)` → `checkout_started_at` 기록 후 `Gateway::checkout()`; `complete(request, callback)` → `ExecutionLock` 안에서 `complete()`+`fetch()`+`markPaid`+원장; `sync(request)` → `fetch()`로 상태·환불 대조; `refund(request, amount, reason, adminId)` → `Gateway::cancel()`+원장. 같은 환불 요청 키의 재제출은 결제사에 다시 보내지 않고 `sync()`의 PG 조회로 대조한다 |
+| `Checkout` | `start(request, device)` → `checkout_started_at` 기록 후 `Gateway::checkout()`; `complete(request, callback)` → `ExecutionLock` 안에서 `complete()`+`fetch()`+`markPaid`+원장; `sync(request)` → `fetch()`로 상태·환불 대조; `refund(request, amount, reason, adminId)` → `Gateway::cancel()`+원장. 같은 요청 키의 재시도도 금액을 다시 계산하지 않고 같은 키로 다시 요청하며(이니시스가 중복 처리하지 않음), 금액 불일치 422나 원장의 중복 참조가 감지되면 `sync()`의 PG 조회로 대조한다 |
 | `CsvImport` | 업로드 파싱(UTF-8·BOM·CP949 자동 변환), 행 검증, 미리보기 토큰(세션, 10분), 확정 시 `Requests::create` 반복 + `initalk_batches` 기록 |
 | `Sales` | 기간별 승인·환불·순매출 집계, 월별 합계, 지급예정일별 정산 캘린더, CSV 내보내기 행 생성. 원천은 `initalk_ledger` |
 | `Events` | 이벤트 기록·조회 |
