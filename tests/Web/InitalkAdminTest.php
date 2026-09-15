@@ -268,5 +268,7 @@ final class InitalkAdminTest extends WebTestCase
         self::assertStringContainsString('attachment; filename="initalk-sales-20260901-20260930.csv"', $csv->getHeaderLine('Content-Disposition'));
         self::assertStringContainsString($request['number'] . ',수강료,홍길동,010-****-7891,승인,50000,TID1', $this->body($csv));
         self::assertSame(422, $this->get($this->app, '/admin/initalk/sales', ['from' => '2026-01-01', 'until' => '2026-06-30'])->getStatusCode());
+        self::assertSame(422, $this->get($this->app, '/admin/initalk/sales', ['from' => '2026-13-01', 'until' => '2026-13-05'])->getStatusCode());
+        self::assertSame(422, $this->get($this->app, '/admin/initalk/sales', ['from' => '2026-02-30', 'until' => '2026-03-01'])->getStatusCode());
     }
 }

@@ -88,6 +88,10 @@ final class InitalkAdminController
         $from = is_string($query['from'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $query['from']) ? $query['from'] : null;
         $until = is_string($query['until'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $query['until']) ? $query['until'] : null;
         if ($from !== null && $until !== null) {
+            foreach ([$from, $until] as $date) {
+                [$y, $m, $d] = array_map('intval', explode('-', $date));
+                if (!checkdate($m, $d, $y)) throw DomainError::validation(['range' => '기간을 확인해 주세요.']);
+            }
             $start = new \DateTimeImmutable($from . ' 00:00:00', new \DateTimeZone('Asia/Seoul'));
             $end = new \DateTimeImmutable($until . ' 23:59:59', new \DateTimeZone('Asia/Seoul'));
             if ($end < $start || $end->getTimestamp() - $start->getTimestamp() > 92 * 86400) throw DomainError::validation(['range' => '조회 기간은 92일 이내로 지정해 주세요.']);
