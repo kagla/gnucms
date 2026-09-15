@@ -270,12 +270,15 @@ final class Requests
         }
     }
 
-    /** 결제창을 연 미결·확인 필요 건. CLI sync 대상. @return list<string> */
+    /** 창 안에 결제창을 연 미결·기한만료 건과 최근 확인 필요 건. CLI sync 대상. @return list<string> */
     public function needingSync(int $window): array
     {
         $now = Clock::timestamp();
+        // 기한이 지난 뒤 늦게 결제한 고객의 콜백이 유실돼도 markPaid가 expired를 받으므로 회수할 수 있다.
+        // 확인 필요는 창으로 묶는다 — 묶지 않으면 한 번 켜진 건을 CLI가 영원히 다시 조회한다.
         $rows = $this->db()->select('SELECT id FROM ' . $this->db()->table('initalk_requests')
-            . " WHERE config_revision <> '' AND ((status IN ('created','waiting') AND checkout_started_at >= ?) OR needs_review = 1) ORDER BY updated_at LIMIT 500", [$now - $window]);
+            . " WHERE config_revision <> '' AND ((status IN ('created','waiting','expired') AND checkout_started_at >= ?) OR (needs_review = 1 AND updated_at >= ?))"
+            . ' ORDER BY updated_at LIMIT 500', [$now - $window, $now - $window]);
         return array_column($rows, 'id');
     }
 

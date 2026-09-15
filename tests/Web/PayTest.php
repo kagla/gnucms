@@ -162,6 +162,69 @@ final class PayTest extends WebTestCase
         self::assertNull($after['paid_at']);
     }
 
+    /** #3 콜백이 두 번 와도(재전송·중복 제출) 결제완료 건을 확인 필요로 표시하지 않는다. */
+    #[DataProvider('connectionProvider')]
+    public function testDuplicateCallbackLeavesThePaidRequestClean(array $config): void
+    {
+        $this->setupApp($config);
+        $r = $this->makeRequest();
+        $path = '/pay/' . $r['url_token'];
+        $this->handle('GET', $path);
+        session_start();
+        $csrf = $_SESSION['csrf_token'];
+        session_write_close();
+        self::assertSame(200, $this->handle('POST', $path . '/start', ['csrf_token' => $csrf], ['HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0)'])->getStatusCode());
+        $stored = $this->app->initalk()->requests->find($r['id']);
+        $state = CallbackToken::create($this->app, Checkout::order($stored));
+        $callback = ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'orderNumber' => $r['id'], 'idc_name' => 'stg',
+            'authToken' => bin2hex(random_bytes(32)), 'authUrl' => 'https://stgstdpay.inicis.com/api/payAuth', 'netCancelUrl' => 'https://stgstdpay.inicis.com/api/netCancel'];
+        $post = fn () => $this->handle('POST', '/pay/callback?' . http_build_query(['id' => $r['id'], 'state' => $state]), [], [], http_build_query($callback), 'application/x-www-form-urlencoded');
+        $tid = 'StdpayCARD' . bin2hex(random_bytes(10));
+        $this->http->responses[] = ['status' => 200, 'body' => ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'MOID' => $r['id'], 'TotPrice' => '15800', 'payMethod' => 'Card', 'tid' => $tid, 'currency' => 'WON']];
+        $this->http->responses[] = ['status' => 200, 'body' => ['resultCode' => 'SUCCESS', 'mid' => $this->merchant['merchant_id'], 'oid' => $r['id'], 'price' => '15800', 'tid' => $tid,
+            'transactionStatus' => 'APPROVAL', 'paymethod' => 'Card', 'approvedDate' => '20260915', 'approvedTime' => '120500', 'cardInfo' => ['currencyCode' => 'WON']]];
+        self::assertSame(303, $post()->getStatusCode());
+        self::assertSame(Status::PAID, $this->app->initalk()->requests->find($r['id'])['status']);
+        $calls = count($this->http->calls);
+        self::assertSame(303, $post()->getStatusCode());
+        $after = $this->app->initalk()->requests->find($r['id']);
+        self::assertSame(Status::PAID, $after['status']);
+        self::assertSame(0, $after['needs_review']);
+        self::assertSame($calls, count($this->http->calls));
+        self::assertSame(1, count(array_filter($this->http->calls, static fn (array $call): bool => str_contains($call['url'], 'payAuth'))));
+        self::assertCount(1, $this->app->initalk()->ledger->forRequest($r['id']));
+    }
+
+    /** #1 결제전 취소된 요청에는 인증 콜백이 와도 승인을 보내지 않는다(고객이 과금되지 않는다). */
+    #[DataProvider('connectionProvider')]
+    public function testCallbackAfterAdminCancelNeverSendsAnApproval(array $config): void
+    {
+        $this->setupApp($config);
+        $r = $this->makeRequest();
+        $path = '/pay/' . $r['url_token'];
+        $this->handle('GET', $path);
+        session_start();
+        $csrf = $_SESSION['csrf_token'];
+        session_write_close();
+        self::assertSame(200, $this->handle('POST', $path . '/start', ['csrf_token' => $csrf], ['HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0)'])->getStatusCode());
+        $stored = $this->app->initalk()->requests->find($r['id']);
+        $state = CallbackToken::create($this->app, Checkout::order($stored));
+        // 고객이 카드 인증을 하는 사이 운영자가 결제전 취소를 눌렀다.
+        $this->app->initalk()->requests->cancel($r['id'], '운영자');
+        $calls = count($this->http->calls);
+        $callback = ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'orderNumber' => $r['id'], 'idc_name' => 'stg',
+            'authToken' => bin2hex(random_bytes(32)), 'authUrl' => 'https://stgstdpay.inicis.com/api/payAuth', 'netCancelUrl' => 'https://stgstdpay.inicis.com/api/netCancel'];
+        $response = $this->handle('POST', '/pay/callback?' . http_build_query(['id' => $r['id'], 'state' => $state]), [], [], http_build_query($callback), 'application/x-www-form-urlencoded');
+        self::assertSame(303, $response->getStatusCode());
+        self::assertSame('/cms' . $path, $response->getHeaderLine('Location'));
+        self::assertSame($calls, count($this->http->calls), '승인 요청을 보내지 않아야 한다');
+        $after = $this->app->initalk()->requests->find($r['id']);
+        self::assertSame(Status::CANCELLED, $after['status']);
+        self::assertNull($after['paid_at']);
+        self::assertSame(1, $after['needs_review']);
+        self::assertSame([], $this->app->initalk()->ledger->forRequest($r['id']));
+    }
+
     #[DataProvider('connectionProvider')]
     public function testClosedRequestsAndStoppedApiShowGuidanceInsteadOfForms(array $config): void
     {

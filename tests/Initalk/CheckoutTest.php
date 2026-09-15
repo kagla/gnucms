@@ -109,10 +109,11 @@ final class CheckoutTest extends DatabaseTestCase
         self::assertSame((new \DateTimeImmutable('2026-09-15 12:05:00', new \DateTimeZone('Asia/Seoul')))->getTimestamp(), $paid['paid_at']);
         $ledger = $this->app->initalk()->ledger->forRequest($request['id']);
         self::assertSame([['approve', 15800, $tid]], array_map(static fn (array $row): array => [$row['kind'], (int) $row['amount'], $row['reference']], $ledger));
-        // 콜백 재전송은 새 승인을 만들지 않는다.
-        $this->respond($this->inquiry($request, $tid));
-        $checkout->complete($request['id'], $this->authCallback($request));
+        // 콜백 재전송은 새 승인을 만들지 않는다. 결제완료 상태에서는 결제사에 아무것도 보내지 않고 거부한다(#1).
+        $calls = count($this->http->calls);
+        try { $checkout->complete($request['id'], $this->authCallback($request)); self::fail('resent'); } catch (DomainError $e) { self::assertArrayHasKey('payment', $e->details()); }
         self::assertCount(1, $this->app->initalk()->ledger->forRequest($request['id']));
+        self::assertSame($calls, count($this->http->calls));
         // 부분 환불
         $key = bin2hex(random_bytes(16));
         $this->respond(['resultCode' => '00', 'prtcDate' => '20260916', 'prtcTime' => '100000', 'prtcPrice' => '5800', 'prtcRemains' => '10000', 'prtcTid' => $tid . 'P1']);
@@ -157,6 +158,29 @@ final class CheckoutTest extends DatabaseTestCase
         self::assertNull($after['paid_at']);
         self::assertSame([], $this->app->initalk()->ledger->forRequest($request['id']));
         $fresh = $this->request(); self::assertSame($fresh['status'], $checkout->sync($fresh['id'], '운영자')['status']); self::assertCount(2, $this->http->calls);
+    }
+
+    /** #3 대조가 끝나면 확인 필요 표시를 내린다. */
+    #[DataProvider('connectionProvider')]
+    public function testCleanSyncClearsTheReviewFlag(array $config): void
+    {
+        $this->setupApp($config);
+        $checkout = $this->app->initalk()->checkout;
+        $request = $this->request();
+        $checkout->start($request['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback');
+        $tid = 'StdpayCARD' . bin2hex(random_bytes(10));
+        $this->respond($this->approval($request, $tid));
+        $this->respond($this->inquiry($request, $tid, 'APPROVAL', 15000));
+        $checkout->complete($request['id'], $this->authCallback($request));
+        self::assertSame(1, $this->app->initalk()->requests->find($request['id'])['needs_review']);
+        // 조회가 요청의 상점·금액·거래번호와 일치하면 확인 필요를 내린다.
+        $this->respond($this->inquiry($request, $tid));
+        $after = $checkout->sync($request['id'], '운영자');
+        self::assertSame(Status::PAID, $after['status']);
+        self::assertSame(0, $after['needs_review']);
+        $events = $this->app->initalk()->events->forRequest($request['id']);
+        self::assertSame('review_cleared', end($events)['type']);
+        self::assertSame('대조 완료', end($events)['note']);
     }
 
     #[DataProvider('connectionProvider')]

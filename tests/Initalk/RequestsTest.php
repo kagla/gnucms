@@ -131,6 +131,30 @@ final class RequestsTest extends DatabaseTestCase
         self::assertStringNotContainsString('01023457891', json_encode($all['items']));
     }
 
+    /** #3·#10 CLI sync 대상: 창 안의 결제창(만료 포함)과 최근 확인 필요 건만. */
+    #[DataProvider('connectionProvider')]
+    public function testNeedingSyncCoversExpiredCheckoutsAndIsBoundedByTheWindow(array $config): void
+    {
+        $this->setupApp($config);
+        $revision = str_repeat('a', 32);
+        $untouched = $this->requests->create($this->input(), 'test', 48, 1, '운영자');
+        $expired = $this->requests->create($this->input(['expiry_hours' => '1']), 'test', 48, 1, '운영자');
+        $this->requests->touchCheckout($expired['id'], $revision);
+        $flagged = $this->requests->create($this->input(), 'test', 48, 1, '운영자');
+        $this->requests->touchCheckout($flagged['id'], $revision);
+        $this->requests->setReview($flagged['id'], true, 'system', '조회 불일치');
+        Clock::freeze('2026-09-15 05:00:00');
+        self::assertSame(1, $this->requests->expire());
+        self::assertSame(Status::EXPIRED, $this->requests->find($expired['id'])['status']);
+        $ids = $this->requests->needingSync(7 * 86400);
+        self::assertContains($expired['id'], $ids);
+        self::assertContains($flagged['id'], $ids);
+        self::assertNotContains($untouched['id'], $ids);
+        // 창 밖으로 나간 확인 필요 건은 CLI가 영원히 다시 조회하지 않는다.
+        Clock::freeze('2026-09-30 05:00:00');
+        self::assertSame([], $this->requests->needingSync(7 * 86400));
+    }
+
     #[DataProvider('connectionProvider')]
     public function testTransitionsExpiryProtectionRefundAndPurge(array $config): void
     {

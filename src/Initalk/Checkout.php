@@ -53,6 +53,10 @@ final class Checkout
     public function complete(string $id, array $callback): void
     {
         $request = $this->requests->find($id);
+        // 인증 중에 결제전 취소·만료 처리가 끼어들었으면 승인하지 않는다. 승인하지 않은 인증 토큰은 그대로 실효된다(과금 없음).
+        if (!Status::canPay($request['status']) && $request['status'] !== Status::EXPIRED) {
+            throw DomainError::validation(['payment' => '결제할 수 없는 상태의 요청입니다. 결제가 승인되지 않았습니다.']);
+        }
         $this->app->inicisGateway()->complete(self::order($request), $callback);
         $this->sync($id, 'customer');
     }
@@ -77,7 +81,12 @@ final class Checkout
         if ($cancelled > $request['refunded_amount'] && Status::canRefund($request['status'])) {
             $request = $this->requests->applyRefund($id, $cancelled, $actor, '결제사 조회로 확인한 취소 반영');
         }
-        if (($payment['open_cancellations'] ?? 0) > 0 && !$request['needs_review']) $this->requests->setReview($id, true, $actor, '보류 중인 환불 요청이 있습니다.');
+        if (($payment['open_cancellations'] ?? 0) > 0) {
+            if (!$request['needs_review']) $this->requests->setReview($id, true, $actor, '보류 중인 환불 요청이 있습니다.');
+        } elseif ($request['needs_review'] && $cancelled === $request['refunded_amount']) {
+            // 조회 결과가 상점·금액·거래번호와 맞고 보류 환불도 없으면 확인할 것이 남지 않았다.
+            $this->requests->setReview($id, false, $actor, '대조 완료');
+        }
         return $this->requests->find($id);
     }
 

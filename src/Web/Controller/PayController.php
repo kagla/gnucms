@@ -128,7 +128,10 @@ final class PayController
             try {
                 $service->checkout->complete($id, is_array($request->getParsedBody()) ? $request->getParsedBody() : []);
             } catch (DomainError $e) {
-                $service->requests->setReview($id, true, 'system', $e->status() >= 500 ? '승인·조회 결과를 확인해 주세요.' : '인증 결과 검증 실패: ' . implode(' ', array_values($e->details() ?: [$e->getMessage()])));
+                $details = $e->details();
+                // 콜백 재전송·경쟁: 다른 콜백이나 조회가 먼저 결제완료를 확정했으면 확인할 것이 없다.
+                if ((isset($details['status']) || isset($details['payment'])) && $service->requests->find($id)['status'] === Status::PAID) return;
+                $service->requests->setReview($id, true, 'system', $e->status() >= 500 ? '승인·조회 결과를 확인해 주세요.' : '인증 결과 검증 실패: ' . implode(' ', array_values($details ?: [$e->getMessage()])));
             }
         });
         return $response->withStatus(303)->withHeader('Location', $this->basePath() . '/pay/' . $found['url_token']);
