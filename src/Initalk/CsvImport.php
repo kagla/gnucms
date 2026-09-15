@@ -68,8 +68,7 @@ final class CsvImport
     public function remember(array $parsed, string $filename, bool $sendNow): string
     {
         $token = bin2hex(random_bytes(16));
-        $pending = is_array($_SESSION['initalk_imports'] ?? null) ? $_SESSION['initalk_imports'] : [];
-        foreach ($pending as $key => $entry) if (($entry['expires'] ?? 0) < Clock::timestamp()) unset($pending[$key]);
+        $pending = $this->prune();
         if (count($pending) >= 3) array_shift($pending);
         $pending[$token] = ['expires' => Clock::timestamp() + self::TTL, 'filename' => mb_substr($filename, 0, 200), 'send' => $sendNow, 'rows' => $parsed['rows']];
         $_SESSION['initalk_imports'] = $pending;
@@ -78,16 +77,25 @@ final class CsvImport
 
     public function pending(string $token): ?array
     {
-        $entry = $_SESSION['initalk_imports'][$token] ?? null;
-        return is_array($entry) && ($entry['expires'] ?? 0) >= Clock::timestamp() ? $entry : null;
+        $entry = $this->prune()[$token] ?? null;
+        return is_array($entry) ? $entry : null;
+    }
+
+    /** 기한이 지난 미리보기를 세션에서 지운다. 원문 휴대폰 번호가 TTL을 넘겨 남지 않게 조회할 때마다 돈다. */
+    private function prune(): array
+    {
+        $pending = is_array($_SESSION['initalk_imports'] ?? null) ? $_SESSION['initalk_imports'] : [];
+        foreach ($pending as $key => $entry) if (!is_array($entry) || ($entry['expires'] ?? 0) < Clock::timestamp()) unset($pending[$key]);
+        $_SESSION['initalk_imports'] = $pending;
+        return $pending;
     }
 
     /** @return array{batch_id:string,created:int,failed:int,sent:int,errors:list<string>} */
     public function confirm(string $token, string $environment, int $actorId, string $actor): array
     {
         $pending = $this->pending($token);
-        if ($pending === null) throw DomainError::validation(['import' => '미리보기가 만료되었습니다. 파일을 다시 올려 주세요.']);
         unset($_SESSION['initalk_imports'][$token]);
+        if ($pending === null) throw DomainError::validation(['import' => '미리보기가 만료되었습니다. 파일을 다시 올려 주세요.']);
         $requests = $this->requests ?? throw DomainError::internal('요청 저장소가 없습니다.');
         $config = ($this->settings ?? throw DomainError::internal('설정이 없습니다.'))->read();
         $batchId = bin2hex(random_bytes(16));

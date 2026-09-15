@@ -9,6 +9,8 @@ declare(strict_types=1);
  *   php bin/initalk.php sync     최근 7일 안에 결제창을 연 미결 건과 확인 필요 건을 결제사에 조회한다
  *   php bin/initalk.php purge    종료 90일이 지난 요청의 구매자명·번호를 정리한다
  *   --config=/경로/config.php    다른 설정 파일을 쓴다
+ *
+ * 스키마는 실행할 때마다 웹 커널과 같은 경로로 맞춘다. sync는 조회하지 못한 건이 있으면 1로 끝낸다.
  */
 
 use GnuCms\App;
@@ -43,7 +45,10 @@ if (!is_array($config) || !isset($config['db'])) {
 
 try {
     $app = new App($config, $configFile);
+    // 배포 뒤 첫 웹 요청보다 cron이 먼저 돌 수 있다. 웹 커널과 같은 경로로 스키마를 맞춘다.
+    $app->schemaUpgrader()->run();
     $service = $app->initalk();
+    $failed = 0;
     if ($command === 'expire') {
         $count = $service->requests->expire(1000);
     } elseif ($command === 'purge') {
@@ -55,11 +60,17 @@ try {
                 ExecutionLock::run($app->storageDir(), static fn () => $service->checkout->sync($id, 'cli'));
                 $count++;
             } catch (Throwable $e) {
+                $failed++;
                 fwrite(STDERR, "  ! " . substr($id, 0, 8) . "…: 조회하지 못했습니다.\n");
             }
         }
     }
     echo "{$command}: {$count}건 처리\n";
+    if ($failed > 0) {
+        // cron·모니터링이 알아채도록 0으로 끝내지 않는다. 건별 사유는 위에 한 줄씩 있다.
+        fwrite(STDERR, "실패 {$failed}건\n");
+        exit(1);
+    }
 } catch (Throwable $e) {
     fwrite(STDERR, "실패: " . $e->getMessage() . "\n");
     exit(1);

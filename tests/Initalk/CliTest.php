@@ -61,4 +61,43 @@ final class CliTest extends TestCase
         self::assertSame(1, $code);
         self::assertStringContainsString('사용법', $err);
     }
+
+    /** #13 조회하지 못한 건이 있으면 0으로 끝내지 않는다. 출력에는 id 앞자리만 남는다. */
+    public function testSyncExitsNonZeroWhenARequestCannotBeSynced(): void
+    {
+        $secret = bin2hex(random_bytes(32));
+        $config = ['db' => ['dsn' => 'sqlite:' . $this->root . '/board.sqlite', 'username' => null, 'password' => null], 'storage' => ['dir' => $this->root . '/storage'],
+            'auth' => ['secret' => $secret], 'app' => ['url' => 'https://shop.example.test']];
+        $configFile = $this->root . '/config.php';
+        file_put_contents($configFile, '<?php return ' . var_export($config, true) . ';');
+        $app = new App($config);
+        (new Schema($app->db()))->create();
+        $request = $app->initalk()->requests->create(['product_name' => '상품', 'product_detail' => '', 'buyer_name' => '구매자', 'phone' => '01023457891', 'amount' => '1000'], 'test', 48, 1, '운영자');
+        // 있지도 않은 결제 설정 판을 붙여 두면 조회가 외부 통신 전에 반드시 실패한다.
+        $app->initalk()->requests->touchCheckout($request['id'], str_repeat('a', 32));
+        [$code, $out, $err] = $this->runCli('sync', $configFile);
+        self::assertSame(1, $code, $out . $err);
+        self::assertStringContainsString('sync: 0건', $out);
+        self::assertStringContainsString('실패 1건', $err);
+        self::assertStringContainsString(substr($request['id'], 0, 8), $err);
+        self::assertStringNotContainsString($request['id'], $err);
+        self::assertStringNotContainsString($secret, $out . $err);
+        self::assertStringNotContainsString('01023457891', $out . $err);
+    }
+
+    /** #13 배포 뒤 첫 웹 요청보다 cron이 먼저 돌아도 스키마를 맞추고 끝낸다. */
+    public function testTheFirstCommandBringsTheSchemaUpToDate(): void
+    {
+        $fresh = $this->root . '/fresh';
+        mkdir($fresh . '/storage', 0700, true);
+        $config = ['db' => ['dsn' => 'sqlite:' . $fresh . '/board.sqlite', 'username' => null, 'password' => null], 'storage' => ['dir' => $fresh . '/storage'],
+            'auth' => ['secret' => bin2hex(random_bytes(32))], 'app' => ['url' => 'https://shop.example.test']];
+        $configFile = $fresh . '/config.php';
+        file_put_contents($configFile, '<?php return ' . var_export($config, true) . ';');
+        self::assertFileDoesNotExist($fresh . '/board.sqlite');
+        [$code, $out, $err] = $this->runCli('expire', $configFile);
+        self::assertSame(0, $code, $out . $err);
+        self::assertStringContainsString('expire: 0건', $out);
+        self::assertSame(0, (new App($config))->initalk()->requests->search(['environment' => 'test'], 1)['total']);
+    }
 }

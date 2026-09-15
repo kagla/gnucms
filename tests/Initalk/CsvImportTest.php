@@ -105,4 +105,22 @@ final class CsvImportTest extends DatabaseTestCase
         Clock::freeze('2026-09-15 03:11:00');
         self::assertNull($import->pending($token));
     }
+
+    /** #12 만료된 미리보기는 조회할 때 세션에서 지운다. 원문 휴대폰 번호가 TTL을 넘겨 남으면 안 된다. */
+    #[DataProvider('connectionProvider')]
+    public function testExpiredPreviewsArePrunedWhenLookedUp(array $config): void
+    {
+        $import = $this->setupApp($config);
+        $first = $import->remember($import->parse("상품명,구매자명,휴대폰번호,금액\n수강료,홍길동,01011112222,50000\n", 48), 'a.csv', false);
+        Clock::freeze('2026-09-15 03:06:00');
+        $second = $import->remember($import->parse("상품명,구매자명,휴대폰번호,금액\n교재비,김이니,01023457891,30000\n", 48), 'b.csv', false);
+        Clock::freeze('2026-09-15 03:11:00');
+        self::assertNull($import->pending($first));
+        self::assertSame([$second], array_keys($_SESSION['initalk_imports']));
+        self::assertStringNotContainsString('01011112222', json_encode($_SESSION, JSON_UNESCAPED_UNICODE));
+        Clock::freeze('2026-09-15 03:17:00');
+        self::assertNull($import->pending($second));
+        self::assertSame([], $_SESSION['initalk_imports']);
+        self::assertStringNotContainsString('01023457891', json_encode($_SESSION, JSON_UNESCAPED_UNICODE));
+    }
 }
