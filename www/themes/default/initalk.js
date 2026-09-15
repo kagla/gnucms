@@ -67,7 +67,8 @@
   }
   document.querySelectorAll('form[data-confirm]').forEach((f) => {
     f.addEventListener('submit', (event) => {
-      const message = f.dataset.confirm === 'refund' ? '입력한 금액을 결제사에 환불 요청합니다. 계속할까요?' : '이 결제 요청을 결제 전 취소할까요?';
+      const message = f.dataset.confirm === 'refund' ? '입력한 금액을 결제사에 환불 요청합니다. 계속할까요?'
+        : (f.dataset.confirm === 'refund-close' ? '결제사에 취소 내역이 없음을 확인했습니까? 보류 중인 환불 신청을 종료합니다.' : '이 결제 요청을 결제 전 취소할까요?');
       if (!window.confirm(message)) event.preventDefault();
     });
   });

@@ -234,7 +234,18 @@ final class InitalkAdminController
             $found = $service->requests->find($id);
         }
         return $this->render($request, $response, 'request', ['request' => $found, 'events' => $service->events->forRequest($id), 'ledger' => $service->ledger->forRequest($id),
-            'refund_key' => bin2hex(random_bytes(16)), 'pay_url' => $this->payUrl($found), 'errors' => $errors]);
+            'refund_key' => bin2hex(random_bytes(16)), 'pay_url' => $this->payUrl($found), 'pending_refunds' => $this->pendingRefunds($found), 'errors' => $errors]);
+    }
+
+    /** 결제사 응답을 확인하지 못한 환불 신청(결제 저널). 화면 표시용이라 조회에 실패해도 상세는 열린다. */
+    private function pendingRefunds(array $found): array
+    {
+        if ($found['config_revision'] === '' || !in_array($found['status'], [Status::PAID, Status::REFUNDED], true)) return [];
+        try {
+            return $this->app->inicisGateway()->pendingRefunds(\GnuCms\Initalk\Checkout::order($found));
+        } catch (DomainError $e) {
+            return [];
+        }
     }
 
     public function qr(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -246,7 +257,7 @@ final class InitalkAdminController
             ->withHeader('Content-Disposition', 'inline; filename="' . $found['number'] . '.svg"')->withHeader('X-Content-Type-Options', 'nosniff');
     }
 
-    /** @param 'send'|'cancel'|'sync'|'refund' $action */
+    /** @param 'send'|'cancel'|'sync'|'refund'|'refund-close' $action */
     public function act(string $action, ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $this->guard($request);
@@ -271,6 +282,9 @@ final class InitalkAdminController
                         $service->checkout->refund($id, $amount === '' ? 0 : (int) $amount, is_string($input['reason'] ?? null) ? $input['reason'] : '',
                             is_string($input['refund_key'] ?? null) ? $input['refund_key'] : '', $this->actor());
                         return ['refunded' => '1'];
+                    case 'refund-close':
+                        $service->checkout->closeUnprocessedRefund($id, is_string($input['key'] ?? null) ? $input['key'] : '', $this->actor());
+                        return ['refund_closed' => '1'];
                 }
                 throw DomainError::validation(['action' => '작업을 확인해 주세요.']);
             });

@@ -181,9 +181,18 @@ final class GatewayTest extends DatabaseTestCase
         $this->rejected(fn () => $this->gateway->cancel($this->order, 13000, 13000, '반품', $key));
         $this->rejected(fn () => $this->gateway->cancel($this->order, 13000, 13000, '반품', $key));
         self::assertCount(2, $this->http->calls);
+        // 보류 중인 신청은 상태를 바꾸지 않고 읽을 수 있다(쇼핑몰 관리자 화면·대조용).
+        $pending = $this->gateway->pendingRefunds($this->order);
+        self::assertSame([$key], array_keys($pending));
+        self::assertSame(13000, $pending[$key]['amount']);
+        self::assertSame(13000, $pending[$key]['remaining']);
+        self::assertSame('반품', $pending[$key]['reason']);
+        self::assertGreaterThan(0, $pending[$key]['at']);
+        self::assertCount(2, $this->http->calls);
         $payment = array_replace($payment, ['transactionStatus' => 'CANCEL', 'cancelDate' => '20260906', 'cancelTime' => '130000']);
         $this->response($payment); $this->rejected(fn () => $this->gateway->confirmRefund($this->order, $key, 'wrong'));
         $this->response($payment); $this->gateway->confirmRefund($this->order, $key, $payment['tid'] . '-full');
+        self::assertSame([], $this->gateway->pendingRefunds($this->order));
         $this->response($payment); $verified = $this->gateway->fetch($this->order);
         self::assertTrue($verified['valid']); self::assertSame(0, $verified['open_cancellations']); self::assertSame(13000, $verified['cancelled']);
     }

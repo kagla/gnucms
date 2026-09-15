@@ -25,7 +25,7 @@ final class Service
         $this->requests = new Requests($app, $this->events);
         $this->notifier = new Notifier($app, $this->settings, $this->requests);
         $this->ledger = new Ledger($app->db());
-        $this->checkout = new Checkout($app, $this->requests, $this->ledger);
+        $this->checkout = new Checkout($app, $this->requests, $this->ledger, $this->events);
         $this->import = new CsvImport($app, $this->requests, $this->notifier, $this->settings);
         $this->sales = new Sales($this->ledger);
     }

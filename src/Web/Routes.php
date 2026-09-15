@@ -133,6 +133,8 @@ final class Routes
             $slim->post('/admin/initalk/requests/{id:[a-f0-9]{32}}/' . $action, static fn ($request, $response, array $args) => $initalk->act($action, $request, $response, $args))
                 ->setName('admin.initalk.request.' . $action);
         }
+        $slim->post('/admin/initalk/requests/{id:[a-f0-9]{32}}/refund/close', static fn ($request, $response, array $args) => $initalk->act('refund-close', $request, $response, $args))
+            ->setName('admin.initalk.request.refund.close');
         $pay = new \GnuCms\Web\Controller\PayController($app);
         $slim->get('/pay/{token:[A-Za-z0-9_-]{20,40}}', [$pay, 'show'])->setName('pay.show');
         $slim->post('/pay/{token:[A-Za-z0-9_-]{20,40}}/start', [$pay, 'start'])->setName('pay.start');

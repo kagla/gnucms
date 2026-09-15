@@ -14,7 +14,7 @@ final class Checkout
 {
     public const RESTART_GRACE = 10;
 
-    public function __construct(private App $app, private Requests $requests, private Ledger $ledger)
+    public function __construct(private App $app, private Requests $requests, private Ledger $ledger, private Events $events)
     {
     }
 
@@ -66,11 +66,16 @@ final class Checkout
     {
         $request = $this->requests->find($id);
         if ($request['config_revision'] === '') return $request;
-        $payment = $this->app->inicisGateway()->fetch(self::order($request));
+        $order = self::order($request);
+        $payment = $this->app->inicisGateway()->fetch($order);
         if (!in_array($payment['status'] ?? 'NOT_FOUND', ['PAID', 'PARTIAL_CANCELLED', 'CANCELLED'], true)) return $request;
         if (!($payment['valid'] ?? false) || ($request['transaction_id'] !== '' && $request['transaction_id'] !== ($payment['transaction_id'] ?? ''))) {
             if (!$request['needs_review']) $this->requests->setReview($id, true, $actor, '결제사 조회 결과가 요청의 상점·금액·거래번호와 일치하지 않습니다.');
             return $this->requests->find($id);
+        }
+        // 대조: 결과를 확인하지 못한 환불 신청을 조회에 보이는 같은 금액의 취소에 연결한다. 연결한 만큼 보류가 줄어든다.
+        if (($payment['open_cancellations'] ?? 0) > 0) {
+            $payment['open_cancellations'] -= $this->linkPendingRefunds($order, $payment['cancellations']);
         }
         if ($request['paid_at'] === null) {
             $request = $this->requests->markPaid($id, (int) $payment['paid_at'], (string) $payment['transaction_id'], $actor);
@@ -88,6 +93,35 @@ final class Checkout
             $this->requests->setReview($id, false, $actor, '대조 완료');
         }
         return $this->requests->find($id);
+    }
+
+    /** 보류 신청을 PG 조회의 같은 금액 취소에 연결한다. 연결한 건수를 돌려준다. 짝이 없으면 보류로 남긴다. */
+    private function linkPendingRefunds(array $order, array $cancellations): int
+    {
+        $gateway = $this->app->inicisGateway();
+        $linked = 0;
+        foreach ($gateway->pendingRefunds($order) as $key => $entry) {
+            foreach ($cancellations as $cancel) {
+                if ((int) ($cancel['amount'] ?? 0) !== $entry['amount']) continue;
+                try {
+                    $gateway->confirmRefund($order, (string) $key, (string) $cancel['id']);
+                    $linked++;
+                    break;
+                } catch (DomainError $e) {
+                    // 이미 다른 신청에 연결된 취소이거나 조회가 그 사이 달라졌다. 다음 후보로 넘어간다.
+                }
+            }
+        }
+        return $linked;
+    }
+
+    /** 운영자가 PG에서 미처리를 확인한 2시간 경과 환불 신청을 종료한다. 게이트웨이의 검사를 그대로 쓴다. */
+    public function closeUnprocessedRefund(string $id, string $key, string $actor): array
+    {
+        $request = $this->requests->find($id);
+        $this->app->inicisGateway()->confirmUnprocessedRefund(self::order($request), $key);
+        $this->events->record($id, 'refund_closed', $actor, '미처리 환불 신청 종료 ' . substr($key, -8));
+        return $this->sync($id, $actor);
     }
 
     public function refund(string $id, int $amount, string $reason, string $refundKey, string $actor): array

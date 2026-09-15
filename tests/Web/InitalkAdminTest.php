@@ -202,6 +202,61 @@ final class InitalkAdminTest extends WebTestCase
         self::assertCount(2, $this->app->initalk()->ledger->forRequest($id));
     }
 
+    /** 결제창 → 승인 → 조회까지 게이트웨이를 실제로 태워 결제완료 상태를 만든다. @return array{0:array,1:string} */
+    private function paidThroughGateway(): array
+    {
+        $request = $this->app->initalk()->requests->create(['product_name' => '수강료', 'product_detail' => '', 'buyer_name' => '홍길동', 'phone' => '01023457891', 'amount' => '50000'], 'test', 48, 1, '운영자');
+        $checkout = $this->app->initalk()->checkout;
+        $checkout->start($request['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback');
+        $tid = 'StdpayCARD' . bin2hex(random_bytes(10));
+        $this->paymentHttp->responses[] = ['status' => 200, 'body' => ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'MOID' => $request['id'],
+            'TotPrice' => '50000', 'payMethod' => 'Card', 'tid' => $tid, 'currency' => 'WON']];
+        $this->paymentHttp->responses[] = ['status' => 200, 'body' => $this->inquiryBody($request['id'], $tid)];
+        $checkout->complete($request['id'], ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'orderNumber' => $request['id'], 'idc_name' => 'stg',
+            'authToken' => bin2hex(random_bytes(32)), 'authUrl' => 'https://stgstdpay.inicis.com/api/payAuth', 'netCancelUrl' => 'https://stgstdpay.inicis.com/api/netCancel']);
+        return [$this->app->initalk()->requests->find($request['id']), $tid];
+    }
+
+    private function inquiryBody(string $id, string $tid, int $price = 50000): array
+    {
+        return ['resultCode' => 'SUCCESS', 'mid' => $this->merchant['merchant_id'], 'oid' => $id, 'price' => (string) $price, 'tid' => $tid,
+            'transactionStatus' => 'APPROVAL', 'paymethod' => 'Card', 'approvedDate' => '20260915', 'approvedTime' => '120000',
+            'cardInfo' => ['currencyCode' => 'WON'], 'availablePartCancelPrice' => (string) $price, 'partCancelTransInfo' => []];
+    }
+
+    /** #2 결과를 확인하지 못한 환불은 상세에 뜨고, 2시간이 지나야 미처리 종료 버튼이 나온다. */
+    #[DataProvider('connectionProvider')]
+    public function testPendingRefundIsListedAndClosedAfterTwoHours(array $config): void
+    {
+        $this->setupApp($config);
+        $this->signIn(true);
+        [$request, $tid] = $this->paidThroughGateway();
+        $path = '/admin/initalk/requests/' . $request['id'];
+        // 부분취소 응답의 금액이 어긋나 거절된다 → 저널에 보류가 남는다.
+        $this->paymentHttp->responses[] = ['status' => 200, 'body' => ['resultCode' => '00', 'prtcDate' => '20260916', 'prtcTime' => '100000',
+            'prtcPrice' => '9000', 'prtcRemains' => '40000', 'prtcTid' => $tid . 'P1']];
+        $failed = $this->post($this->app, $path . '/refund', ['csrf_token' => $this->csrf(), 'amount' => '10000', 'reason' => '일부 환불', 'refund_key' => bin2hex(random_bytes(16))]);
+        self::assertSame(503, $failed->getStatusCode());
+        $detail = $this->body($this->get($this->app, $path));
+        self::assertStringContainsString('보류 중인 환불', $detail);
+        self::assertStringContainsString('10,000', $detail);
+        self::assertStringNotContainsString('미처리 종료', $detail);
+        // 2시간이 지나면 종료 버튼이 나온다.
+        Clock::freeze('2026-09-15 06:00:00');
+        $detail = $this->body($this->get($this->app, $path));
+        self::assertStringContainsString('미처리 종료', $detail);
+        self::assertSame(1, preg_match('/name="key" value="(initalk-' . $request['id'] . '-[a-f0-9]{32})"/', $detail, $m));
+        $this->paymentHttp->responses[] = ['status' => 200, 'body' => $this->inquiryBody($request['id'], $tid)];
+        $this->paymentHttp->responses[] = ['status' => 200, 'body' => $this->inquiryBody($request['id'], $tid)];
+        $closed = $this->post($this->app, $path . '/refund/close', ['csrf_token' => $this->csrf(), 'key' => $m[1]]);
+        self::assertSame(303, $closed->getStatusCode());
+        self::assertStringContainsString('refund_closed=1', $closed->getHeaderLine('Location'));
+        $detail = $this->body($this->get($this->app, $path, ['refund_closed' => '1']));
+        self::assertStringContainsString('미처리 환불 신청을 종료했습니다', $detail);
+        self::assertStringNotContainsString('보류 중인 환불', $detail);
+        self::assertSame(0, $this->app->initalk()->requests->find($request['id'])['needs_review']);
+    }
+
     #[DataProvider('connectionProvider')]
     public function testCsvImportPreviewsThenCreatesAndSends(array $config): void
     {

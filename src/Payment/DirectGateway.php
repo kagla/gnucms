@@ -120,6 +120,20 @@ abstract class DirectGateway implements Gateway
         return $result;
     }
 
+    /** 아직 결과를 확인하지 못한 환불 신청. 읽기 전용이라 상태를 바꾸지 않고 PG에 묻지도 않는다.
+     *  @return array<string,array{amount:int,remaining:int,reason:string,at:int}> */
+    public function pendingRefunds(array $order): array
+    {
+        if (($order['provider'] ?? '') !== $this->id()) throw DomainError::validation(['order' => '주문 결제사를 확인해 주세요.']);
+        $pending = [];
+        foreach ($this->journal->read($order['id'])['refunds'] ?? [] as $key => $refund) {
+            if (($refund['status'] ?? '') !== 'pending') continue;
+            $pending[(string) $key] = ['amount' => (int) $refund['amount'], 'remaining' => (int) $refund['remaining'],
+                'reason' => (string) $refund['reason'], 'at' => (int) $refund['at']];
+        }
+        return $pending;
+    }
+
     /** 관리자 대조: PG 조회에서 확인한 취소만 기존 보류 요청에 연결한다. */
     public function confirmRefund(array $order, string $key, string $reference): void
     {

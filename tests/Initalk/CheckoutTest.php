@@ -78,6 +78,19 @@ final class CheckoutTest extends DatabaseTestCase
             'availablePartCancelPrice' => (string) ($price - $cancelled), 'partCancelTransInfo' => $partials, 'cancelDate' => '20260916', 'cancelTime' => '090000'];
     }
 
+    /** 결제창 → 승인 → 조회까지 끝낸 결제완료 요청. */
+    private function paidRequest(string &$tid): array
+    {
+        $request = $this->request();
+        $checkout = $this->app->initalk()->checkout;
+        $checkout->start($request['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback');
+        $tid = 'StdpayCARD' . bin2hex(random_bytes(10));
+        $this->respond($this->approval($request, $tid));
+        $this->respond($this->inquiry($request, $tid));
+        $checkout->complete($request['id'], $this->authCallback($request));
+        return $this->app->initalk()->requests->find($request['id']);
+    }
+
     #[DataProvider('connectionProvider')]
     public function testStartCompleteSyncAndRefunds(array $config): void
     {
@@ -181,6 +194,72 @@ final class CheckoutTest extends DatabaseTestCase
         $events = $this->app->initalk()->events->forRequest($request['id']);
         self::assertSame('review_cleared', end($events)['type']);
         self::assertSame('대조 완료', end($events)['note']);
+    }
+
+    /** #2 (a) 결과를 확인하지 못한 환불은 조회가 같은 금액의 취소를 찾으면 연결되고, 그 뒤 새 환불이 다시 열린다. */
+    #[DataProvider('connectionProvider')]
+    public function testSyncLinksAPendingRefundToTheMatchingCancellation(array $config): void
+    {
+        $this->setupApp($config);
+        $checkout = $this->app->initalk()->checkout;
+        $tid = '';
+        $request = $this->paidRequest($tid);
+        // 부분취소 응답의 금액이 어긋나 게이트웨이가 거절한다 → 저널에 보류가 남는다.
+        $this->respond(['resultCode' => '00', 'prtcDate' => '20260916', 'prtcTime' => '100000', 'prtcPrice' => '4000', 'prtcRemains' => '10000', 'prtcTid' => $tid . 'P1']);
+        try { $checkout->refund($request['id'], 5800, '일부 반품', bin2hex(random_bytes(16)), '운영자'); self::fail('rejected'); } catch (DomainError $e) { self::assertSame(503, $e->status()); }
+        self::assertCount(1, $this->app->initalk()->ledger->forRequest($request['id']));
+        // 보류가 남아 있는 동안에는 새 키의 환불도 막힌다.
+        try { $checkout->refund($request['id'], 5800, '다시 반품', bin2hex(random_bytes(16)), '운영자'); self::fail('blocked'); }
+        catch (DomainError $e) { self::assertSame('기존 환불을 PG에서 확인해 주세요.', $e->details()['refund'] ?? ''); }
+        // 조회에 같은 금액의 취소가 보이면 보류 신청에 연결하고 원장·환불 누적액도 같은 실행에서 맞춘다.
+        $partials = [['tid' => $tid . 'P1', 'requestDate' => '20260916', 'requestTime' => '100000', 'requestPrice' => '5800']];
+        $this->respond($this->inquiry($request, $tid, 'PART_CANCEL', 15800, $partials));
+        $this->respond($this->inquiry($request, $tid, 'PART_CANCEL', 15800, $partials));
+        $after = $checkout->sync($request['id'], '운영자');
+        self::assertSame(Status::PAID, $after['status']);
+        self::assertSame(5800, $after['refunded_amount']);
+        self::assertSame(0, $after['needs_review']);
+        self::assertCount(2, $this->app->initalk()->ledger->forRequest($request['id']));
+        self::assertSame([], $this->app->inicisGateway()->pendingRefunds(Checkout::order($request)));
+        // 보류가 풀렸으므로 새 환불을 다시 받는다.
+        $this->respond(['resultCode' => '00', 'prtcDate' => '20260917', 'prtcTime' => '110000', 'prtcPrice' => '1000', 'prtcRemains' => '9000', 'prtcTid' => $tid . 'P2']);
+        $third = $checkout->refund($request['id'], 1000, '추가 반품', bin2hex(random_bytes(16)), '운영자');
+        self::assertSame(6800, $third['refunded_amount']);
+        self::assertCount(3, $this->app->initalk()->ledger->forRequest($request['id']));
+    }
+
+    /** #2 (b) PG에 취소가 없으면 2시간이 지난 뒤에만 미처리로 종료할 수 있다. */
+    #[DataProvider('connectionProvider')]
+    public function testUnprocessedRefundIsClosedOnlyAfterTwoHours(array $config): void
+    {
+        $this->setupApp($config);
+        $checkout = $this->app->initalk()->checkout;
+        $tid = '';
+        $request = $this->paidRequest($tid);
+        $this->respond(['resultCode' => '00', 'prtcDate' => '20260916', 'prtcTime' => '100000', 'prtcPrice' => '4000', 'prtcRemains' => '10000', 'prtcTid' => $tid . 'P1']);
+        try { $checkout->refund($request['id'], 5800, '일부 반품', bin2hex(random_bytes(16)), '운영자'); self::fail('rejected'); } catch (DomainError $e) { self::assertSame(503, $e->status()); }
+        $pending = $this->app->inicisGateway()->pendingRefunds(Checkout::order($request));
+        self::assertCount(1, $pending);
+        $key = (string) array_key_first($pending);
+        // 조회에 취소가 없다 → 연결할 것이 없고 보류가 남아 확인 필요로 표시된다.
+        $this->respond($this->inquiry($request, $tid));
+        $synced = $checkout->sync($request['id'], '운영자');
+        self::assertSame(0, $synced['refunded_amount']);
+        self::assertSame(1, $synced['needs_review']);
+        try { $checkout->closeUnprocessedRefund($request['id'], $key, '운영자'); self::fail('too soon'); } catch (DomainError $e) { self::assertSame(422, $e->status()); }
+        Clock::freeze('2026-09-15 06:00:00');
+        $this->respond($this->inquiry($request, $tid));
+        $this->respond($this->inquiry($request, $tid));
+        $closed = $checkout->closeUnprocessedRefund($request['id'], $key, '운영자');
+        self::assertSame(0, $closed['refunded_amount']);
+        self::assertSame(0, $closed['needs_review']);
+        self::assertSame([], $this->app->inicisGateway()->pendingRefunds(Checkout::order($request)));
+        $events = array_column($this->app->initalk()->events->forRequest($request['id']), 'type');
+        self::assertContains('refund_closed', $events);
+        // 종료 뒤에는 새 환불을 다시 받는다.
+        $this->respond(['resultCode' => '00', 'prtcDate' => '20260916', 'prtcTime' => '120000', 'prtcPrice' => '5800', 'prtcRemains' => '10000', 'prtcTid' => $tid . 'P9']);
+        $again = $checkout->refund($request['id'], 5800, '다시 반품', bin2hex(random_bytes(16)), '운영자');
+        self::assertSame(5800, $again['refunded_amount']);
     }
 
     #[DataProvider('connectionProvider')]

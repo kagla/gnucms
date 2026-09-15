@@ -13,6 +13,7 @@ $notice = match (true) {
     isset($query['cancelled']) => '결제 전 취소했습니다.',
     isset($query['synced']) => '결제사 조회 결과를 반영했습니다.',
     isset($query['refunded']) => '환불을 처리했습니다.',
+    isset($query['refund_closed']) => '미처리 환불 신청을 종료했습니다.',
     default => '',
 };
 $r = $request; $remaining = $r['amount'] - $r['refunded_amount'];
@@ -48,6 +49,16 @@ $r = $request; $remaining = $r['amount'] - $r['refunded_amount'];
 <button class="btn btn-error">환불</button></form><?php endif ?>
 </section>
 </div>
+<?php if ($pending_refunds !== []): ?>
+<section class="card card-body extension-panel"><h2 class="card-title">보류 중인 환불 신청</h2>
+<p class="muted">결제사 응답을 확인하지 못한 환불입니다. 결제 상태 조회로 같은 금액의 취소를 찾으면 연결합니다. 결제사에 취소 내역이 없다면 신청 2시간 뒤부터 종료할 수 있습니다.</p>
+<div class="table-wrap"><table class="table"><thead><tr><th>요청 키</th><th class="num">금액</th><th>신청 시각</th><th>경과</th><th>작업</th></tr></thead><tbody>
+<?php foreach ($pending_refunds as $pendingKey => $pending): $age = \GnuCms\Support\Clock::timestamp() - $pending['at']; ?>
+<tr><td>…<?= $this->e(substr($pendingKey, -8)) ?></td><td class="num"><?= number_format($pending['amount']) ?>원</td><td><?= $this->e($time($pending['at'])) ?></td><td><?= (int) floor($age / 60) ?>분 전</td>
+<td><?php if ($age > 7200): ?><form method="post" action="<?= $this->url('admin.initalk.request.refund.close', ['id' => $r['id']]) ?>" data-confirm="refund-close"><input type="hidden" name="csrf_token" value="<?= $this->e($csrf_token) ?>"><input type="hidden" name="key" value="<?= $this->e($pendingKey) ?>"><button class="btn btn-sm btn-outline">미처리 종료</button></form><?php else: ?><span class="muted">결제 상태 조회로 대조</span><?php endif ?></td></tr>
+<?php endforeach ?>
+</tbody></table></div></section>
+<?php endif ?>
 <section class="card card-body extension-panel"><h2 class="card-title">확정 원장</h2><div class="table-wrap"><table class="table"><thead><tr><th>일시</th><th>구분</th><th class="num">금액</th><th>거래·취소 ID</th></tr></thead><tbody>
 <?php foreach ($ledger as $row): ?><tr><td><?= $this->e($time($row['at'])) ?></td><td><?= $row['kind'] === 'approve' ? '승인' : '환불' ?></td><td class="num"><?= number_format((int) $row['amount']) ?>원</td><td><?= $this->e($row['reference']) ?></td></tr><?php endforeach ?>
 <?php if ($ledger === []): ?><tr><td colspan="4">확정된 결제가 없습니다.</td></tr><?php endif ?></tbody></table></div></section>
