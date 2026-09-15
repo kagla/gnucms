@@ -252,12 +252,8 @@ final class InitalkAdminController
     {
         $options = ['test' => [], 'live' => []];
         foreach (['test', 'live'] as $environment) {
-            try {
-                foreach ($this->app->messaging()->templateAction('list', ['environment' => $environment]) as $template) {
-                    if ($template['enabled']) $options[$environment][] = ['id' => $template['id'], 'name' => $template['name'], 'code' => $template['code']];
-                }
-            } catch (\Throwable $e) {
-                // 알림톡 설정 전에는 목록이 비어 있다.
+            foreach ($this->app->messaging()->templateAction('list', ['environment' => $environment]) as $template) {
+                if ($template['enabled']) $options[$environment][] = ['id' => $template['id'], 'name' => $template['name'], 'code' => $template['code']];
             }
         }
         return $options;
