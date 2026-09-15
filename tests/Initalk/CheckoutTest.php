@@ -1,0 +1,181 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GnuCms\Tests\Initalk;
+
+use GnuCms\App;
+use GnuCms\Db\Schema;
+use GnuCms\Error\DomainError;
+use GnuCms\Initalk\Checkout;
+use GnuCms\Initalk\Status;
+use GnuCms\Payment\InicisGateway;
+use GnuCms\Support\Clock;
+use GnuCms\Tests\Payment\FakeTransport;
+use GnuCms\Tests\Payment\Fixtures;
+use GnuCms\Tests\Support\DatabaseTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+
+final class CheckoutTest extends DatabaseTestCase
+{
+    private App $app;
+    private string $root;
+    private FakeTransport $http;
+    private array $merchant;
+
+    private function setupApp(array $config): void
+    {
+        $this->root = sys_get_temp_dir() . '/gnucms-initalk-checkout-' . bin2hex(random_bytes(5));
+        $config['prefix'] = 'ic' . bin2hex(random_bytes(4)) . '_';
+        $this->app = new App(['db' => $config, 'storage' => ['dir' => $this->root], 'auth' => ['secret' => bin2hex(random_bytes(32))],
+            'app' => ['url' => 'https://shop.example.test']]);
+        (new Schema($this->app->db()))->create();
+        Clock::freeze('2026-09-15 03:00:00');
+        $this->merchant = Fixtures::config('inicis');
+        $this->app->paymentSettings()->save('test', $this->merchant);
+        $this->app->paymentSettings()->enable('test', true);
+        $this->http = new FakeTransport();
+        $this->app->setInicisGateway(new InicisGateway($this->app->paymentSettings(), $this->http));
+    }
+
+    protected function tearDown(): void
+    {
+        Clock::unfreeze();
+        if (isset($this->app)) (new Schema($this->app->db()))->drop();
+        if (isset($this->root) && is_dir($this->root)) {
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST) as $file) {
+                $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+            }
+            rmdir($this->root);
+        }
+        parent::tearDown();
+    }
+
+    private function request(): array
+    {
+        return $this->app->initalk()->requests->create(['product_name' => '플로럴 핸드크림 30ml', 'product_detail' => '', 'buyer_name' => '김이니',
+            'phone' => '01023457891', 'amount' => '15800'], 'test', 48, 1, '운영자');
+    }
+
+    private function authCallback(array $request): array
+    {
+        return ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'orderNumber' => $request['id'], 'idc_name' => 'stg',
+            'authToken' => bin2hex(random_bytes(32)), 'authUrl' => 'https://stgstdpay.inicis.com/api/payAuth', 'netCancelUrl' => 'https://stgstdpay.inicis.com/api/netCancel'];
+    }
+
+    private function respond(array $body): void { $this->http->responses[] = ['status' => 200, 'body' => $body]; }
+
+    private function approval(array $request, string $tid, int $price = 15800): array
+    {
+        return ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'MOID' => $request['id'], 'TotPrice' => (string) $price, 'payMethod' => 'Card', 'tid' => $tid, 'currency' => 'WON'];
+    }
+
+    private function inquiry(array $request, string $tid, string $status = 'APPROVAL', int $price = 15800, array $partials = []): array
+    {
+        $cancelled = array_sum(array_column($partials, 'requestPrice'));
+        return ['resultCode' => 'SUCCESS', 'mid' => $this->merchant['merchant_id'], 'oid' => $request['id'], 'price' => (string) $price, 'tid' => $tid,
+            'transactionStatus' => $status, 'paymethod' => 'Card', 'approvedDate' => '20260915', 'approvedTime' => '120500', 'cardInfo' => ['currencyCode' => 'WON'],
+            'availablePartCancelPrice' => (string) ($price - $cancelled), 'partCancelTransInfo' => $partials, 'cancelDate' => '20260916', 'cancelTime' => '090000'];
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testStartCompleteSyncAndRefunds(array $config): void
+    {
+        $this->setupApp($config);
+        $checkout = $this->app->initalk()->checkout;
+        $request = $this->request();
+        $form = $checkout->start($request['id'], 'web', 'https://shop.example.test/pay/' . $request['url_token'] . '/return', 'https://shop.example.test/pay/callback');
+        self::assertSame('inicis', $form['kind']);
+        self::assertSame($request['id'], $form['fields']['oid']);
+        self::assertSame('15800', $form['fields']['price']);
+        self::assertStringStartsWith('https://shop.example.test/pay/callback?id=' . $request['id'] . '&state=', $form['fields']['returnUrl']);
+        $started = $this->app->initalk()->requests->find($request['id']);
+        self::assertSame(Clock::timestamp(), $started['checkout_started_at']);
+        self::assertSame($this->app->paymentSettings()->summary('test')['revision'], $started['config_revision']);
+        try { $checkout->start($request['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback'); self::fail('too soon'); } catch (DomainError $e) { self::assertSame(422, $e->status()); }
+        Clock::freeze('2026-09-15 03:00:20');
+        $mobile = $checkout->start($request['id'], 'mobile', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback');
+        self::assertSame('form', $mobile['kind']);
+        self::assertSame('EUC-KR', $mobile['charset']);
+        self::assertSame($request['id'], $mobile['fields']['P_OID']);
+        self::assertSame([], $this->http->calls);
+        $tid = 'StdpayCARD' . bin2hex(random_bytes(10));
+        $this->respond($this->approval($request, $tid));
+        $this->respond($this->inquiry($request, $tid));
+        $checkout->complete($request['id'], $this->authCallback($request));
+        $paid = $this->app->initalk()->requests->find($request['id']);
+        self::assertSame(Status::PAID, $paid['status']);
+        self::assertSame($tid, $paid['transaction_id']);
+        self::assertSame((new \DateTimeImmutable('2026-09-15 12:05:00', new \DateTimeZone('Asia/Seoul')))->getTimestamp(), $paid['paid_at']);
+        $ledger = $this->app->initalk()->ledger->forRequest($request['id']);
+        self::assertSame([['approve', 15800, $tid]], array_map(static fn (array $row): array => [$row['kind'], (int) $row['amount'], $row['reference']], $ledger));
+        // 콜백 재전송은 새 승인을 만들지 않는다.
+        $this->respond($this->inquiry($request, $tid));
+        $checkout->complete($request['id'], $this->authCallback($request));
+        self::assertCount(1, $this->app->initalk()->ledger->forRequest($request['id']));
+        // 부분 환불
+        $key = bin2hex(random_bytes(16));
+        $this->respond(['resultCode' => '00', 'prtcDate' => '20260916', 'prtcTime' => '100000', 'prtcPrice' => '5800', 'prtcRemains' => '10000', 'prtcTid' => $tid . 'P1']);
+        $partial = $checkout->refund($request['id'], 5800, '일부 반품', $key, '운영자');
+        self::assertSame(Status::PAID, $partial['status']);
+        self::assertSame(5800, $partial['refunded_amount']);
+        self::assertCount(2, $this->app->initalk()->ledger->forRequest($request['id']));
+        // 같은 키로 다시 요청하면 결제사에 다시 보내지 않고 조회로 대조한다.
+        $calls = count($this->http->calls);
+        $this->respond($this->inquiry($request, $tid, 'PART_CANCEL', 15800, [['tid' => $tid . 'P1', 'requestDate' => '20260916', 'requestTime' => '100000', 'requestPrice' => '5800']]));
+        $again = $checkout->refund($request['id'], 5800, '일부 반품', $key, '운영자');
+        self::assertSame(5800, $again['refunded_amount']);
+        self::assertCount(2, $this->app->initalk()->ledger->forRequest($request['id']));
+        self::assertSame($calls + 1, count($this->http->calls));
+        try { $checkout->refund($request['id'], 10001, '초과', bin2hex(random_bytes(16)), '운영자'); self::fail('over'); } catch (DomainError $e) { self::assertArrayHasKey('amount', $e->details()); }
+        // 남은 금액 전액 환불. 총액(15,800)보다 작은 금액이므로 게이트웨이는 부분취소 API를 쓴다.
+        $this->respond(['resultCode' => '00', 'prtcDate' => '20260917', 'prtcTime' => '110000', 'prtcPrice' => '10000', 'prtcRemains' => '0', 'prtcTid' => $tid . 'P2']);
+        $full = $checkout->refund($request['id'], 10000, '전체 반품', bin2hex(random_bytes(16)), '운영자');
+        self::assertSame(Status::REFUNDED, $full['status']);
+        self::assertSame(15800, $full['refunded_amount']);
+        self::assertCount(3, $this->app->initalk()->ledger->forRequest($request['id']));
+        $between = $this->app->initalk()->ledger->between('test', 0, Clock::timestamp() + 86400 * 10);
+        self::assertSame(3, count($between));
+        self::assertSame($request['number'], $between[0]['number']);
+        self::assertSame('010-****-7891', $between[0]['phone_mask']);
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testMismatchedInquiryFlagsReviewInsteadOfPaying(array $config): void
+    {
+        $this->setupApp($config);
+        $checkout = $this->app->initalk()->checkout;
+        $request = $this->request();
+        $checkout->start($request['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback');
+        $tid = 'StdpayCARD' . bin2hex(random_bytes(10));
+        $this->respond($this->approval($request, $tid));
+        $this->respond($this->inquiry($request, $tid, 'APPROVAL', 15000));
+        $checkout->complete($request['id'], $this->authCallback($request));
+        $after = $this->app->initalk()->requests->find($request['id']);
+        self::assertSame(Status::CREATED, $after['status']);
+        self::assertSame(1, $after['needs_review']);
+        self::assertNull($after['paid_at']);
+        self::assertSame([], $this->app->initalk()->ledger->forRequest($request['id']));
+        $fresh = $this->request(); self::assertSame($fresh['status'], $checkout->sync($fresh['id'], '운영자')['status']); self::assertCount(2, $this->http->calls);
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testStartRejectsClosedOrExpiredRequestsAndStoppedApi(array $config): void
+    {
+        $this->setupApp($config);
+        $checkout = $this->app->initalk()->checkout;
+        $cancelled = $this->request();
+        $this->app->initalk()->requests->cancel($cancelled['id'], '운영자');
+        try { $checkout->start($cancelled['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback'); self::fail('cancelled'); } catch (DomainError $e) { self::assertSame(422, $e->status()); }
+        $late = $this->request();
+        Clock::freeze('2026-09-18 00:00:00');
+        try { $checkout->start($late['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback'); self::fail('expired'); } catch (DomainError $e) { self::assertSame(422, $e->status()); }
+        Clock::freeze('2026-09-15 03:00:00');
+        $this->app->paymentSettings()->enable('test', false);
+        $open = $this->request();
+        try { $checkout->start($open['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback'); self::fail('stopped'); } catch (DomainError $e) { self::assertSame(503, $e->status()); }
+        self::assertSame('mobile', Checkout::device('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)'));
+        self::assertSame('web', Checkout::device('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'));
+        self::assertSame([], $this->http->calls);
+    }
+}

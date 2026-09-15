@@ -13,6 +13,8 @@ final class Service
     public readonly Events $events;
     public readonly Requests $requests;
     public readonly Notifier $notifier;
+    public readonly Ledger $ledger;
+    public readonly Checkout $checkout;
 
     public function __construct(public readonly App $app)
     {
@@ -20,5 +22,7 @@ final class Service
         $this->events = new Events($app->db());
         $this->requests = new Requests($app, $this->events);
         $this->notifier = new Notifier($app, $this->settings, $this->requests);
+        $this->ledger = new Ledger($app->db());
+        $this->checkout = new Checkout($app, $this->requests, $this->ledger);
     }
 }
