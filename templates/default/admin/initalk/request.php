@@ -19,7 +19,9 @@ $notice = match (true) {
 $r = $request; $remaining = $r['amount'] - $r['refunded_amount'];
 ?>
 <?php $this->insert('admin/initalk/_nav', ['active' => 'requests', 'errors' => $errors, 'notice' => $notice, 'config' => $config]) ?>
-<?php if ($r['needs_review']): ?><p class="alert alert-warning" role="alert">결제사 조회 결과와 요청이 일치하지 않거나 보류 중인 환불이 있습니다. 결제 상태 조회로 대조해 주세요.</p><?php endif ?>
+<?php if ($r['needs_review']): ?><p class="alert alert-warning" role="alert">결제사 조회 결과와 요청이 일치하지 않거나 보류 중인 환불이 있습니다. 결제 상태 조회로 대조해 주세요.</p>
+<?php if (\GnuCms\Initalk\Status::canCancel($r['status'])): ?><p class="muted">확인 필요: 결제 상태 조회로 PG 결과를 대조하고, 결제 내역이 없으면 취소 후 새 요청을 만드세요. 이미 요청한 결제의 결과가 확정되지 않으면 고객의 재결제도 막힙니다.</p><?php endif ?>
+<?php endif ?>
 <div class="cols initalk-cols">
 <section class="card card-body extension-panel"><h2 class="card-title"><?= $this->e($r['number']) ?> <span class="badge badge-soft initalk-status-<?= $this->e($r['status']) ?>"><?= $this->e($r['status_label']) ?></span></h2>
 <dl class="initalk-dl">

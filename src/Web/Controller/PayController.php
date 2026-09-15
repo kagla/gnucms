@@ -89,7 +89,12 @@ final class PayController
                 $found['id'], Checkout::device($this->userAgent($request)),
                 $this->siteUrl() . '/pay/' . $token . '/return', $this->siteUrl() . '/pay/callback'));
         } catch (DomainError $e) {
-            $message = $e->status() >= 500 ? '지금은 결제할 수 없습니다. 잠시 후 다시 시도해 주세요.' : implode(' ', array_values($e->details() ?: [$e->getMessage()]));
+            // 앞선 승인 결과가 미확정이면 게이트웨이가 새 결제창을 막는다. 고객이 할 수 있는 일은 상점 문의뿐이다.
+            $message = match (true) {
+                $e->status() >= 500 => '지금은 결제할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+                ($e->details()['payment'] ?? '') === '이미 요청한 결제 결과를 먼저 확인해 주세요.' => '이전 결제 요청의 결과를 확인하는 중입니다. 상점에 문의해 주세요.',
+                default => implode(' ', array_values($e->details() ?: [$e->getMessage()])),
+            };
             return $this->render($request, $response->withStatus($e->status()), 'show', ['request' => $this->safe($found), 'state' => $this->state($found), 'failed' => false, 'errors' => [$message]]);
         }
         return $this->render($request, $response, 'start', ['request' => $this->safe($found), 'payment' => $payment, 'token' => $token]);

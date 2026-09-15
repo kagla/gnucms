@@ -162,6 +162,34 @@ final class PayTest extends WebTestCase
         self::assertNull($after['paid_at']);
     }
 
+    /** #4 승인이 미확정으로 남은 뒤의 재시도는 고객에게 무엇을 해야 하는지 알려 준다. */
+    #[DataProvider('connectionProvider')]
+    public function testRetryAfterAFailedApprovalTellsTheCustomerToAskTheStore(array $config): void
+    {
+        $this->setupApp($config);
+        $r = $this->makeRequest();
+        $path = '/pay/' . $r['url_token'];
+        $this->handle('GET', $path);
+        session_start();
+        $csrf = $_SESSION['csrf_token'];
+        session_write_close();
+        self::assertSame(200, $this->handle('POST', $path . '/start', ['csrf_token' => $csrf], ['HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0)'])->getStatusCode());
+        $stored = $this->app->initalk()->requests->find($r['id']);
+        $state = CallbackToken::create($this->app, Checkout::order($stored));
+        $callback = ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'orderNumber' => $r['id'], 'idc_name' => 'stg',
+            'authToken' => bin2hex(random_bytes(32)), 'authUrl' => 'https://stgstdpay.inicis.com/api/payAuth', 'netCancelUrl' => 'https://stgstdpay.inicis.com/api/netCancel'];
+        // 승인 응답의 금액이 주문과 달라 승인이 미확정(pending)으로 남는다.
+        $this->http->responses[] = ['status' => 200, 'body' => ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'MOID' => $r['id'],
+            'TotPrice' => '999', 'payMethod' => 'Card', 'tid' => 'StdpayCARD' . bin2hex(random_bytes(10)), 'currency' => 'WON']];
+        self::assertSame(303, $this->handle('POST', '/pay/callback?' . http_build_query(['id' => $r['id'], 'state' => $state]), [], [], http_build_query($callback), 'application/x-www-form-urlencoded')->getStatusCode());
+        self::assertSame(1, $this->app->initalk()->requests->find($r['id'])['needs_review']);
+        Clock::freeze('2026-09-15 03:05:00');
+        $retry = $this->handle('POST', $path . '/start', ['csrf_token' => $csrf], ['HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0)']);
+        self::assertSame(422, $retry->getStatusCode());
+        self::assertStringContainsString('이전 결제 요청의 결과를 확인하는 중입니다. 상점에 문의해 주세요.', $this->body($retry));
+        self::assertStringNotContainsString('INIStdPay.js', $this->body($retry));
+    }
+
     /** #3 콜백이 두 번 와도(재전송·중복 제출) 결제완료 건을 확인 필요로 표시하지 않는다. */
     #[DataProvider('connectionProvider')]
     public function testDuplicateCallbackLeavesThePaidRequestClean(array $config): void

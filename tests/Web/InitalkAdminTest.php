@@ -113,6 +113,8 @@ final class InitalkAdminTest extends WebTestCase
         self::assertStringNotContainsString('010-2345-7891', $list);
         self::assertStringContainsString('name="ids[]"', $list);
         self::assertStringContainsString('조회된 결제 요청이 없습니다', $this->body($this->get($this->app, '/admin/initalk/requests', ['status' => 'paid'])));
+        // #5 달력에 없는 날짜로 검색해도 500이 아니라 조건 없이 조회한다.
+        self::assertSame(200, $this->get($this->app, '/admin/initalk/requests', ['from' => '2026-13-45', 'until' => '2026-02-30'])->getStatusCode());
         // 고객 확인 JSON
         $customer = $this->post($this->app, '/admin/initalk/customer', ['csrf_token' => $this->csrf(), 'phone' => '010-2345-7891']);
         self::assertSame('application/json; charset=utf-8', $customer->getHeaderLine('Content-Type'));
@@ -298,8 +300,14 @@ final class InitalkAdminTest extends WebTestCase
         self::assertSame(200, $svg->getStatusCode());
         self::assertSame('image/svg+xml; charset=utf-8', $svg->getHeaderLine('Content-Type'));
         self::assertStringStartsWith('<svg', $this->body($svg));
-        self::assertStringContainsString('qr.svg', $this->body($this->get($this->app, '/admin/initalk/requests/' . $request['id'])));
+        $detail = $this->body($this->get($this->app, '/admin/initalk/requests/' . $request['id']));
+        self::assertStringContainsString('qr.svg', $detail);
         self::assertSame(404, $this->get($this->app, '/admin/initalk/requests/' . str_repeat('0', 32) . '/qr.svg')->getStatusCode());
+        // #4 미결 상태의 확인 필요 건에는 복구 절차를 안내한다.
+        self::assertStringNotContainsString('결제 내역이 없으면 취소 후 새 요청을 만드세요', $detail);
+        $this->app->initalk()->requests->setReview($request['id'], true, 'system', '조회 불일치');
+        self::assertStringContainsString('확인 필요: 결제 상태 조회로 PG 결과를 대조하고, 결제 내역이 없으면 취소 후 새 요청을 만드세요.',
+            $this->body($this->get($this->app, '/admin/initalk/requests/' . $request['id'])));
     }
 
     #[DataProvider('connectionProvider')]

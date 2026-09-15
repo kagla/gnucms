@@ -131,6 +131,21 @@ final class RequestsTest extends DatabaseTestCase
         self::assertStringNotContainsString('01023457891', json_encode($all['items']));
     }
 
+    /** #5 달력에 없는 날짜는 예외가 아니라 무시한다(정규식에 안 맞는 값과 같게). */
+    #[DataProvider('connectionProvider')]
+    public function testSearchIgnoresImpossibleDates(array $config): void
+    {
+        $this->setupApp($config);
+        $this->requests->create($this->input(), 'test', 48, 1, '운영자');
+        self::assertSame(1, $this->requests->search(['environment' => 'test', 'from' => '2026-13-45', 'until' => '2026-02-30'], 1)['total']);
+        self::assertSame(1, $this->requests->search(['environment' => 'test', 'from' => '2026-09-15', 'until' => '2026-09-15'], 1)['total']);
+        self::assertSame(0, $this->requests->search(['environment' => 'test', 'from' => '2026-09-16'], 1)['total']);
+        self::assertTrue(Requests::isCalendarDate('2026-02-28'));
+        self::assertFalse(Requests::isCalendarDate('2026-02-30'));
+        self::assertFalse(Requests::isCalendarDate('2026-2-8'));
+        self::assertFalse(Requests::isCalendarDate('오늘'));
+    }
+
     /** #3·#10 CLI sync 대상: 창 안의 결제창(만료 포함)과 최근 확인 필요 건만. */
     #[DataProvider('connectionProvider')]
     public function testNeedingSyncCoversExpiredCheckoutsAndIsBoundedByTheWindow(array $config): void

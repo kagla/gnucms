@@ -42,11 +42,13 @@ final class Checkout
         $settings = $this->app->paymentSettings();
         $settings->requireEnabled($request['environment']);
         $revision = (string) $settings->summary($request['environment'])['revision'];
-        $this->requests->touchCheckout($id, $revision);
         $request['config_revision'] = $revision;
         $order = self::order($request);
         $callbackUrl = $callbackBase . '?id=' . $id . '&state=' . CallbackToken::create($this->app, $order);
-        return $this->app->inicisGateway()->checkout($order, ['name' => $request['buyer_name'], 'phone' => $request['phone'], 'email' => ''], $returnUrl, $callbackUrl, $device === 'mobile' ? 'mobile' : 'web');
+        $form = $this->app->inicisGateway()->checkout($order, ['name' => $request['buyer_name'], 'phone' => $request['phone'], 'email' => ''], $returnUrl, $callbackUrl, $device === 'mobile' ? 'mobile' : 'web');
+        // 게이트웨이가 결제창을 내준 뒤에만 기록한다. 거부된 시도가 만료 보호(30분)를 연장하면 안 된다.
+        $this->requests->touchCheckout($id, $revision);
+        return $form;
     }
 
     /** 인증 결과 콜백. 승인 후 조회로 확정한다. 호출자가 ExecutionLock 안에서 부른다. */

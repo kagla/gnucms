@@ -115,7 +115,7 @@ final class Requests
         if (in_array($filter['environment'] ?? '', ['test', 'live'], true)) { $where[] = 'environment = ?'; $params[] = $filter['environment']; }
         foreach (['from' => '>=', 'until' => '<='] as $key => $op) {
             $value = $filter[$key] ?? '';
-            if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value)) {
+            if (is_string($value) && self::isCalendarDate($value)) {
                 $day = new \DateTimeImmutable($value . ($op === '>=' ? ' 00:00:00' : ' 23:59:59'), new \DateTimeZone('Asia/Seoul'));
                 $where[] = 'created_at ' . $op . ' ?'; $params[] = $day->getTimestamp();
             }
@@ -141,6 +141,12 @@ final class Requests
         $page = max(1, $page);
         $rows = $this->db()->select('SELECT * FROM ' . $table . $sql . ' ORDER BY created_at DESC, number DESC LIMIT ' . self::PER_PAGE . ' OFFSET ' . (($page - 1) * self::PER_PAGE), $params);
         return ['items' => array_map(fn (array $row): array => $this->decode($row, false), $rows), 'total' => $total, 'page' => $page, 'per_page' => self::PER_PAGE];
+    }
+
+    /** 달력에 있는 YYYY-MM-DD 인가. 화면 필터와 매출 기간이 같은 규칙을 쓴다. */
+    public static function isCalendarDate(string $value): bool
+    {
+        return preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $value, $m) === 1 && checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
     }
 
     public function counts(string $environment): array

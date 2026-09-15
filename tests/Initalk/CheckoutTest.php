@@ -196,6 +196,25 @@ final class CheckoutTest extends DatabaseTestCase
         self::assertSame('대조 완료', end($events)['note']);
     }
 
+    /** #11 결제창이 거부되면 만료 보호(30분)를 연장하지 않는다. */
+    #[DataProvider('connectionProvider')]
+    public function testRejectedCheckoutDoesNotExtendTheExpiryProtection(array $config): void
+    {
+        $this->setupApp($config);
+        $checkout = $this->app->initalk()->checkout;
+        $request = $this->request();
+        $checkout->start($request['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback');
+        $first = $this->app->initalk()->requests->find($request['id'])['checkout_started_at'];
+        self::assertSame(Clock::timestamp(), $first);
+        // 승인 응답의 금액이 달라 승인이 미확정으로 남는다 → 게이트웨이가 새 결제창을 막는다.
+        $this->respond($this->approval($request, 'StdpayCARD' . bin2hex(random_bytes(10)), 999));
+        try { $checkout->complete($request['id'], $this->authCallback($request)); self::fail('approval'); } catch (DomainError $e) { self::assertGreaterThanOrEqual(500, $e->status()); }
+        Clock::freeze('2026-09-15 03:30:00');
+        try { $checkout->start($request['id'], 'web', 'https://shop.example.test/r', 'https://shop.example.test/pay/callback'); self::fail('pending'); }
+        catch (DomainError $e) { self::assertSame('이미 요청한 결제 결과를 먼저 확인해 주세요.', $e->details()['payment'] ?? ''); }
+        self::assertSame($first, $this->app->initalk()->requests->find($request['id'])['checkout_started_at']);
+    }
+
     /** #2 (a) 결과를 확인하지 못한 환불은 조회가 같은 금액의 취소를 찾으면 연결되고, 그 뒤 새 환불이 다시 열린다. */
     #[DataProvider('connectionProvider')]
     public function testSyncLinksAPendingRefundToTheMatchingCancellation(array $config): void
