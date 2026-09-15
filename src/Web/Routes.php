@@ -117,6 +117,10 @@ final class Routes
         $slim->post('/admin/initalk/requests/bulk', [$initalk, 'bulk'])->setName('admin.initalk.requests.bulk');
         $slim->get('/admin/initalk/requests/new', [$initalk, 'newForm'])->setName('admin.initalk.requests.new');
         $slim->post('/admin/initalk/requests/new', [$initalk, 'create']);
+        $slim->get('/admin/initalk/requests/import', [$initalk, 'importForm'])->setName('admin.initalk.import');
+        $slim->post('/admin/initalk/requests/import', [$initalk, 'import']);
+        $slim->post('/admin/initalk/requests/import/confirm', [$initalk, 'importConfirm'])->setName('admin.initalk.import.confirm');
+        $slim->get('/admin/initalk/requests/import/sample', [$initalk, 'importSample'])->setName('admin.initalk.import.sample');
         $slim->post('/admin/initalk/customer', [$initalk, 'customer'])->setName('admin.initalk.customer');
         $slim->get('/admin/initalk/settings', [$initalk, 'settingsForm'])->setName('admin.initalk.settings');
         $slim->post('/admin/initalk/settings', [$initalk, 'saveSettings']);

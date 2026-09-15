@@ -203,6 +203,36 @@ final class InitalkAdminTest extends WebTestCase
     }
 
     #[DataProvider('connectionProvider')]
+    public function testCsvImportPreviewsThenCreatesAndSends(array $config): void
+    {
+        $this->setupApp($config);
+        $this->signIn(true);
+        $sample = $this->body($this->get($this->app, '/admin/initalk/requests/import/sample'));
+        self::assertStringStartsWith("\xEF\xBB\xBF상품명", $sample);
+        $csv = "상품명,구매자명,휴대폰번호,금액\n수강료,홍길동,010-2345-7891,50000\n교재비,김이니,010-2345-7891,\"30,000\"\n";
+        $tmp = tempnam(sys_get_temp_dir(), 'gnucms-csv-');
+        file_put_contents($tmp, $csv);
+        $file = new \Slim\Psr7\UploadedFile($tmp, '9월.csv', 'text/csv', strlen($csv), UPLOAD_ERR_OK);
+        $preview = $this->postWithFiles($this->app, '/admin/initalk/requests/import', ['csrf_token' => $this->csrf(), 'send_now' => '1'], ['file' => $file]);
+        self::assertSame(200, $preview->getStatusCode());
+        self::assertStringContainsString('2건 · 합계 80,000원', $this->body($preview));
+        preg_match('/name="token" value="([a-f0-9]{32})"/', $this->body($preview), $m);
+        $confirmed = $this->post($this->app, '/admin/initalk/requests/import/confirm', ['csrf_token' => $this->csrf(), 'token' => $m[1]]);
+        self::assertSame(303, $confirmed->getStatusCode());
+        parse_str((string) parse_url($confirmed->getHeaderLine('Location'), PHP_URL_QUERY), $query);
+        self::assertSame('2', $query['imported']);
+        self::assertSame('2', $query['sent']);
+        self::assertSame(2, $this->messagingHttp->count('/v3/message'));
+        self::assertSame(2, $this->app->initalk()->requests->search(['environment' => 'test', 'batch' => $query['batch']], 1)['total']);
+        self::assertSame(422, $this->post($this->app, '/admin/initalk/requests/import/confirm', ['csrf_token' => $this->csrf(), 'token' => $m[1]])->getStatusCode());
+        file_put_contents($tmp, "상품명,구매자명,휴대폰번호,금액\n,홍길동,010-2345-7891,50000\n");
+        $bad = $this->postWithFiles($this->app, '/admin/initalk/requests/import', ['csrf_token' => $this->csrf()], ['file' => new \Slim\Psr7\UploadedFile($tmp, 'bad.csv', 'text/csv', 60, UPLOAD_ERR_OK)]);
+        self::assertSame(422, $bad->getStatusCode());
+        self::assertStringContainsString('2행: 상품명', $this->body($bad));
+        @unlink($tmp);
+    }
+
+    #[DataProvider('connectionProvider')]
     public function testQrEndpointIsAdminOnlyAndRendersTheLink(array $config): void
     {
         $this->setupApp($config);

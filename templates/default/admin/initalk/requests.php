@@ -6,6 +6,7 @@
 <?php $this->start('body') ?>
 <?php
 $notice = match (true) {
+    isset($query['imported']) => 'CSV로 ' . (int) $query['imported'] . '건을 만들었습니다.' . ((int) ($query['failed'] ?? 0) > 0 ? ' 실패 ' . (int) $query['failed'] . '건.' : '') . ((int) ($query['sent'] ?? 0) > 0 ? ' 알림톡 ' . (int) $query['sent'] . '건 발송.' : ''),
     isset($query['sent']) => '알림톡 ' . (int) $query['sent'] . '건을 발송했습니다.' . ((int) ($query['failed'] ?? 0) > 0 ? ' 실패 ' . (int) $query['failed'] . '건은 상세에서 확인해 주세요.' : ''),
     isset($query['cancelled']) => (int) $query['cancelled'] . '건을 결제 전 취소했습니다.' . ((int) ($query['failed'] ?? 0) > 0 ? ' 취소할 수 없는 ' . (int) $query['failed'] . '건은 건너뛰었습니다.' : ''),
     isset($query['none']) => '선택한 결제 요청이 없습니다.',

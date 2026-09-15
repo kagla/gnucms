@@ -223,6 +223,56 @@ final class InitalkAdminController
         return $this->redirect($request, $response, 'admin.initalk.request', ['id' => $id], $query);
     }
 
+    public function importForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->guard($request);
+        return $this->render($request, $response, 'import', ['preview' => null, 'parse_errors' => []]);
+    }
+
+    public function import(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->guard($request);
+        $input = $this->input($request);
+        $upload = $request->getUploadedFiles()['file'] ?? null;
+        $service = $this->app->initalk();
+        if (!$upload instanceof \Psr\Http\Message\UploadedFileInterface || $upload->getError() !== UPLOAD_ERR_OK) {
+            return $this->render($request, $response->withStatus(422), 'import', ['preview' => null, 'parse_errors' => [], 'errors' => ['CSV 파일을 선택해 주세요. 파일이 크면 PHP 업로드 용량 제한을 확인해 주세요.']]);
+        }
+        if (($upload->getSize() ?? 0) > \GnuCms\Initalk\CsvImport::MAX_BYTES) {
+            return $this->render($request, $response->withStatus(422), 'import', ['preview' => null, 'parse_errors' => [], 'errors' => ['파일은 1MB 이하여야 합니다.']]);
+        }
+        $parsed = $service->import->parse((string) $upload->getStream()->getContents(), $service->settings->read()['expiry_hours']);
+        if ($parsed['errors'] !== [] || $parsed['rows'] === []) {
+            $errors = $parsed['rows'] === [] && $parsed['errors'] === [] ? ['등록할 행이 없습니다.'] : [];
+            return $this->render($request, $response->withStatus(422), 'import', ['preview' => null, 'parse_errors' => $parsed['errors'], 'errors' => $errors, 'total' => $parsed['total']]);
+        }
+        $token = $service->import->remember($parsed, (string) ($upload->getClientFilename() ?? 'upload.csv'), ($input['send_now'] ?? '') === '1');
+        return $this->render($request, $response, 'import', ['preview' => ['token' => $token, 'rows' => $parsed['rows'], 'sum' => array_sum(array_column($parsed['rows'], 'amount')),
+            'send' => ($input['send_now'] ?? '') === '1', 'filename' => (string) ($upload->getClientFilename() ?? 'upload.csv')], 'parse_errors' => []]);
+    }
+
+    public function importConfirm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->guard($request);
+        $input = $this->input($request);
+        $service = $this->app->initalk();
+        $config = $service->settings->read();
+        try {
+            $summary = ExecutionLock::run($this->app->storageDir(), fn (): array => $service->import->confirm(is_string($input['token'] ?? null) ? $input['token'] : '', $config['environment'], $this->actorId(), $this->actor()));
+        } catch (DomainError $e) {
+            return $this->render($request, $response->withStatus($e->status()), 'import', ['preview' => null, 'parse_errors' => [], 'errors' => $this->errors($e)]);
+        }
+        return $this->redirect($request, $response, 'admin.initalk.requests', [], ['environment' => $config['environment'], 'batch' => $summary['batch_id'],
+            'imported' => $summary['created'], 'failed' => $summary['failed'], 'sent' => $summary['sent']]);
+    }
+
+    public function importSample(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->guard($request);
+        $response->getBody()->write(\GnuCms\Initalk\CsvImport::sample());
+        return $response->withHeader('Content-Type', 'text/csv; charset=utf-8')->withHeader('Content-Disposition', 'attachment; filename="initalk-sample.csv"')->withHeader('Cache-Control', 'no-store');
+    }
+
     public function settingsForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $this->guard($request);
