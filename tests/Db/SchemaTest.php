@@ -381,6 +381,46 @@ final class SchemaTest extends WebTestCase
         self::assertNotNull($app->users()->findByDisplayName('홍길동2'));
     }
 
+    /** v23 설치에서 올라오는 길: 이니톡 표·인덱스를 다시 만들고, 한 번 더 돌려도 그대로다. */
+    #[DataProvider('connectionProvider')]
+    public function testInitalkMigrationRecreatesTablesAndIndexesAndIsIdempotent(array $dbConfig): void
+    {
+        $db = $this->freshDatabase($dbConfig);
+        $tables = ['initalk_ledger', 'initalk_events', 'initalk_batches', 'initalk_requests'];
+        foreach ($tables as $table) {
+            $db->execute('DROP TABLE ' . $db->table($table));
+            $this->assertTableMissing($db, $table);
+        }
+        $db->execute('UPDATE ' . $db->q('site_settings') . ' SET setting_value = ? WHERE setting_key = ?', ['23', 'system.schema_version']);
+
+        (new Schema($db))->ensureCurrent();
+        // 두 번째 실행은 아무것도 바꾸지 않는다(표·인덱스 모두 존재 검사 후 만든다).
+        (new Schema($db))->migrateInitalk();
+
+        foreach ($tables as $table) {
+            self::assertSame(0, (int) $db->selectOne('SELECT COUNT(*) AS c FROM ' . $db->table($table))['c'], $table . ' 표가 있어야 한다');
+        }
+        $requestIndexes = $this->indexNames($db, 'initalk_requests');
+        foreach (['ux_initalk_number', 'ux_initalk_token', 'ix_initalk_status', 'ix_initalk_created', 'ix_initalk_phone', 'ix_initalk_expires', 'ix_initalk_batch'] as $index) {
+            self::assertContains($db->prefix() . $index, $requestIndexes, $index . ' 인덱스가 있어야 한다');
+        }
+        self::assertSame(count($requestIndexes), count(array_unique($requestIndexes)), '인덱스가 중복 생성되면 안 된다');
+        self::assertContains($db->prefix() . 'ix_initalk_events', $this->indexNames($db, 'initalk_events'));
+        foreach (['ix_initalk_ledger_at', 'ix_initalk_ledger_request'] as $index) {
+            self::assertContains($db->prefix() . $index, $this->indexNames($db, 'initalk_ledger'));
+        }
+        self::assertStringStartsWith(Schema::VERSION . '.', (string) (new Schema($db))->storedStamp());
+    }
+
+    /** @return list<string> */
+    private function indexNames(Connection $db, string $table): array
+    {
+        if ($db->dialect()->name() === 'sqlite') {
+            return array_column($db->select("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ?", [$db->tableName($table)]), 'name');
+        }
+        return array_column($db->select('SHOW INDEX FROM ' . $db->table($table)), 'Key_name');
+    }
+
     /** 자동 증가 ID가 없는 옛 테이블 fixture는 lastInsertId를 요청하지 않는다. */
     private function insertLegacy(Connection $db, string $table, array $row): void
     {

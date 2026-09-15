@@ -106,6 +106,28 @@ final class CsvImportTest extends DatabaseTestCase
         self::assertNull($import->pending($token));
     }
 
+    /** #6 즉시 발송이 모두 실패해도 생성 건수는 그대로고 실패 사유만 배치에 남는다(수신정보 없이). */
+    #[DataProvider('connectionProvider')]
+    public function testConfirmCountsSendFailuresWithoutLosingCreatedRequests(array $config): void
+    {
+        $import = $this->setupApp($config);
+        // 알림톡 템플릿을 고르지 않은 상태라 건별 발송이 모두 거절된다(외부 통신 없음).
+        $parsed = $import->parse("상품명,구매자명,휴대폰번호,금액\n수강료,홍길동,01011112222,50000\n교재비,김이니,01023457891,30000\n", 48);
+        $summary = $import->confirm($import->remember($parsed, '9월.csv', true), 'test', 7, '운영자');
+        self::assertSame(2, $summary['created']);
+        self::assertSame(0, $summary['failed']);
+        self::assertSame(0, $summary['sent']);
+        self::assertCount(2, $summary['errors']);
+        self::assertStringStartsWith('발송 실패 ', $summary['errors'][0]);
+        self::assertStringContainsString('템플릿', $summary['errors'][0]);
+        self::assertStringNotContainsString('01011112222', json_encode($summary['errors'], JSON_UNESCAPED_UNICODE));
+        self::assertSame(2, $this->app->initalk()->requests->search(['environment' => 'test', 'batch' => $summary['batch_id']], 1)['total']);
+        $batch = $this->app->db()->selectOne('SELECT * FROM ' . $this->app->db()->table('initalk_batches') . ' WHERE id = ?', [$summary['batch_id']]);
+        self::assertSame(2, (int) $batch['created']);
+        self::assertSame(0, (int) $batch['failed']);
+        self::assertStringContainsString('발송 실패', (string) $batch['errors']);
+    }
+
     /** #12 만료된 미리보기는 조회할 때 세션에서 지운다. 원문 휴대폰 번호가 TTL을 넘겨 남으면 안 된다. */
     #[DataProvider('connectionProvider')]
     public function testExpiredPreviewsArePrunedWhenLookedUp(array $config): void
