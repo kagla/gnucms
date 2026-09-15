@@ -94,9 +94,9 @@ final class Checkout
         try {
             $result = $this->app->inicisGateway()->cancel(self::order($request), $amount, $remaining, $reason, $cancelKey);
         } catch (DomainError $e) {
-            // 같은 요청 키의 재제출: 이전 성공으로 remaining이 이미 이 환불만큼 줄어 있다. 그 이전 값으로 한 번 더 대조한다.
+            // 같은 요청 키의 재제출: 그 사이 다른 환불이 반영되어 remaining이 달라졌을 수 있다. remaining을 다시 추정해 재전송하지 않고 PG 조회로 대조한다.
             if ($e->status() !== 422 || ($e->details()['refund'] ?? '') !== '같은 요청 키의 환불 내용이 다릅니다.') throw $e;
-            $result = $this->app->inicisGateway()->cancel(self::order($request), $amount, $remaining + $amount, $reason, $cancelKey);
+            return $this->sync($id, $actor);
         }
         if (!$this->ledger->record('refund', $id, (int) $result['amount'], (int) $result['at'], (string) $result['id'])) {
             // 같은 요청 키의 재제출: 결제사는 저장된 결과를 돌려준다. 조회로 대조만 한다.
