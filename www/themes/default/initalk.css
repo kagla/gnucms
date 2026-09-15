@@ -9,6 +9,8 @@
 .initalk-admin .initalk-dl dt{color:var(--bc-soft);font-size:13px}
 .initalk-admin .initalk-dl dd{margin:0;overflow-wrap:anywhere}
 .initalk-admin .initalk-link{display:flex;gap:.5rem;align-items:center}
+.initalk-admin .initalk-qr{margin-top:1rem;display:flex;gap:1rem;align-items:center}
+.initalk-admin .initalk-qr img{background:#fff;border:1px solid var(--bc-line, #e5e7eb);border-radius:8px}
 .initalk-admin .initalk-timeline{padding-left:1.25rem}
 .initalk-admin .initalk-pager{display:flex;gap:1rem;justify-content:center;margin-top:1rem}
 .initalk-admin .initalk-status-paid{color:var(--color-success)}

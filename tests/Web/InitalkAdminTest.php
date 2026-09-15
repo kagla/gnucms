@@ -201,4 +201,19 @@ final class InitalkAdminTest extends WebTestCase
         self::assertSame(Status::PAID, $this->app->initalk()->requests->find($id)['status']);
         self::assertCount(2, $this->app->initalk()->ledger->forRequest($id));
     }
+
+    #[DataProvider('connectionProvider')]
+    public function testQrEndpointIsAdminOnlyAndRendersTheLink(array $config): void
+    {
+        $this->setupApp($config);
+        $request = $this->app->initalk()->requests->create(['product_name' => '수강료', 'product_detail' => '', 'buyer_name' => '홍길동', 'phone' => '01023457891', 'amount' => '50000'], 'test', 48, 1, '운영자');
+        $this->assertLoginRedirect($this->get($this->app, '/admin/initalk/requests/' . $request['id'] . '/qr.svg'), '/admin/initalk/requests/' . $request['id'] . '/qr.svg');
+        $this->signIn(true);
+        $svg = $this->get($this->app, '/admin/initalk/requests/' . $request['id'] . '/qr.svg');
+        self::assertSame(200, $svg->getStatusCode());
+        self::assertSame('image/svg+xml; charset=utf-8', $svg->getHeaderLine('Content-Type'));
+        self::assertStringStartsWith('<svg', $this->body($svg));
+        self::assertStringContainsString('qr.svg', $this->body($this->get($this->app, '/admin/initalk/requests/' . $request['id'])));
+        self::assertSame(404, $this->get($this->app, '/admin/initalk/requests/' . str_repeat('0', 32) . '/qr.svg')->getStatusCode());
+    }
 }

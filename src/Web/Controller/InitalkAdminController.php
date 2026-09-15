@@ -179,6 +179,15 @@ final class InitalkAdminController
             'refund_key' => bin2hex(random_bytes(16)), 'pay_url' => $this->payUrl($found), 'errors' => $errors]);
     }
 
+    public function qr(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->guard($request);
+        $found = $this->app->initalk()->requests->find((string) $args['id']);
+        $response->getBody()->write(\GnuCms\Support\QrCode::svg($this->payUrl($found), 6));
+        return $response->withHeader('Content-Type', 'image/svg+xml; charset=utf-8')->withHeader('Cache-Control', 'private, no-store')
+            ->withHeader('Content-Disposition', 'inline; filename="' . $found['number'] . '.svg"')->withHeader('X-Content-Type-Options', 'nosniff');
+    }
+
     /** @param 'send'|'cancel'|'sync'|'refund' $action */
     public function act(string $action, ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
