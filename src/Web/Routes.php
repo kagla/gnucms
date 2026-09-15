@@ -126,6 +126,10 @@ final class Routes
             $slim->post('/admin/initalk/requests/{id:[a-f0-9]{32}}/' . $action, static fn ($request, $response, array $args) => $initalk->act($action, $request, $response, $args))
                 ->setName('admin.initalk.request.' . $action);
         }
+        $pay = new \GnuCms\Web\Controller\PayController($app);
+        $slim->get('/pay/{token:[A-Za-z0-9_-]{20,40}}', [$pay, 'show'])->setName('pay.show');
+        $slim->post('/pay/{token:[A-Za-z0-9_-]{20,40}}/start', [$pay, 'start'])->setName('pay.start');
+        $slim->get('/pay/{token:[A-Za-z0-9_-]{20,40}}/return', [$pay, 'back'])->setName('pay.return');
         $slim->get('/admin/settings/maintenance', [$cms, 'maintenance'])->setName('admin.settings.maintenance');
         $slim->post('/admin/uploads/gc', [$cms, 'uploadsGc'])->setName('admin.uploads.gc');
         $backups = new BackupController($app);
@@ -313,7 +317,11 @@ final class Routes
             },
             65536, 'application/json',
         ];
-        $slim->add(new ExternalRequests(['/messaging/bizppurio/result' => $webhook, '/plugins/bizppurio/result' => $webhook], $slim->getBasePath()));
+        $slim->add(new ExternalRequests([
+            '/messaging/bizppurio/result' => $webhook, '/plugins/bizppurio/result' => $webhook,
+            // 이니시스 인증 결과 콜백(폼). 세션 없이 HMAC state로만 인증한다.
+            '/pay/callback' => [[$pay, 'callbackAuthenticate'], [$pay, 'callback'], 65536, 'application/x-www-form-urlencoded'],
+        ], $slim->getBasePath()));
         // 코어 경로가 등록된 뒤 확장 기본 주소의 충돌을 검사한다.
         \GnuCms\Extension\AdminRoutes::register($slim, $app);
     }

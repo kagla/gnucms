@@ -1,0 +1,18 @@
+/* 공개 결제 페이지. 외부 자산 없이 모바일 우선. */
+:root{color-scheme:light dark;--pay-bg:#f4f5f8;--pay-card:#fff;--pay-text:#1b1d24;--pay-soft:#6b7280;--pay-line:#e5e7eb;--pay-primary:#4f46e5;--pay-alert:#b91c1c;--pay-alert-bg:#fef2f2}
+@media (prefers-color-scheme:dark){:root{--pay-bg:#0f1117;--pay-card:#171a23;--pay-text:#f3f4f6;--pay-soft:#9ca3af;--pay-line:#2a2f3d;--pay-primary:#818cf8;--pay-alert:#fca5a5;--pay-alert-bg:#3b1111}}
+*{box-sizing:border-box}
+body.pay-body{margin:0;padding:1rem;background:var(--pay-bg);color:var(--pay-text);font:16px/1.5 Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+.pay-card{max-width:28rem;margin:0 auto;background:var(--pay-card);border:1px solid var(--pay-line);border-radius:16px;padding:1.25rem}
+.pay-head{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;border-bottom:1px solid var(--pay-line);padding-bottom:.75rem;margin-bottom:1rem}
+.pay-store{font-weight:700}.pay-brand{font-size:12px;color:var(--pay-soft)}
+.pay-title{font-size:1.25rem;margin:.25rem 0 1rem;line-height:1.35}
+.pay-summary{display:grid;grid-template-columns:6rem 1fr;gap:.5rem .75rem;margin:0 0 1rem}
+.pay-summary dt{color:var(--pay-soft);font-size:14px}.pay-summary dd{margin:0;overflow-wrap:anywhere}
+.pay-amount{font-size:1.4rem;font-weight:700}
+.pay-hint{color:var(--pay-soft);font-size:14px}
+.pay-alert{background:var(--pay-alert-bg);color:var(--pay-alert);border-radius:10px;padding:.75rem 1rem;font-size:14px}
+.pay-button{display:block;width:100%;padding:.9rem 1rem;border:0;border-radius:12px;background:var(--pay-primary);color:#fff;font-size:1rem;font-weight:700;cursor:pointer}
+.pay-link{color:var(--pay-primary)}
+.pay-foot{margin-top:1.25rem;padding-top:.75rem;border-top:1px solid var(--pay-line);font-size:12px;color:var(--pay-soft)}
+.pay-foot a{color:inherit}
