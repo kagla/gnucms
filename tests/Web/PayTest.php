@@ -107,6 +107,7 @@ final class PayTest extends WebTestCase
         $back = $this->handle('GET', $path . '/return');
         self::assertSame(303, $back->getStatusCode());
         self::assertSame('/cms' . $path . '?failed=1', $back->getHeaderLine('Location'));
+        self::assertSame('no-referrer', $back->getHeaderLine('Referrer-Policy'));
         self::assertStringContainsString('결제가 완료되지 않았습니다', $this->body($this->handle('GET', $path . '?failed=1')));
         // 콜백: 잘못된 state → 403, 올바른 state → 승인·조회 후 완료 화면
         $stored = $this->app->initalk()->requests->find($r['id']);
@@ -132,6 +133,33 @@ final class PayTest extends WebTestCase
         self::assertStringNotContainsString('action="/cms' . $path . '/start"', $final);
         // 이미 결제된 요청의 결제 시작은 거부한다.
         self::assertSame(422, $this->handle('POST', $path . '/start', ['csrf_token' => $csrf])->getStatusCode());
+    }
+
+    /** 인증(state)은 맞지만 승인 결과가 주문과 다르면 500을 이니시스에 보이지 않고 확인 필요로 표시한다. */
+    #[DataProvider('connectionProvider')]
+    public function testCallbackApprovalFailureMarksReviewWithoutFailingTheRequest(array $config): void
+    {
+        $this->setupApp($config);
+        $r = $this->makeRequest();
+        $path = '/pay/' . $r['url_token'];
+        session_start();
+        $csrf = $_SESSION['csrf_token'];
+        session_write_close();
+        self::assertSame(200, $this->handle('POST', $path . '/start', ['csrf_token' => $csrf], ['HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0)'])->getStatusCode());
+        $stored = $this->app->initalk()->requests->find($r['id']);
+        $state = CallbackToken::create($this->app, Checkout::order($stored));
+        $callback = ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'orderNumber' => $r['id'], 'idc_name' => 'stg',
+            'authToken' => bin2hex(random_bytes(32)), 'authUrl' => 'https://stgstdpay.inicis.com/api/payAuth', 'netCancelUrl' => 'https://stgstdpay.inicis.com/api/netCancel'];
+        // 승인 응답의 금액이 주문과 다르다 → 게이트웨이가 망취소를 시도하고(응답 없음, 무시) 원래 오류를 던진다.
+        $tid = 'StdpayCARD' . bin2hex(random_bytes(10));
+        $this->http->responses[] = ['status' => 200, 'body' => ['resultCode' => '0000', 'mid' => $this->merchant['merchant_id'], 'MOID' => $r['id'], 'TotPrice' => '999', 'payMethod' => 'Card', 'tid' => $tid, 'currency' => 'WON']];
+        $response = $this->handle('POST', '/pay/callback?' . http_build_query(['id' => $r['id'], 'state' => $state]), [], [], http_build_query($callback), 'application/x-www-form-urlencoded');
+        self::assertSame(303, $response->getStatusCode());
+        self::assertSame('/cms' . $path, $response->getHeaderLine('Location'));
+        $after = $this->app->initalk()->requests->find($r['id']);
+        self::assertSame(1, $after['needs_review']);
+        self::assertSame(Status::CREATED, $after['status']);
+        self::assertNull($after['paid_at']);
     }
 
     #[DataProvider('connectionProvider')]

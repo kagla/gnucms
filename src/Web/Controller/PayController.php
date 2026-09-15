@@ -100,7 +100,8 @@ final class PayController
     {
         $found = $this->find((string) $args['token']);
         $suffix = Status::canPay($found['status']) ? '?failed=1' : '';
-        return $response->withStatus(303)->withHeader('Cache-Control', 'no-store')->withHeader('Location', $this->basePath() . '/pay/' . $args['token'] . $suffix);
+        return $response->withStatus(303)->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer')
+            ->withHeader('Location', $this->basePath() . '/pay/' . $args['token'] . $suffix);
     }
 
     /** ExternalRequests 인증기: 요청이 있고 state가 그 요청·결제사·설정 판의 HMAC과 맞아야 한다. */
