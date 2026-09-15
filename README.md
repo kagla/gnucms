@@ -360,7 +360,7 @@ DB 비밀번호는 명령 인자에 직접 넣지 말고 프롬프트 또는 MyS
 
 ## 알림톡·문자 발송과 이니시스 결제
 
-비즈뿌리오 알림톡·SMS·LMS 발송과 KG이니시스 카드결제는 코어 기능이다. 설정 → **알림톡·문자**, 설정 → **결제**에서 계정을 저장하고 환경별 실행을 허용한다. 운영 → **메시지 발송**에서 템플릿·웹발송·이력을 관리한다. 자세한 내용은 [docs/messaging.md](docs/messaging.md)를 본다.
+비즈뿌리오 알림톡·SMS·LMS 발송과 KG이니시스 카드결제는 코어 기능이다. 설정 → **알림톡·문자**, 설정 → **결제**에서 계정을 저장하고 환경별 실행을 허용한다. 운영 → **메시지 발송**에서 템플릿·웹발송·이력을 관리한다. 자세한 내용은 [docs/messaging.md](docs/messaging.md)를 본다. 두 기능을 조합한 **이니톡 결제**(운영 → 이니톡 결제, `/admin/initalk`)는 [docs/initalk.md](docs/initalk.md)를 본다.
 
 이전 `feat/bizppurio-messaging` 플러그인·모듈과 `feat/direct-pg-payments`의 이니시스 결제 플러그인으로 설치한 사이트는 업그레이드 시 DB 데이터를 그대로 승계한다. 덮어쓰기 배포에서는 이전 `plugins/bizppurio/`, `modules/alimtalk/`, `modules/sms/`, `plugins/payment-inicis/` 폴더를 제거하고, 비즈뿌리오에 등록한 결과 수신 URL을 `/messaging/bizppurio/result?…`로 바꾼다(이전 주소도 당분간 받는다). 실행 허용 키가 플러그인 시절과 달라져서, 업그레이드 후에는 결제의 **API 실행 허용**과 알림톡·문자의 **발송 허용**·**인증 확인**을 설정 화면에서 다시 켜야 한다.
 

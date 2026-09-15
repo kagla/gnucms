@@ -34,7 +34,7 @@
 
 ## 2. 데이터 모델
 
-`Schema::VERSION`을 23으로 올리고 아래 테이블을 `Schema::TABLES`에 넣는다(코어 마이그레이션·백업·복원 자동 포함). 기존 플러그인 테이블은 이름을 유지해 데이터를 승계한다.
+`Schema::VERSION`은 1단계에서 23, 2단계에서 24가 된다(이니톡 테이블 추가). 아래 테이블을 `Schema::TABLES`에 넣는다(코어 마이그레이션·백업·복원 자동 포함). 기존 플러그인 테이블은 이름을 유지해 데이터를 승계한다.
 
 | 테이블 | 출처 | 내용 |
 |---|---|---|
@@ -146,7 +146,7 @@ created ──알림톡 접수 성공──▶ waiting ──고객 결제 승�
 | `RequestNumber` | 일별 순번 채번 |
 | `Requests` | 생성(`create(array $input, int $adminId)`), 검색(`search(array $filter, int $page)`), 상태 카운트(`counts()`), 상세(`find`, `findByToken`), 고객 이력(`customerSummary(string $phone)`: 거래횟수·총액·최근거래일), 전이(`cancel`, `expire(int $limit)`, `markPaid`, `applyRefund`), 개인정보 정리(`purge()`) |
 | `Notifier` | 요청 → 템플릿 변수 치환 입력 구성 → `MessagingService::send()` 호출(멱등키 `initalk:{id}:{dispatch_count+1}`) → `waiting` 전이·이벤트. 재발송·기한 연장 포함. 선택 건 일괄 발송은 건별 호출 후 결과 요약 |
-| `Checkout` | `start(request, device)` → `checkout_started_at` 기록 후 `Gateway::checkout()`; `complete(request, callback)` → `ExecutionLock` 안에서 `complete()`+`fetch()`+`markPaid`+원장; `sync(request)` → `fetch()`로 상태·환불 대조; `refund(request, amount, reason, adminId)` → `Gateway::cancel()`+원장 |
+| `Checkout` | `start(request, device)` → `checkout_started_at` 기록 후 `Gateway::checkout()`; `complete(request, callback)` → `ExecutionLock` 안에서 `complete()`+`fetch()`+`markPaid`+원장; `sync(request)` → `fetch()`로 상태·환불 대조; `refund(request, amount, reason, adminId)` → `Gateway::cancel()`+원장. 같은 환불 요청 키의 재제출은 결제사에 다시 보내지 않고 `sync()`의 PG 조회로 대조한다 |
 | `CsvImport` | 업로드 파싱(UTF-8·BOM·CP949 자동 변환), 행 검증, 미리보기 토큰(세션, 10분), 확정 시 `Requests::create` 반복 + `initalk_batches` 기록 |
 | `Sales` | 기간별 승인·환불·순매출 집계, 월별 합계, 지급예정일별 정산 캘린더, CSV 내보내기 행 생성. 원천은 `initalk_ledger` |
 | `Events` | 이벤트 기록·조회 |
@@ -223,6 +223,7 @@ CLI `bin/initalk.php`: `expire`(만료 처리), `sync`(최근 7일 `checkout_sta
 - `GET /admin/initalk/requests/{id}/qr.svg`: 결제 링크 `https://<사이트>/pay/{token}`의 QR SVG. 관리자만. `Cache-Control: private, no-store`.
 - 상세 화면에 QR을 표시하고 "새 창에서 크게 보기"·"SVG 저장" 링크를 둔다. 대면 결제는 고객이 QR을 찍어 같은 결제 페이지로 들어오는 것이다.
 - 인코더는 §4의 `Support\QrCode`. 취소·만료·완료 건도 QR은 만들 수 있으나 결제 페이지가 상태 안내를 낸다.
+- QR 라운드트립은 OpenCV가 있을 때 자동 검증하고, 없으면 PNG를 휴대폰으로 스캔해 확인한다.
 
 ## 10. 매출·정산
 
@@ -262,7 +263,7 @@ CLI `bin/initalk.php`: `expire`(만료 처리), `sync`(최근 7일 `checkout_sta
 ## 14. 문서
 
 - `AGENTS.md`: 기능 지도에 알림톡·문자 발송, 이니시스 결제, 이니톡 결제를 추가하고 "확장 예제" 항목은 유지. "비즈뿌리오 플러그인·알림톡 모듈은 `feat/bizppurio-messaging`", "결제 플러그인·쇼핑몰은 `feat/direct-pg-payments`" 규칙을 삭제하고 쇼핑몰(`modules/shop`)·KCP·KSPay·토스만 해당 브랜치에 남는다고 적는다.
-- `docs/initalk.md`(신규): 운영 절차(이니시스 MID 계약 → 결제 설정 → 비즈뿌리오 계정·템플릿 검수 → 알림톡 설정 → 이니톡 결제 설정 → 테스트 → 운영), 권장 템플릿, 웹훅·콜백 URL 등록, 접근 로그 제외, 만료·정리 CLI, 정산 캘린더의 한계, 이니톡과의 차이.
+- `docs/initalk.md`(신규): 운영 절차(이니시스 MID 계약 → 결제 설정 → 비즈뿌리오 계정·템플릿 검수 → 알림톡 설정 → 이니톡 결제 설정 → 테스트 → 운영), 권장 템플릿, 웹훅·콜백 URL의 접근 로그 제외(`docs/messaging.md` 참조), 만료·정리 CLI, 정산 캘린더의 한계, 이니톡과의 차이.
 - `docs/messaging.md`(신규): 플러그인·모듈 README를 코어 기준으로 옮긴다. `docs/bizppurio-alimtalk-plan.md`는 가져오지 않는다(이력은 브랜치에 남는다).
 - `docs/extensions.md`, `README.md`: 플러그인 예시 문구·기능 목록 정리.
 - `config/config.sample.php`: 변경 없음(비밀정보는 DB 암호화).
