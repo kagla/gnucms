@@ -125,6 +125,8 @@ final class Routes
         $slim->get('/admin/initalk/settings', [$initalk, 'settingsForm'])->setName('admin.initalk.settings');
         $slim->post('/admin/initalk/settings', [$initalk, 'saveSettings']);
         $slim->post('/admin/initalk/purge', [$initalk, 'purge'])->setName('admin.initalk.purge');
+        $slim->get('/admin/initalk/sales', [$initalk, 'sales'])->setName('admin.initalk.sales');
+        $slim->get('/admin/initalk/sales/export', [$initalk, 'salesExport'])->setName('admin.initalk.sales.export');
         $slim->get('/admin/initalk/requests/{id:[a-f0-9]{32}}', [$initalk, 'show'])->setName('admin.initalk.request');
         $slim->get('/admin/initalk/requests/{id:[a-f0-9]{32}}/qr.svg', [$initalk, 'qr'])->setName('admin.initalk.request.qr');
         foreach (['send', 'cancel', 'sync', 'refund'] as $action) {

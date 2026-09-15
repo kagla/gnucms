@@ -17,3 +17,8 @@
 .initalk-admin .initalk-status-expired,.initalk-admin .initalk-status-cancelled{color:var(--bc-soft)}
 .initalk-admin .initalk-status-refunded{color:var(--color-error)}
 .initalk-admin .card-body form + form{margin-top:.75rem}
+.initalk-admin .initalk-payout{font-size:1.75rem;margin:.25rem 0}
+.initalk-admin .initalk-calendar td{vertical-align:top;height:4rem;width:14.28%}
+.initalk-admin .initalk-cal-day{font-size:12px;color:var(--bc-soft)}
+.initalk-admin .initalk-cal-amount{font-weight:700;font-size:13px}
+.initalk-admin .initalk-cal-amount.is-negative{color:var(--color-error)}

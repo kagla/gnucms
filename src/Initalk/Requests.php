@@ -270,6 +270,15 @@ final class Requests
         }
     }
 
+    /** 결제창을 연 미결·확인 필요 건. CLI sync 대상. @return list<string> */
+    public function needingSync(int $window): array
+    {
+        $now = Clock::timestamp();
+        $rows = $this->db()->select('SELECT id FROM ' . $this->db()->table('initalk_requests')
+            . " WHERE config_revision <> '' AND ((status IN ('created','waiting') AND checkout_started_at >= ?) OR needs_review = 1) ORDER BY updated_at LIMIT 500", [$now - $window]);
+        return array_column($rows, 'id');
+    }
+
     /** 종료된 지 90일이 지난 요청의 구매자명·번호를 지운다. 최대 100건. */
     public function purge(int $limit = 100): int
     {

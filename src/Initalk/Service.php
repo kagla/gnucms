@@ -16,6 +16,7 @@ final class Service
     public readonly Ledger $ledger;
     public readonly Checkout $checkout;
     public readonly CsvImport $import;
+    public readonly Sales $sales;
 
     public function __construct(public readonly App $app)
     {
@@ -26,5 +27,6 @@ final class Service
         $this->ledger = new Ledger($app->db());
         $this->checkout = new Checkout($app, $this->requests, $this->ledger);
         $this->import = new CsvImport($app, $this->requests, $this->notifier, $this->settings);
+        $this->sales = new Sales($this->ledger);
     }
 }

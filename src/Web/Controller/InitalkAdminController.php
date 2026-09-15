@@ -70,7 +70,61 @@ final class InitalkAdminController
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $this->guard($request);
-        return $this->redirect($request, $response, 'admin.initalk.requests');
+        $service = $this->app->initalk();
+        $config = $service->settings->read();
+        $service->requests->expire();
+        $now = \GnuCms\Support\Clock::timestamp();
+        $today = (new \DateTimeImmutable('@' . $now))->setTimezone(new \DateTimeZone('Asia/Seoul'));
+        [$from, $until] = \GnuCms\Initalk\Sales::monthRange((int) $today->format('Y'), (int) $today->format('n'));
+        return $this->render($request, $response, 'dashboard', ['environment' => $config['environment'], 'counts' => $service->requests->counts($config['environment']),
+            'month' => $service->sales->summary($config['environment'], $from, $until), 'month_label' => $today->format('Y년 n월'),
+            'payout' => $service->sales->expectedPayout($config['environment'], $config['settlement_days'], $now), 'recent' => $service->requests->recent($config['environment'], 10)]);
+    }
+
+    /** @return array{0:int,1:int,2:string,3:int,4:int} from, until, label, year, month */
+    private function salesRange(array $query): array
+    {
+        $today = (new \DateTimeImmutable('@' . \GnuCms\Support\Clock::timestamp()))->setTimezone(new \DateTimeZone('Asia/Seoul'));
+        $from = is_string($query['from'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $query['from']) ? $query['from'] : null;
+        $until = is_string($query['until'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/D', $query['until']) ? $query['until'] : null;
+        if ($from !== null && $until !== null) {
+            $start = new \DateTimeImmutable($from . ' 00:00:00', new \DateTimeZone('Asia/Seoul'));
+            $end = new \DateTimeImmutable($until . ' 23:59:59', new \DateTimeZone('Asia/Seoul'));
+            if ($end < $start || $end->getTimestamp() - $start->getTimestamp() > 92 * 86400) throw DomainError::validation(['range' => '조회 기간은 92일 이내로 지정해 주세요.']);
+            return [$start->getTimestamp(), $end->getTimestamp(), $from . ' ~ ' . $until, (int) $start->format('Y'), (int) $start->format('n')];
+        }
+        $month = is_string($query['month'] ?? null) && preg_match('/^\d{4}-\d{2}$/D', $query['month']) ? $query['month'] : $today->format('Y-m');
+        [$year, $monthNumber] = array_map('intval', explode('-', $month));
+        if ($monthNumber < 1 || $monthNumber > 12) throw DomainError::validation(['month' => '월을 확인해 주세요.']);
+        [$start, $end] = \GnuCms\Initalk\Sales::monthRange($year, $monthNumber);
+        return [$start, $end, $year . '년 ' . $monthNumber . '월', $year, $monthNumber];
+    }
+
+    public function sales(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->guard($request);
+        $query = $request->getQueryParams();
+        $service = $this->app->initalk();
+        $config = $service->settings->read();
+        $environment = in_array($query['environment'] ?? '', ['test', 'live'], true) ? $query['environment'] : 'live';
+        [$from, $until, $label, $year, $month] = $this->salesRange($query);
+        return $this->render($request, $response, 'sales', ['environment' => $environment, 'range_label' => $label, 'from' => $from, 'until' => $until,
+            'month_value' => sprintf('%04d-%02d', $year, $month), 'daily' => $service->sales->daily($environment, $from, $until),
+            'summary' => $service->sales->summary($environment, $from, $until), 'calendar' => $service->sales->calendar($environment, $year, $month, $config['settlement_days']),
+            'calendar_days' => (int) (new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month), new \DateTimeZone('Asia/Seoul')))->format('t'),
+            'calendar_first_weekday' => (int) (new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month), new \DateTimeZone('Asia/Seoul')))->format('w')]);
+    }
+
+    public function salesExport(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->guard($request);
+        $query = $request->getQueryParams();
+        $environment = in_array($query['environment'] ?? '', ['test', 'live'], true) ? $query['environment'] : 'live';
+        [$from, $until] = $this->salesRange($query);
+        $seoulDate = static fn (int $timestamp): string => (new \DateTimeImmutable('@' . $timestamp))->setTimezone(new \DateTimeZone('Asia/Seoul'))->format('Ymd');
+        $name = 'initalk-sales-' . $seoulDate($from) . '-' . $seoulDate($until) . '.csv';
+        $response->getBody()->write($this->app->initalk()->sales->csv($environment, $from, $until));
+        return $response->withHeader('Content-Type', 'text/csv; charset=utf-8')->withHeader('Content-Disposition', 'attachment; filename="' . $name . '"')->withHeader('Cache-Control', 'no-store');
     }
 
     public function requests(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

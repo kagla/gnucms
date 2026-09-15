@@ -80,7 +80,7 @@ final class InitalkAdminTest extends WebTestCase
         $this->signIn(false);
         foreach (['/admin/initalk', '/admin/initalk/requests', '/admin/initalk/requests/new', '/admin/initalk/settings'] as $path) self::assertSame(403, $this->get($this->app, $path)->getStatusCode());
         $this->signIn(true);
-        self::assertSame(303, $this->get($this->app, '/admin/initalk')->getStatusCode());
+        self::assertSame(200, $this->get($this->app, '/admin/initalk')->getStatusCode());
         self::assertStringContainsString('이니톡 결제', $this->body($this->get($this->app, '/admin')));
         $list = $this->get($this->app, '/admin/initalk/requests');
         self::assertSame(200, $list->getStatusCode());
@@ -245,5 +245,28 @@ final class InitalkAdminTest extends WebTestCase
         self::assertStringStartsWith('<svg', $this->body($svg));
         self::assertStringContainsString('qr.svg', $this->body($this->get($this->app, '/admin/initalk/requests/' . $request['id'])));
         self::assertSame(404, $this->get($this->app, '/admin/initalk/requests/' . str_repeat('0', 32) . '/qr.svg')->getStatusCode());
+    }
+
+    #[DataProvider('connectionProvider')]
+    public function testDashboardAndSalesScreens(array $config): void
+    {
+        $this->setupApp($config);
+        $this->signIn(true);
+        $request = $this->app->initalk()->requests->create(['product_name' => '수강료', 'product_detail' => '', 'buyer_name' => '홍길동', 'phone' => '01023457891', 'amount' => '50000'], 'test', 48, 1, '운영자');
+        $this->app->initalk()->requests->markPaid($request['id'], Clock::timestamp(), 'TID1', 'customer');
+        $this->app->initalk()->ledger->record('approve', $request['id'], 50000, Clock::timestamp(), 'TID1');
+        $dashboard = $this->body($this->get($this->app, '/admin/initalk'));
+        self::assertStringContainsString('2026년 9월 매출 현황', $dashboard);
+        self::assertStringContainsString('50,000원', $dashboard);
+        self::assertStringContainsString($request['number'], $dashboard);
+        $sales = $this->body($this->get($this->app, '/admin/initalk/sales', ['environment' => 'test', 'month' => '2026-09']));
+        self::assertStringContainsString('2026-09-15', $sales);
+        self::assertStringContainsString('정산 캘린더', $sales);
+        self::assertStringContainsString('<div class="initalk-cal-amount">50,000</div>', $sales);
+        $csv = $this->get($this->app, '/admin/initalk/sales/export', ['environment' => 'test', 'month' => '2026-09']);
+        self::assertSame('text/csv; charset=utf-8', $csv->getHeaderLine('Content-Type'));
+        self::assertStringContainsString('attachment; filename="initalk-sales-20260901-20260930.csv"', $csv->getHeaderLine('Content-Disposition'));
+        self::assertStringContainsString($request['number'] . ',수강료,홍길동,010-****-7891,승인,50000,TID1', $this->body($csv));
+        self::assertSame(422, $this->get($this->app, '/admin/initalk/sales', ['from' => '2026-01-01', 'until' => '2026-06-30'])->getStatusCode());
     }
 }
