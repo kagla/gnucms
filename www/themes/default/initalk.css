@@ -1,0 +1,17 @@
+/* 이니톡 결제 관리자 화면. 관리 콘솔 컴포넌트 위에 배치만 보탠다. */
+.initalk-admin .initalk-counts{margin-bottom:1.25rem}
+.initalk-admin .initalk-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:.25rem 1rem}
+.initalk-admin .initalk-filters .form-actions{grid-column:1/-1;flex-wrap:wrap}
+.initalk-admin .initalk-table .num{text-align:right;white-space:nowrap}
+.initalk-admin .initalk-cols{display:grid;grid-template-columns:2fr 1fr;gap:1rem;align-items:start}
+@media (max-width:900px){.initalk-admin .initalk-cols{grid-template-columns:1fr}}
+.initalk-admin .initalk-dl{display:grid;grid-template-columns:8rem 1fr;gap:.35rem .75rem;margin:0}
+.initalk-admin .initalk-dl dt{color:var(--bc-soft);font-size:13px}
+.initalk-admin .initalk-dl dd{margin:0;overflow-wrap:anywhere}
+.initalk-admin .initalk-link{display:flex;gap:.5rem;align-items:center}
+.initalk-admin .initalk-timeline{padding-left:1.25rem}
+.initalk-admin .initalk-pager{display:flex;gap:1rem;justify-content:center;margin-top:1rem}
+.initalk-admin .initalk-status-paid{color:var(--color-success)}
+.initalk-admin .initalk-status-expired,.initalk-admin .initalk-status-cancelled{color:var(--bc-soft)}
+.initalk-admin .initalk-status-refunded{color:var(--color-error)}
+.initalk-admin .card-body form + form{margin-top:.75rem}

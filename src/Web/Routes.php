@@ -111,6 +111,21 @@ final class Routes
             'admin.messaging.sms.detail' => ['/admin/messaging/sms/history/{id:[a-f0-9]{32}}', 'sms-detail']] as $name => [$path, $page]) {
             $slim->map(['GET', 'POST'], $path, static fn ($request, $response, array $args) => $messagingOps->handle($page, $request, $response, $args))->setName($name);
         }
+        $initalk = new \GnuCms\Web\Controller\InitalkAdminController($app);
+        $slim->get('/admin/initalk', [$initalk, 'index'])->setName('admin.initalk');
+        $slim->get('/admin/initalk/requests', [$initalk, 'requests'])->setName('admin.initalk.requests');
+        $slim->post('/admin/initalk/requests/bulk', [$initalk, 'bulk'])->setName('admin.initalk.requests.bulk');
+        $slim->get('/admin/initalk/requests/new', [$initalk, 'newForm'])->setName('admin.initalk.requests.new');
+        $slim->post('/admin/initalk/requests/new', [$initalk, 'create']);
+        $slim->post('/admin/initalk/customer', [$initalk, 'customer'])->setName('admin.initalk.customer');
+        $slim->get('/admin/initalk/settings', [$initalk, 'settingsForm'])->setName('admin.initalk.settings');
+        $slim->post('/admin/initalk/settings', [$initalk, 'saveSettings']);
+        $slim->post('/admin/initalk/purge', [$initalk, 'purge'])->setName('admin.initalk.purge');
+        $slim->get('/admin/initalk/requests/{id:[a-f0-9]{32}}', [$initalk, 'show'])->setName('admin.initalk.request');
+        foreach (['send', 'cancel', 'sync', 'refund'] as $action) {
+            $slim->post('/admin/initalk/requests/{id:[a-f0-9]{32}}/' . $action, static fn ($request, $response, array $args) => $initalk->act($action, $request, $response, $args))
+                ->setName('admin.initalk.request.' . $action);
+        }
         $slim->get('/admin/settings/maintenance', [$cms, 'maintenance'])->setName('admin.settings.maintenance');
         $slim->post('/admin/uploads/gc', [$cms, 'uploadsGc'])->setName('admin.uploads.gc');
         $backups = new BackupController($app);
