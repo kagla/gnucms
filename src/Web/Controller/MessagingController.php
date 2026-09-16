@@ -49,7 +49,7 @@ final class MessagingController
         $base = RouteContext::fromRequest($request)->getBasePath();
         $data = ['page' => $page, 'base' => $base, 'environment' => $environment, 'ready' => true,
             'errors' => [], 'notice' => '', 'templates' => [], 'selected' => null, 'preview' => null,
-            'confirmation' => null, 'detail' => null, 'remote_list' => null, 'remote_detail' => null,
+            'confirmation' => null, 'detail' => null, 'remote_list' => null, 'remote_detail' => null, 'import_summary' => null, 'sample_values' => [],
             'history' => ['items' => [], 'page' => 1, 'total' => 0],
             'account_status' => ['configured' => false, 'enabled' => false, 'api_verified' => false, 'account_type' => 'module'],
             'values' => $input, 'csrf_token' => $_SESSION['csrf_token'] ?? '', 'status_labels' => self::STATUS_LABELS,
@@ -63,22 +63,38 @@ final class MessagingController
                     $selected = $service->templateAction('get', ['id' => $selectedId]);
                     if ($selected['environment'] !== $environment) throw DomainError::notFound('이 환경의 템플릿이 아닙니다.');
                     $data['selected'] = $selected;
+                    if ($page === 'templates' && $selected['enabled']) {
+                        // 보기 모달의 발송해 보기 폼에 채울 예시 값. 도메인 자리 변수에는 사이트 호스트를 넣는다.
+                        $host = parse_url((string) $this->app->config('site.url', ''), PHP_URL_HOST) ?: $request->getUri()->getHost();
+                        $data['sample_values'] = \GnuCms\Messaging\Templates::sampleValues($selected, (string) ($this->app->cms()->settings()['site_name'] ?? 'GNUCMS'), (string) $host);
+                    }
                 }
             }
             if ($request->getMethod() === 'POST') {
                 $action = $input['action'] ?? '';
-                if ($page === 'templates' && in_array($action, ['remote-list', 'remote-detail', 'remote-import'], true)) {
+                if ($page === 'templates' && in_array($action, ['remote-list', 'remote-detail', 'remote-import', 'remote-import-all'], true)) {
                     $result = $service->templateAction($action, $input);
                     if ($action === 'remote-import') return $this->redirect($response, $routes->urlFor('admin.messaging.templates') . '?environment=' . $environment . '&id=' . $result['id']);
-                    $data[$action === 'remote-list' ? 'remote_list' : 'remote_detail'] = $result;
-                } elseif ($page === 'templates' && $action === 'save') {
-                    if (isset($input['buttons']) && is_array($input['buttons'])) {
-                        $input['buttons'] = array_values(array_filter($input['buttons'], static fn ($row): bool => !is_array($row)
-                            || ($row['name'] ?? '') !== '' || ($row['url_mobile'] ?? '') !== '' || ($row['url_pc'] ?? '') !== ''));
+                    if ($action === 'remote-import-all') {
+                        $data['import_summary'] = $result;
+                        $data['notice'] = sprintf('가져옴 %d · 갱신 %d · 사용 중지 %d · 건너뜀 %d (비즈뿌리오 템플릿 %d개 확인)',
+                            $result['imported'], $result['refreshed'], count($result['disabled']), count($result['skipped']), $result['total']);
+                        $data['templates'] = $service->templateAction('list', ['environment' => $environment]);
+                        $data['remote_list'] = $service->templateAction('remote-list', ['environment' => $environment]);
+                    } else {
+                        $data[$action === 'remote-list' ? 'remote_list' : 'remote_detail'] = $result;
                     }
-                    $saved = $service->templateAction('save', $input);
+                } elseif ($page === 'templates' && $action === 'enable') {
+                    $saved = $service->templateAction('enable', $input);
                     return $this->redirect($response, $routes->urlFor('admin.messaging.templates') . '?environment=' . $environment . '&id=' . $saved['id']);
-                } elseif ($page === 'send' && $action === 'preview') {
+                } elseif ($page === 'templates' && $action === 'delete') {
+                    // 이니톡 결제가 알림톡 템플릿으로 지정한 사본은 결제 알림이 끊기므로 먼저 바꾸게 한다.
+                    if (in_array($this->string($input, 'id'), $this->app->initalk()->settings->read()['template'], true)) {
+                        throw DomainError::validation(['template' => '이니톡 결제 알림톡 템플릿으로 지정된 템플릿입니다. 이니톡 결제 설정에서 다른 템플릿을 고른 뒤 삭제해 주세요.']);
+                    }
+                    $service->templateAction('delete', $input);
+                    return $this->redirect($response, $routes->urlFor('admin.messaging.templates') . '?environment=' . $environment);
+                } elseif (in_array($page, ['send', 'templates'], true) && $action === 'preview') {
                     $preview = $service->preview($input);
                     if ($preview['environment'] !== $environment) throw DomainError::validation(['environment' => '선택한 환경의 템플릿을 사용해 주세요.']);
                     $phone = $this->string($input, 'phone');
@@ -93,7 +109,7 @@ final class MessagingController
                         'subject' => $preview['subject'], 'message' => $preview['message'], 'config_revision' => $preview['config_revision']]);
                     $data['preview'] = $preview;
                     $data['confirmation'] = $token;
-                } elseif (in_array($page, ['send', 'sms-send'], true) && $action === 'send') {
+                } elseif (in_array($page, ['send', 'sms-send', 'templates'], true) && $action === 'send') {
                     $pending = $this->confirmed($text ? 'sms_previews' : 'alimtalk_previews', $this->string($input, 'confirmation'), $environment);
                     $sent = $text ? $service->sendText($pending) : $service->send($pending);
                     return $this->redirect($response, $routes->urlFor($text ? 'admin.messaging.sms.detail' : 'admin.messaging.detail', ['id' => $sent['id']]) . '?environment=' . $environment);

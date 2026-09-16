@@ -44,14 +44,32 @@ final class StreamTransport implements HttpTransport
             $meta = stream_get_meta_data($stream);
             if (!is_string($raw) || strlen($raw) > $limit || !empty($meta['timed_out'])) throw new TransportFailure();
             $status = 0;
+            $headers = [];
             foreach ($meta['wrapper_data'] ?? [] as $line) {
-                if (preg_match('~^HTTP/\S+ (\d{3})~', $line, $match)) $status = (int) $match[1];
+                if (preg_match('~^HTTP/\S+ (\d{3})~', $line, $match)) { $status = (int) $match[1]; $headers = []; continue; }
+                // RateLimit-Reset 같은 응답 헤더를 소문자 이름으로 넘긴다.
+                if (preg_match('/^([A-Za-z0-9-]+):\s*(.*)$/', $line, $match)) $headers[strtolower($match[1])] = trim($match[2]);
             }
-            $data = json_decode($raw, true, 32);
-            if (!is_array($data) || array_is_list($data) || $status < 200 || ($status >= 300 && $status < 400)) throw new TransportFailure();
-            return ['status' => $status, 'body' => $data];
+            return self::decode($status, $raw, $headers);
         } finally {
             fclose($stream);
         }
+    }
+
+    /**
+     * 응답 본문을 해석한다. 비즈뿌리오 검수 서버는 5xx에서 따옴표 없는 본문({ code: 9000, description: "unknown error" })을
+     * 돌려주므로, 그 경우에만 code·description을 직접 읽어 공식 코드 정의로 안내할 수 있게 한다.
+     * @return array{status:int,body:array,headers:array<string,string>}
+     */
+    public static function decode(int $status, string $raw, array $headers): array
+    {
+        if ($status < 200 || ($status >= 300 && $status < 400)) throw new TransportFailure();
+        $data = json_decode($raw, true, 32);
+        if ((!is_array($data) || array_is_list($data)) && $status >= 500 && preg_match('/\bcode\s*:\s*(\d{1,8})\b/', $raw, $code)) {
+            $data = ['code' => (int) $code[1]];
+            if (preg_match('/\bdescription\s*:\s*"([^"\r\n]{0,200})"/', $raw, $description)) $data['description'] = $description[1];
+        }
+        if (!is_array($data) || array_is_list($data)) throw new TransportFailure();
+        return ['status' => $status, 'body' => $data, 'headers' => $headers];
     }
 }

@@ -78,14 +78,17 @@ final class Results
                         $code = $event['result_code'];
                         $success = match ($row['channel']) { 'sms' => '4100', 'lms' => '6600', default => '7000' };
                         if ($code === $success) { $delivery = 'delivered'; break; }
+                        // 공식 결과 코드 분류: 9000번대는 채널 공통 실패 사유 코드다.
+                        if (preg_match('/^9\d{3}$/D', $code) === 1) { $delivery = 'failed'; continue; }
                         if ($row['channel'] !== 'at') {
                             $delivery = ResultCodes::textFailure($row['channel'], $code) ? 'failed' : 'uncertain';
                             continue;
                         }
+                        // 카카오: 7305 성공 불확실(30일 이내 수신 가능), 7307 처리 지연·7461 처리 중, 그 외 7000번대는 실패.
                         $delivery = match (true) {
-                            $code === '7307' => 'pending',
+                            $code === '7307', $code === '7461' => 'pending',
                             $code === '7305' => 'uncertain',
-                            preg_match('/^7[123]\d{2}$/D', $code) === 1 => 'failed',
+                            preg_match('/^7\d{3}$/D', $code) === 1 => 'failed',
                             default => 'uncertain',
                         };
                     }

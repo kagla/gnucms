@@ -11,6 +11,9 @@ use Throwable;
 
 final class Dispatch
 {
+    /** 공식 재시도 정책(운영 가이드): 동시 접속 초과 3008, 호출 제한 5002, 업체 서버 오류 5003·5004·5005·9000. AUTH는 로컬 인증 준비 실패. */
+    public const RETRYABLE = ['AUTH', '3008', '5002', '5003', '5004', '5005', '9000'];
+
     public function __construct(private Store $store, private Settings $settings, private Templates $templates,
         private Api $api, private SecretCipher $cipher, private string $secret, private string $storageDir)
     {
@@ -86,7 +89,7 @@ final class Dispatch
                 $row = $this->row($id);
                 $last = $this->attempts($id);
                 $last = $last === [] ? null : $last[count($last) - 1];
-                if ($row['submission'] !== 'rejected' || !in_array($last['result_code'] ?? '', ['5002', 'AUTH'], true)
+                if ($row['submission'] !== 'rejected' || !in_array($last['result_code'] ?? '', self::RETRYABLE, true)
                     || $row['payload'] === '' || (int) $row['attempts'] >= 3 || (int) $row['retry_at'] > Clock::timestamp()) {
                     throw DomainError::validation(['retry' => '재시도할 수 없습니다. 불명확한 발송은 업체 이력에서 먼저 확인해 주세요.']);
                 }
@@ -119,7 +122,7 @@ final class Dispatch
         try {
             $token = $this->api->token($settings, $refreshToken);
         } catch (Throwable $e) {
-            $this->record($id, $attemptId, 'rejected', 'AUTH', 0, '');
+            $this->record($id, $attemptId, 'rejected', 'AUTH', 0, '', self::retryDelay('AUTH', []));
             return $this->detail($id);
         }
         $this->store->update('bp_attempts', $attemptId, ['submission' => 'sending']);
@@ -128,14 +131,18 @@ final class Dispatch
                 'from' => $payload['from'], 'to' => $payload['phone'], 'content' => $payload['content']], $token);
             $status = (int) $response['status'];
             $body = $response['body'];
+            $headers = array_change_key_case(is_array($response['headers'] ?? null) ? $response['headers'] : [], CASE_LOWER);
             $code = is_scalar($body['code'] ?? null) ? (string) $body['code'] : '';
             $messagekey = is_string($body['messagekey'] ?? null) && preg_match('/^[A-Za-z0-9_#.-]{1,128}$/D', $body['messagekey']) ? $body['messagekey'] : '';
             $echoValid = !isset($body['refkey']) || $body['refkey'] === $refkey;
+            // 공식 코드 정의: 4xx의 2000·3000번대·5002와 5xx의 5003·5004·5005·9000은 접수되지 않은 명확한 거절이다.
+            $rejected = (in_array($status, [200, 400, 401, 403, 429], true)
+                    && in_array($code, ['2000','3000','3001','3002','3003','3004','3005','3006','3007','3008','3009','3010','3011','3014','3015','5002'], true))
+                || (in_array($status, [500, 502, 503, 504], true) && in_array($code, ['5003', '5004', '5005', '9000'], true));
             if ($status === 200 && $code === '1000' && $messagekey !== '' && $echoValid) {
                 $this->record($id, $attemptId, 'accepted', $code, $status, $messagekey);
-            } elseif (in_array($status, [200, 400, 401, 403, 429], true) && $echoValid
-                && in_array($code, ['2000','3000','3001','3002','3003','3004','3005','3006','3007','3008','3009','3010','3014','5002'], true)) {
-                $this->record($id, $attemptId, 'rejected', $code, $status, '');
+            } elseif ($rejected && $echoValid) {
+                $this->record($id, $attemptId, 'rejected', $code, $status, '', self::retryDelay($code, $headers));
                 if (!$refreshToken && in_array($code, ['3002', '3005'], true) && (int) $row['attempts'] < 2) {
                     return $this->transmit($this->row($id), $settings, $payload, true);
                 }
@@ -149,9 +156,19 @@ final class Dispatch
         return $this->detail($id);
     }
 
-    private function record(string $id, string $attemptId, string $state, string $code, int $http, string $messagekey): void
+    /** 재시도 대기 초. 5002는 응답 헤더 RateLimit-Reset(초)을 따르고 그 외 재시도 가능 코드는 30초다. */
+    private static function retryDelay(string $code, array $headers): int
     {
-        $this->store->db->transaction(function () use ($id, $attemptId, $state, $code, $http, $messagekey): void {
+        if (!in_array($code, self::RETRYABLE, true)) return 0;
+        if ($code === '5002' && is_numeric($headers['ratelimit-reset'] ?? null)) {
+            return (int) min(3600, max(1, (int) ceil((float) $headers['ratelimit-reset'])));
+        }
+        return 30;
+    }
+
+    private function record(string $id, string $attemptId, string $state, string $code, int $http, string $messagekey, int $retryAfter = 0): void
+    {
+        $this->store->db->transaction(function () use ($id, $attemptId, $state, $code, $http, $messagekey, $retryAfter): void {
             $this->store->db->execute('UPDATE ' . $this->store->db->table('bp_dispatches') . ' SET updated_at = updated_at WHERE id = ?', [$id]);
             // 먼저 도착한 웹훅이 채운 키·성공 상태는 늦은 HTTP 응답으로 되돌리지 않는다.
             $attempt = $this->store->find('bp_attempts', $attemptId);
@@ -162,7 +179,7 @@ final class Dispatch
             }
             $this->store->update('bp_attempts', $attemptId, ['submission' => $state, 'result_code' => $code, 'http_status' => $http, 'messagekey' => $messagekey]);
             $this->store->update('bp_dispatches', $id, ['submission' => $state, 'updated_at' => Clock::timestamp(),
-                'retry_at' => in_array($code, ['AUTH', '5002'], true) ? Clock::timestamp() + 30 : 0]);
+                'retry_at' => $state === 'rejected' && $retryAfter > 0 ? Clock::timestamp() + $retryAfter : 0]);
         });
     }
 
@@ -176,7 +193,15 @@ final class Dispatch
             $settings = $this->settings->read($row['environment']);
             if ($settings === null || hash('sha256', $settings['account']) !== ($this->payload($row)['account_id'] ?? '')) throw DomainError::validation(['report' => '계정 변경 전 발송입니다. 업체 이력에서 확인해 주세요.']);
             $response = $this->api->post($settings, '/v2/report', ['messagekey' => $attempts[count($attempts) - 1]['messagekey']], $this->api->token($settings));
-            if ($response['status'] !== 200 || (string) ($response['body']['code'] ?? '') !== '1000') throw DomainError::serviceUnavailable('결과 재요청에 실패했습니다. 잠시 후 확인해 주세요.');
+            $code = is_scalar($response['body']['code'] ?? null) ? (string) $response['body']['code'] : '';
+            if ($response['status'] === 200 && $code === '1000') return;
+            // 공식 코드 정의: 3012 보관 주기(35일) 경과, 3013 통신사·카카오 결과 미수신. 9000은 결과 수신 URL이 없을 때도 관찰됐다.
+            throw match ($code) {
+                '3012' => DomainError::validation(['report' => '비즈뿌리오 보관 기간(35일)이 지난 메시지라 결과를 다시 받을 수 없습니다.']),
+                '3013' => DomainError::validation(['report' => '통신사·카카오 결과가 아직 비즈뿌리오에 도착하지 않은 메시지입니다. 잠시 후 다시 요청해 주세요.']),
+                '9000' => DomainError::validation(['report' => '비즈뿌리오가 결과 재요청을 처리하지 못했습니다(9000). 이 계정에 결과 수신 URL이 등록되어 있는지 확인해 주세요. 등록 전에는 결과가 GNUCMS로 오지 않습니다.']),
+                default => DomainError::serviceUnavailable('결과 재요청에 실패했습니다. 잠시 후 확인해 주세요.'),
+            };
         }, LOCK_SH);
     }
 
@@ -269,7 +294,7 @@ final class Dispatch
     private function requireEnabled(string $environment, string $phone): array
     {
         $settings = $this->settings->read($environment);
-        if ($settings === null || !$this->settings->enabled($settings)) throw DomainError::validation(['enabled' => '발송이 정지되어 있습니다. 플러그인 설정을 확인해 주세요.']);
+        if ($settings === null || !$this->settings->enabled($settings)) throw DomainError::validation(['enabled' => '발송이 정지되어 있습니다. 설정 → 알림톡·문자를 확인해 주세요.']);
         if ($settings['test_only'] && $phone !== $settings['test_phone']) throw DomainError::validation(['phone' => '현재 지정된 테스트 번호로만 발송할 수 있습니다.']);
         return $settings;
     }

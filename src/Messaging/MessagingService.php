@@ -81,7 +81,8 @@ final class MessagingService
 
     private function channelDetail(string $id, bool $text): array
     {
-        $detail = $this->dispatch->detail($id, $text);
+        // 상세는 알림톡·문자 모두 수신번호 원문을 준다. 목록은 마스킹만 보여 준다.
+        $detail = $this->dispatch->detail($id, true);
         if (!in_array($detail['channel'], $text ? ['sms', 'lms'] : ['at'], true)) throw DomainError::notFound('이 채널의 발송 이력이 아닙니다.');
         return $detail;
     }
@@ -95,6 +96,9 @@ final class MessagingService
             'remote-list' => $this->remoteTemplates->listing(Input::environment($input['environment'] ?? null), $input),
             'remote-detail' => $this->remoteTemplates->detail(Input::environment($input['environment'] ?? null), $input),
             'remote-import' => $this->remoteTemplates->import(Input::environment($input['environment'] ?? null), $input),
+            'remote-import-all' => $this->remoteTemplates->importAll(Input::environment($input['environment'] ?? null), $input),
+            'enable' => $this->templates->setEnabled(Input::id($input['id'] ?? null), Input::id($input['revision'] ?? null), ($input['enabled'] ?? '') === '1'),
+            'delete' => $this->templates->delete(Input::id($input['id'] ?? null), Input::id($input['revision'] ?? null)),
             default => throw DomainError::validation(['action' => '템플릿 작업을 확인해 주세요.']),
         };
     }
