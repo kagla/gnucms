@@ -34,18 +34,39 @@ final class SettingsController
         try {
             if ($request->getMethod() === 'POST') {
                 $action = $input['action'] ?? '';
-                if ($action === 'reveal-password') {
+                if ($action === 'reveal-password' || $action === 'reveal-kapi-key') {
+                    // 저장된 비밀값은 화면 HTML에 넣지 않고, 눈 아이콘이 현재 설정 판을 확인한 JSON 요청으로만 받는다.
+                    $field = $action === 'reveal-password' ? 'password' : 'kapi_key';
                     $settings = $service->settings->read($environment);
                     if ($settings === null || ($input['revision'] ?? null) !== $settings['revision'] || ($input['account'] ?? null) !== $settings['account']) {
-                        throw DomainError::validation(['password' => '계정 설정이 변경되었습니다. 화면을 새로 연 뒤 확인해 주세요.']);
+                        throw DomainError::validation([$field => '계정 설정이 변경되었습니다. 화면을 새로 연 뒤 확인해 주세요.']);
                     }
-                    $response->getBody()->write(json_encode(['password' => $settings['password']], JSON_THROW_ON_ERROR));
+                    if (($settings[$field] ?? '') === '') throw DomainError::validation([$field => '저장된 값이 없습니다. 화면을 새로 연 뒤 확인해 주세요.']);
+                    $response->getBody()->write(json_encode([$field => $settings[$field]], JSON_THROW_ON_ERROR));
                     return $response->withHeader('Content-Type', 'application/json; charset=utf-8')
                         ->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer')
                         ->withHeader('X-Content-Type-Options', 'nosniff');
                 } elseif ($action === 'save') {
+                    // 결과 송신 IP에 GNUCMS 서버 자신의 IP를 넣으면 비즈뿌리오의 결과 전달이 모두 거부되므로 막는다.
+                    $own = $request->getServerParams()['SERVER_ADDR'] ?? '';
+                    if (is_string($own) && $own !== '' && in_array($own, preg_split('/[\s,]+/', trim((string) ($input['webhook_ips'] ?? '')), -1, PREG_SPLIT_NO_EMPTY), true)) {
+                        throw DomainError::validation(['webhook_ips' => '결과 송신 IP에는 비즈뿌리오가 결과를 보내는 IP를 적습니다. GNUCMS 서버 자신의 IP(' . $own . ')는 넣을 수 없습니다. 모르면 비워 두세요.']);
+                    }
                     $service->settings->save($environment, $input);
                     $notice = '설정을 저장했습니다. 발송은 정지 상태입니다.';
+                } elseif ($action === 'copy-from') {
+                    // 계정 하나로 검수·운영을 함께 쓰는 경우 다른 환경의 계정·키·발신번호를 그대로 가져온다. 발송 허용은 꺼진 채 시작한다.
+                    $source = Input::environment($input['source'] ?? '');
+                    $label = $source === 'live' ? '운영' : '테스트';
+                    if ($source === $environment) throw DomainError::validation(['source' => '같은 환경으로는 복사할 수 없습니다.']);
+                    $from = $service->settings->read($source);
+                    if ($from === null) throw DomainError::validation(['source' => $label . ' 환경에 저장된 설정이 없습니다.']);
+                    $target = $service->settings->read($environment);
+                    if ($environment === 'test' && ($target['test_phone'] ?? '') === '') throw DomainError::validation(['test_phone' => '테스트 환경은 테스트 수신번호가 필요합니다. 먼저 저장한 뒤 복사해 주세요.']);
+                    $service->settings->save($environment, ['account_type' => $from['account_type'], 'account' => $from['account'], 'password' => $from['password'],
+                        'senderkey' => $from['senderkey'], 'kapi_key' => $from['kapi_key'] ?? '', 'from' => $from['from'], 'test_phone' => $target['test_phone'] ?? '',
+                        'webhook_ips' => implode(' ', $from['webhook_ips'] ?? [])]);
+                    $notice = $label . ' 환경의 설정을 복사했습니다. 인증 연결 확인 후 발송을 허용해 주세요. 템플릿 사본은 환경별이므로 템플릿 탭에서 따로 가져옵니다.';
                 } elseif (in_array($action, ['enable', 'disable'], true)) {
                     $service->settings->setEnabled($environment, $action === 'enable');
                     $notice = $action === 'enable' ? '발송을 허용했습니다.' : '발송을 정지했습니다. 결과 수신은 계속됩니다.';
@@ -81,7 +102,8 @@ final class SettingsController
             $response->withHeader('Cache-Control', 'no-store')->withHeader('Referrer-Policy', 'no-referrer'),
             'admin/messaging_settings',
             ['base' => RouteContext::fromRequest($request)->getBasePath(), 'environment' => $environment, 'ready' => true,
-                'settings' => $settings, 'notice' => $notice, 'errors' => $errors, 'webhook' => $webhook]
+                'settings' => $settings, 'notice' => $notice, 'errors' => $errors, 'webhook' => $webhook,
+                'other_configured' => $service->settings->read($environment === 'live' ? 'test' : 'live') !== null]
         );
     }
 }

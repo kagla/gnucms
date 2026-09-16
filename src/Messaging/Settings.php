@@ -31,6 +31,9 @@ final class Settings
         $settings = $this->read($environment);
         if ($settings === null) return ['environment' => $environment, 'account_type' => 'module', 'configured' => false, 'enabled' => false, 'api_verified' => false];
         $settings['kapi_configured'] = ($settings['kapi_key'] ?? '') !== '';
+        // 화면의 마스킹 placeholder용 글자 수. 값 자체는 요약에 넣지 않는다.
+        $settings['password_length'] = mb_strlen((string) ($settings['password'] ?? ''));
+        $settings['kapi_key_length'] = mb_strlen((string) ($settings['kapi_key'] ?? ''));
         unset($settings['password'], $settings['webhook_token'], $settings['kapi_key']);
         return $settings + ['configured' => true, 'enabled' => $this->enabled($settings), 'api_verified' => $this->verified($settings)];
     }
@@ -42,16 +45,18 @@ final class Settings
             $before = $this->read($environment);
             $accountType = $input['account_type'] ?? $before['account_type'] ?? 'module';
             if (!in_array($accountType, ['module', 'web'], true)) throw DomainError::validation(['account_type' => '계정 유형을 확인해 주세요.']);
-            $account = Input::text($input['account'] ?? null, '계정', 20);
-            if (!preg_match('/^[A-Za-z0-9_.@-]+$/D', $account)) throw DomainError::validation(['account' => '계정 형식을 확인해 주세요.']);
-            $kapiKey = Input::text($input['kapi_key'] ?? '', 'KAPI 키', 500, true);
+            // 비즈뿌리오 화면에서 복사해 붙여 넣은 값에는 앞뒤 공백·줄바꿈이 따라오기 쉬우므로 지우고 검사한다.
+            $clean = static fn (mixed $value): ?string => is_string($value) ? trim($value) : null;
+            $account = Input::text($clean($input['account'] ?? null), '아이디', 20);
+            if (!preg_match('/^[A-Za-z0-9_.@-]+$/D', $account)) throw DomainError::validation(['account' => '아이디 형식을 확인해 주세요.']);
+            $kapiKey = Input::text($clean($input['kapi_key'] ?? '') ?? '', 'API 키', 500, true);
             if ($kapiKey === '' && $account === ($before['account'] ?? null)) $kapiKey = $before['kapi_key'] ?? '';
             if (($input['clear_kapi_key'] ?? '') === '1') $kapiKey = '';
-            $password = Input::text($input['password'] ?? '', '비밀번호', 500, true);
+            $password = Input::text(is_string($input['password'] ?? null) ? rtrim($input['password'], "\r\n") : '', '비밀번호', 500, true);
             if ($password === '') $password = $before['password'] ?? '';
             if ($password === '') throw DomainError::validation(['password' => '계정 비밀번호를 입력해 주세요.']);
-            $sender = Input::text($input['senderkey'] ?? $before['senderkey'] ?? '', '발신프로필 키', 40, true);
-            if ($sender !== '' && !preg_match('/^[A-Za-z0-9_-]{1,40}$/D', $sender)) throw DomainError::validation(['senderkey' => '발신프로필 키를 확인해 주세요.']);
+            $sender = Input::text(isset($input['senderkey']) ? ($clean($input['senderkey']) ?? '') : ($before['senderkey'] ?? ''), '발신프로필키', 40, true);
+            if ($sender !== '' && !preg_match('/^[A-Za-z0-9_-]{1,40}$/D', $sender)) throw DomainError::validation(['senderkey' => '발신프로필키를 확인해 주세요.']);
             $from = str_replace(['-', ' '], '', Input::text($input['from'] ?? null, '발신번호', 20));
             if (!preg_match('/^\d{8,16}$/D', $from)) throw DomainError::validation(['from' => '발신번호는 8~16자리 숫자로 입력해 주세요.']);
             $testPhone = $environment === 'test' ? Input::phone($input['test_phone'] ?? null) : '';
@@ -63,9 +68,10 @@ final class Settings
             }
             $changedIdentity = $before !== null && ($account !== $before['account'] || $sender !== $before['senderkey']);
             if ($changedIdentity) {
+                // 전송 중·불명확 건만 막는다. 이미 접수된 발송은 결과 웹훅이 없으면 영원히 대기 상태라 변경을 막는 근거가 되지 않는다.
                 $pending = $this->store->db->selectOne('SELECT id FROM ' . $this->store->db->table('bp_dispatches')
-                    . " WHERE environment = ? AND (submission IN ('sending','unknown') OR (submission = 'accepted' AND delivery IN ('pending','uncertain'))) LIMIT 1", [$environment]);
-                if ($pending !== null) throw DomainError::validation(['account' => '미완료 발송을 확인한 뒤 계정·프로필을 변경해 주세요.']);
+                    . " WHERE environment = ? AND submission IN ('prepared', 'sending', 'unknown') LIMIT 1", [$environment]);
+                if ($pending !== null) throw DomainError::validation(['account' => '전송 중이거나 결과가 불명확한 발송이 있습니다. 발송 이력에서 확인한 뒤 계정·발신프로필키를 변경해 주세요.']);
                 // 다른 프로필의 승인 템플릿을 잘못 사용하는 것을 막는다.
                 $this->store->db->update('bp_templates', ['enabled' => 0], 'environment = :env', ['env' => $environment]);
             }

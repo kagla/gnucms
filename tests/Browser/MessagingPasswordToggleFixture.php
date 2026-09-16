@@ -13,7 +13,7 @@ echo $view->fetch('admin/messaging_settings', [
     'settings' => [
         'configured' => true, 'enabled' => false, 'account' => 'browser-test', 'account_type' => 'module',
         'revision' => str_repeat('a', 32), 'senderkey' => bin2hex(random_bytes(20)), 'from' => '0212345678',
-        'test_phone' => '01000000000', 'webhook_ips' => [], 'api_verified' => false, 'kapi_configured' => false,
+        'test_phone' => '01000000000', 'webhook_ips' => [], 'api_verified' => false, 'kapi_configured' => true, 'password_length' => 20, 'kapi_key_length' => 36,
     ],
     'notice' => '', 'errors' => [], 'webhook' => null,
 ]);

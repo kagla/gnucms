@@ -21,7 +21,7 @@ function html(base, environment) {
       const page = await browser.newPage();
       const url = 'https://gnucms.test' + base + '/admin/settings/messaging';
       const content = html(base, environment), requests = [], errors = [];
-      const password = require('node:crypto').randomUUID();
+      const password = require('node:crypto').randomUUID(), kapiKey = require('node:crypto').randomUUID();
       page.on('pageerror', error => errors.push(error.message));
       await page.setRequestInterception(true);
       page.on('request', request => {
@@ -29,10 +29,11 @@ function html(base, environment) {
         if (request.url().includes('daisyui.css')) return request.respond({status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(root, 'www/vendor/daisyui/daisyui.css'), 'utf8')});
         if (new URL(request.url()).pathname.endsWith('/theme.css')) return request.respond({status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(root, 'www/themes/default/theme.css'), 'utf8')});
         if (request.method() === 'POST') {
-          requests.push({url: request.url(), body: new URLSearchParams(request.postData())});
-          return request.respond(request.url() === url
-            ? {status: 200, contentType: 'application/json', body: JSON.stringify({password})}
-            : {status: 404, body: 'not found'});
+          const body = new URLSearchParams(request.postData());
+          requests.push({url: request.url(), body});
+          if (request.url() !== url) return request.respond({status: 404, body: 'not found'});
+          return request.respond({status: 200, contentType: 'application/json',
+            body: JSON.stringify(body.get('action') === 'reveal-kapi-key' ? {kapi_key: kapiKey} : {password})});
         }
         return request.respond({status: 200, contentType: 'text/html', body: content});
       });
@@ -47,7 +48,7 @@ function html(base, environment) {
       await clickToggle('#senderkey-toggle');
       assert.equal(await page.$eval('#senderkey', element => element.type), 'text');
       assert.equal(await page.$eval('#senderkey', element => element.value), senderKey);
-      assert.equal(await page.$eval('#senderkey-toggle', element => element.getAttribute('aria-label')), '발신프로필 키 숨기기');
+      assert.equal(await page.$eval('#senderkey-toggle', element => element.getAttribute('aria-label')), '발신프로필키 숨기기');
       await clickToggle('#senderkey-toggle');
       assert.equal(await page.$eval('#senderkey', element => element.type), 'password');
       assert.equal(await page.$eval('#senderkey', element => new FormData(element.form).get('senderkey')), senderKey);
@@ -71,6 +72,27 @@ function html(base, environment) {
       await clickToggle('#password-toggle');
       assert.equal(await page.$eval('#password', element => element.value), 'newly-typed-value');
       assert.equal(requests.length, 1, '새로 입력한 값은 서버에서 다시 읽지 않는다');
+      assert.equal(await page.$eval('#kapi_key', element => element.value), '');
+      assert.equal(await page.$eval('#kapi_key', element => element.type), 'password');
+      await clickToggle('#kapi-key-toggle');
+      await page.waitForFunction(() => !document.getElementById('kapi-key-toggle').disabled);
+      assert.equal(requests.length, 2, '저장된 KAPI 키는 서버에서 읽는다');
+      assert.equal(requests[1].url, url);
+      for (const [key, value] of Object.entries({action: 'reveal-kapi-key', environment, account: 'browser-test', revision: 'a'.repeat(32), csrf_token: 'browser-test-csrf'})) {
+        assert.equal(requests[1].body.get(key), value);
+      }
+      assert.equal(await page.$eval('#kapi_key', element => element.type), 'text');
+      assert.equal(await page.$eval('#kapi_key', element => element.value), kapiKey);
+      assert.equal(await page.$eval('#kapi-key-toggle', element => element.getAttribute('aria-label')), 'API 키 숨기기');
+      assert.equal(await page.$eval('#password', element => element.value), 'newly-typed-value', 'KAPI 키 표시는 비밀번호 입력값을 건드리지 않는다');
+      await clickToggle('#kapi-key-toggle');
+      assert.equal(await page.$eval('#kapi_key', element => element.type), 'password');
+      assert.equal(await page.$eval('#kapi_key', element => element.value), '', '숨기면 서버에서 읽은 키를 지운다');
+      await page.type('#kapi_key', 'typed-kapi-key');
+      await clickToggle('#kapi-key-toggle');
+      assert.equal(await page.$eval('#kapi_key', element => element.type), 'text');
+      assert.equal(await page.$eval('#kapi_key', element => element.value), 'typed-kapi-key');
+      assert.equal(requests.length, 2, '새로 입력한 KAPI 키는 서버에서 다시 읽지 않는다');
       assert.deepEqual(errors, []);
       await page.close();
     }
