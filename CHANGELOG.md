@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.8.0](https://github.com/kagla/gnucms/compare/v0.7.1...v0.8.0) (2026-10-06)
+
+
+### Features
+
+* add installer screenshots to manual ([9ef0b6f](https://github.com/kagla/gnucms/commit/9ef0b6f8dddf1527ac1b9b0d4268fd405d27e65d))
+* add operator and developer manual module ([fafde84](https://github.com/kagla/gnucms/commit/fafde84953e78124ce639e387d6c4f4a4806234b))
+* add simple whole-order returns and notification bindings ([2ce1c2f](https://github.com/kagla/gnucms/commit/2ce1c2ff21ceaed08a122942c86a4eca7e6d37e9))
+* complete notification and checkout improvements ([9ae5862](https://github.com/kagla/gnucms/commit/9ae5862d8d0b1612f41deb96af83097b53b8340a))
+* simplify shop for one-person operation ([8ff8738](https://github.com/kagla/gnucms/commit/8ff8738e31e51051588ceddc119fa6dd95c9226d))
+* streamline shop order management and numbering ([c892017](https://github.com/kagla/gnucms/commit/c892017a85ed0fc856144985d874456762000a4f))
+* unify notification settings and configurable alimtalk information ([d35217b](https://github.com/kagla/gnucms/commit/d35217bfde955122f2261fadebbe6a40858d9095))
+
+
+### Bug Fixes
+
+* align mobile navigation and footer spacing ([0978f99](https://github.com/kagla/gnucms/commit/0978f9940559fa81c2c5868522fc9633bec62739))
+* disable KCP REST payments for new shop orders ([89c9acc](https://github.com/kagla/gnucms/commit/89c9acce450fa39e9bded934fdbb109eb3ff049b))
+* improve manual headings and responsive navigation ([871336e](https://github.com/kagla/gnucms/commit/871336e330cc220d518332687c1b680d606bae58))
+* keep manual image scrolling inside dialog ([8101883](https://github.com/kagla/gnucms/commit/81018838ff84397ab4bc7d728ed71a2a307b3ba5))
+* keep shop product headings visible while scrolling ([b44c91a](https://github.com/kagla/gnucms/commit/b44c91a743930388d2146af9da2fc1084f22dc62))
+* reject non-scalar notification text settings ([89aa865](https://github.com/kagla/gnucms/commit/89aa8658fd3dad6d514517af211911a34c32d1d8))
+* send required Alimtalk fallback titles and interpret results ([9ab1be4](https://github.com/kagla/gnucms/commit/9ab1be44a905ce835921399146a149d8bcc3caba))
+* simplify message template preview and sending ([52926d9](https://github.com/kagla/gnucms/commit/52926d9a3a0bc5d0e278ff3e0fbc6922c893a0f5))
+* use GNUCMS product name in installer ([2e3f742](https://github.com/kagla/gnucms/commit/2e3f742c37ef229cdd991c1de8ecc162fb3997fa))
+
 ## [0.7.1](https://github.com/kagla/gnucms/compare/v0.7.0...v0.7.1) (2026-09-30)
 
 ### 수정 사항
