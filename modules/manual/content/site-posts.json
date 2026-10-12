@@ -20,6 +20,19 @@
       ]
     },
     {
+      "title": "유튜브 영상 넣기",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "본문에서 유튜브 주소를 한 줄에 하나씩 붙이고 글을 저장하면 공개 화면에서 영상 플레이어로 표시합니다. 일반 영상 주소, youtu.be 짧은 주소, Shorts와 라이브 주소를 지원하며 링크의 시작 시각도 반영합니다. 독립된 유튜브 링크가 있는 기존 글에도 적용됩니다."
+        },
+        {
+          "type": "p",
+          "text": "문장 안의 링크, 코드 예시, 재생목록만 있는 주소와 올바르지 않은 영상 주소는 플레이어로 바꾸지 않습니다. 편집 화면에는 원래 주소와 링크를 유지하며 저장된 본문을 자동으로 수정하지 않습니다. 플레이어 아래에는 YouTube에서 여는 링크가 남습니다."
+        }
+      ]
+    },
+    {
       "title": "댓글과 답글",
       "blocks": [
         {
@@ -64,6 +77,8 @@
   ],
   "sources": [
     "src/Web/Controller/PostController.php",
-    "src/Web/Controller/CommentController.php"
+    "src/Web/Controller/CommentController.php",
+    "src/Cms/ContentRenderer.php",
+    "src/Cms/YouTubeEmbed.php"
   ]
 }

@@ -8,7 +8,8 @@ namespace GnuCms\Cms;
  * 저장된 본문을 화면에 내보내기 직전에 손질한다.
  *
  * 정화(HtmlSanitizer)를 거친 뒤, 본문에 넣은 사진을 축소본으로 바꾸고
- * 원본은 눌렀을 때만 받아 가도록 링크로 감싼다. 저장된 내용은 건드리지 않는다.
+ * 원본은 눌렀을 때만 받아 가도록 링크로 감싼다. 독립된 유튜브 주소·링크는
+ * 반응형 플레이어로 표시한다. 저장된 내용은 건드리지 않는다.
  */
 final class ContentRenderer
 {
@@ -22,7 +23,7 @@ final class ContentRenderer
 
     public function render(string $raw): string
     {
-        return $this->zoomable($this->sanitizer->clean($raw));
+        return YouTubeEmbed::render($this->zoomable($this->sanitizer->clean($raw)));
     }
 
     /**
