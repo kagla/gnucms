@@ -47,7 +47,7 @@
         },
         {
           "type": "p",
-          "text": "현재 선택한 테마가 기본 파일을 재정의하면 templates/테마명 안의 같은 경로를 사용합니다. GNUCMS.com 전용 테마는 templates/gnucmscom과 www/themes/gnucmscom에 있습니다."
+          "text": "현재 선택한 테마가 기본 파일을 재정의하면 templates/테마명 안의 같은 경로를 사용합니다. GNUCMS.com의 현재 테마는 templates/modern과 www/themes/modern입니다. gnucmscom은 이전 테마로 남아 있습니다."
         }
       ]
     },
@@ -65,7 +65,7 @@
         },
         {
           "type": "p",
-          "text": "공식 사이트의 gnucmscom은 별도 fallback 보완을 사용합니다. 이 공식 사이트 구현을 모든 사용자 테마의 계약으로 가정하지 않습니다. 업그레이드마다 코어에서 바뀐 화면·partial·전역 변수를 비교해야 합니다."
+          "text": "공식 사이트 저장소는 modern을 포함한 선택 테마에 화면이 없으면 default를 찾는 별도 fallback 보완을 사용합니다. 이 공식 사이트 구현을 모든 사용자 테마의 계약으로 가정하지 않습니다. 업그레이드마다 코어에서 바뀐 화면·partial·전역 변수를 비교해야 합니다."
         }
       ]
     },

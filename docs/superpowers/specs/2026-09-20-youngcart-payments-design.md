@@ -1,5 +1,7 @@
 # 영카트 결제 설계 (2026-09-20)
 
+> 과거 계획·작업 기록입니다. 작성 당시의 제안·검증 결과는 보존하며 현재 기능 제공을 보장하지 않습니다. 현재 지원 범위는 [공개 매뉴얼](https://gnucms.com/manual/support)과 [지원 범위 문서](https://github.com/kagla/gnucms/blob/main/docs/supported-features.md)를 따릅니다. 백업·확장·쇼핑몰은 현재 코어에 구현되어 있으며 자동 복원·자동 DB 백업은 제공하지 않습니다.
+
 쇼핑몰(`src/Shop`)의 주문에 결제를 붙인다. 카드·간편결제·실시간 계좌이체·
 가상계좌·무통장입금 다섯 수단을 모두 다루되, 실행은 세 묶음으로 나눈다. 결제사 연동은
 `feat/initalk` 브랜치에 있던 이니시스 결제 계층(`src/Payment`)을 통합 브랜치 `feat/core-commerce`로

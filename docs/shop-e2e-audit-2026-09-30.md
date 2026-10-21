@@ -1,5 +1,7 @@
 # 쇼핑몰 실사용 흐름 검증 보고서 (2026-09-30)
 
+> 과거 계획·작업 기록입니다. 작성 당시의 제안·검증 결과는 보존하며 현재 기능 제공을 보장하지 않습니다. 현재 지원 범위는 [공개 매뉴얼](https://gnucms.com/manual/support)과 [지원 범위 문서](https://github.com/kagla/gnucms/blob/main/docs/supported-features.md)를 따릅니다. 백업·확장·쇼핑몰은 현재 코어에 구현되어 있으며 자동 복원·자동 DB 백업은 제공하지 않습니다.
+
 ## 대상과 방법
 
 - 대상: `https://gnucms.charmgen.com`의 실제 HTTPS 쇼핑몰. 제공된 관리자 계정으로 Chrome/Puppeteer에서 로그인하여 화면과 관리자 기능을 실행했다. 로컬 체크아웃은 `4fd400f`이며 배포 코드의 동일 커밋 여부는 확인하지 않았다.

@@ -32,6 +32,7 @@
     }
   ],
   "start": [
+    "support",
     "install",
     "site/settings",
     "site/boards",
@@ -39,6 +40,14 @@
     "messages/channels"
   ],
   "articles": [
+    {
+      "slug": "support",
+      "title": "현재 지원 범위와 제한",
+      "summary": "PHP·DB, 회원·쇼핑몰·결제·알림·백업과 원격 설치의 실제 지원 범위를 확인합니다.",
+      "group": "start",
+      "audience": "운영자·개발자",
+      "file": "support.json"
+    },
     {
       "slug": "start",
       "title": "처음 시작하는 운영 순서",
