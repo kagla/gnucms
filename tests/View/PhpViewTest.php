@@ -43,13 +43,16 @@ final class PhpViewTest extends TestCase
             static fn (string $name, array $p = [], array $q = []): string =>
                 '/r/' . $name . ($p ? '/' . implode('/', $p) : '') . ($q ? '?' . http_build_query($q) : '')
         );
-        return new PhpView(
+        $view = new PhpView(
             [$this->dir],
             $routes,
             '/base',
             static fn (string $path): string => '/themes/t/' . $path,
             static fn (string $html): string => '<div class="rich">' . $html . '</div>'
         );
+        // These helper expectations use UTC; timezone conversion tests override this value.
+        $view->addGlobal('site', ['timezone' => 'UTC']);
+        return $view;
     }
 
     public function testEscapesHtmlSpecialChars(): void

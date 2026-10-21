@@ -82,7 +82,7 @@ final class HistoryTest extends DatabaseTestCase
     private function expireRecheckWindow(int $jobId): void
     {
         $this->db->update('message_recipients',
-            ['checked_at' => date('Y-m-d H:i:s', strtotime('-2 minutes'))],
+            ['checked_at' => gmdate('Y-m-d H:i:s', Clock::timestamp() - 120)],
             'job_id = :j', ['j' => $jobId]);
     }
 
@@ -185,7 +185,7 @@ final class HistoryTest extends DatabaseTestCase
         $this->history->refresh();
         // 남은 한 명을 7일이 지난 것처럼 만들어 포기 처리를 태운다.
         $this->db->update('message_recipients',
-            ['requested_at' => date('Y-m-d H:i:s', strtotime('-8 days'))],
+            ['requested_at' => gmdate('Y-m-d H:i:s', Clock::timestamp() - 8 * 86400)],
             'job_id = :j AND status = :s', ['j' => $jobId, 's' => 'accepted']);
         $this->expireRecheckWindow($jobId);
 
@@ -232,7 +232,7 @@ final class HistoryTest extends DatabaseTestCase
     public function testStopsAskingAfterSevenDaysAndMarksUnknown(array $config): void
     {
         $this->boot($config);
-        $old = date('Y-m-d H:i:s', strtotime('-8 days'));
+        $old = gmdate('Y-m-d H:i:s', Clock::timestamp() - 8 * 86400);
         $jobId = $this->seed('sms', 'M1', $old);
 
         self::assertSame(0, $this->history->refresh());
