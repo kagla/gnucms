@@ -70,6 +70,20 @@
           ]
         }
       ]
+    },
+    {
+      "title": "실행 검증 기록 · 2026-10-21",
+      "blocks": [
+        {
+          "type": "p",
+          "text": "PHP 8.2·8.4 / MySQL 8.4와 PHP 8.4 / MariaDB 12.3.3에서 전체 검사와 HTTP 새 설치·백업/수동 복원을 확인했습니다. 정식 0.9.6 배포 ZIP도 새로 설치해 확인했습니다. 실제 상품·장바구니·회원 주문·취소·재고 복원과 modern 테마의 매뉴얼 55개를 포함한 73개 화면을 확인했습니다."
+        },
+        {
+          "type": "note",
+          "title": "확인한 범위",
+          "text": "외부 PG의 실제 승인·청구, 문자·알림톡 실수신과 과금, 외부 메일 수신·사업자 OAuth 로그인, 고객 호스팅에 대한 FTP/SFTP 원격 설치는 실행하지 않았습니다. 사업자 계약·호스팅 환경과 수신 성공은 별도로 확인해야 합니다."
+        }
+      ]
     }
   ],
   "related": [
@@ -81,6 +95,7 @@
   ],
   "sources": [
     "docs/supported-features.md",
-    "docs/guidance-audit-20261021.md"
+    "docs/guidance-audit-20261021.md",
+    "docs/functional-validation-20261021.md"
   ]
 }

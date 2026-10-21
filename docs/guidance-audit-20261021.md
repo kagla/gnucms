@@ -18,3 +18,5 @@ GNUCMS 코어 GitHub main, 공식 사이트 GitHub feat/modern-theme, gnucms.cha
 ## 확인 범위와 한계
 
 문구·JSON 구조·목록/관련 문서/소스 참조·검색 색인과 변경 전후 내용을 정적으로 검토했다. 기능 테스트, PHP lint, 실제 결제·발송·설치·복원은 실행하지 않았다. 소스가 지원하는 기능과 특정 호스팅에서 실제 거래가 성공한다는 보장은 구분한다. 변경에 제품 버전 증가, 신규 배포 ZIP/태그/Release 생성, 런타임 로직·고객 데이터 구조 변경은 포함하지 않았다. 기존 Release 첨부 ZIP은 당시 배포물로 보존했다.
+
+후속 실행 검증: [새 설치·주요 기능 검증 기록](functional-validation-20261021.md). PHP 8.2·8.4 / MySQL 8.4와 PHP 8.4 / MariaDB 12.3.3에서 확인했습니다.

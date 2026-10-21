@@ -24,3 +24,5 @@
 확인 근거: `composer.json`, `src/Install/ServerCheck.php`, `src/Shop/Commerce/Payments.php`, `src/Shop/Settings.php`, `src/Payment/KcpLegacyGateway.php`, `src/Payment/KcpLegacyProvider.php`, `src/Notify/Events.php`, `src/Maintenance/BackupManager.php`, `bin/backup.php`, `src/Theme/ThemeManager.php`, `.github/workflows/release.yml`.
 
 카페24 요금 예시는 2026-10-21 공식 뉴아우토반 상품 안내 기준 월 500원(VAT 포함), 1년 약정 할인 시 월 450원(VAT 포함), 설치비 5,000원 별도입니다. 요금·조건은 변경될 수 있으므로 [공식 상품 페이지](https://hosting.cafe24.com/?controller=new_product_page&page=newautobahn)를 확인합니다. 사이트 트래픽·저장 용량·외부 실행 허용 조건은 상품별로 확인합니다.
+
+후속 실행 검증: [새 설치·주요 기능 검증 기록](functional-validation-20261021.md). PHP 8.2·8.4 / MySQL 8.4와 PHP 8.4 / MariaDB 12.3.3에서 확인했습니다.
