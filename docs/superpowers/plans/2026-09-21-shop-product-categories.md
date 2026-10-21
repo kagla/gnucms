@@ -1,5 +1,7 @@
 # 상품의 분류 제한 없이, 목록에서 분류 일괄 넣기·빼기, 분류 메뉴 숨김 — 구현 계획
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** 연결 표 `yc_product_categories(product_id, category_id, slot)` 는 그대로다. slot 1 이 대표, 2 이상이 순서다. 폼은 `category_id`(대표) + `extra_category_ids[]`(추가 목록, JS 로 줄 추가) 로 바뀌고 검증이 목록을 받는다. 목록 일괄 작업은 같은 선택 폼에 `categorize`/`uncategorize` 동작을 더한다. 분류 표에 `menu_hidden` 칸(30판)을 더하고 메뉴·바로가기·하위 칩만 이를 거른다.
 
-**Tech Stack:** PHP 8.4, Slim, PHPUnit 10, SQLite·MariaDB. 새 의존성 없음.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, Slim, PHPUnit 10, SQLite·MariaDB. 새 의존성 없음.
 
 **Spec:** 사용자와 채팅에서 확정한 설계(2026-09-21): (1) 상품 폼 대표 분류 + "분류 추가" 목록, 상한 20; (2) 상품 목록 일괄 "분류에 추가 / 분류에서 제거"; (3) 분류 "메뉴에서 숨김" 스위치. 이 문서의 Global Constraints 가 그 요약이다.
 

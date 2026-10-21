@@ -1,5 +1,7 @@
 # 알리고 발송 엔진 구현 계획 (1/3)
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** `src/Aligo/`에 알리고 연동을 모은다. 알림톡(`kakaoapi.aligo.in`)과 문자(`apis.aligo.in`)는 호스트·인증 파라미터·응답 필드·인코딩이 달라 `AlimtalkApi`·`SmsApi`로 나누고, 그 아래 HTTP 실행부(`Transport`)와 그 위 발송 작업·수신자·결과 갱신은 공유한다. 설정은 `site_settings`에 `aligo.` 접두사로 넣고 API 키만 암호화한다.
 
-**Tech Stack:** PHP 8.1+, Slim 4, PDO(SQLite·MySQL), PHPUnit 10.5. 새 Composer 의존성 없음.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, Slim 4, PDO(SQLite·MySQL), PHPUnit 10.5. 새 Composer 의존성 없음.
 
 **Spec:** [docs/superpowers/specs/2026-09-17-aligo-messaging-design.md](../specs/2026-09-17-aligo-messaging-design.md)
 

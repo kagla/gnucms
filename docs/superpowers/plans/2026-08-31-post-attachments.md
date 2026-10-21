@@ -1,5 +1,7 @@
 # 게시판 파일 첨부 구현 계획
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** 백엔드는 기존 것을 재사용한다 — 서명 디스크립터 `AttachmentService`(업로드·검증), `posts.attachments` JSON 칸, `FileController` 다운로드, `posts/show.php` 첨부 목록. 새로 만드는 것은 웹 업로드 라우트 하나(`POST /boards/{key}/files`), 폼 조각(`posts/_attachments.php`, 외부 라이브러리 없는 HTML5 드래그), 사이트 설정 두 칸, 그리고 "버려진 파일 정리" 단추다.
 
-**Tech Stack:** PHP 8.1+/Slim 4/PDO(SQLite·MySQL/MariaDB), PHPUnit 10, daisyUI 5 CDN. 서버에 composer·npm·컴파일 없음 — 자산은 빌드 없이 넣는다.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장/Slim 4/PDO(SQLite·MySQL/MariaDB), PHPUnit 10, daisyUI 5 CDN. 서버에 composer·npm·컴파일 없음 — 자산은 빌드 없이 넣는다.
 
 스펙: `docs/superpowers/specs/2026-08-31-post-attachments-design.md`
 

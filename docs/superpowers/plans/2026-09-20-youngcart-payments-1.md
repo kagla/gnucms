@@ -1,5 +1,7 @@
 # 영카트 결제 3.1 구현 계획
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** `feat/initalk`의 `src/Payment`(Gateway 계약 + 이니시스 구현 + 암호화 설정·원장)를 코어로 옮기고, 영카트 모듈 안에 `Commerce\Payments`(수단 목록, 게이트웨이 주문 변환, 승인·환불 기록)와 `Web\PayController`(결제 페이지, 세션 없는 콜백)를 둔다. 주문 상태 흐름에 `paid`가 들어가고, 결제 칸은 모듈 스키마 3판이 더한다. 결제 원장·자격증명 판·콜백 HMAC 은 결제 계층이 이미 보장하므로 모듈은 주문과 원장 키를 잇기만 한다.
 
-**Tech Stack:** PHP 8.4, Slim, PHPUnit 10, SQLite(기본)·MySQL(선택), daisyUI 5 템플릿. 새 Composer 의존성 금지.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, Slim, PHPUnit 10, SQLite(기본)·MySQL(선택), daisyUI 5 템플릿. 새 Composer 의존성 금지.
 
 **Spec:** `docs/superpowers/specs/2026-09-20-youngcart-payments-design.md` (§1 범위 표의 3.1 행, §2·§3·§4 주문서·결제사 수단(카드)·무통장·기한, §5, §7, §8, §9).
 

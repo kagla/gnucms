@@ -1,5 +1,7 @@
 # 단계형 설치기와 스키마 업그레이더 구현 계획
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,13 +10,13 @@
 
 **Architecture:** `src/Db/SchemaUpgrader` 가 `Kernel::create()` 에서 `Schema::ensureCurrent()` 를 대신한다. 옮기지 못하면 `MaintenanceRequired` 를 던지고 `public/index.php` 가 `MaintenancePage` 로 503 을 낸다. 설치기는 `src/Install/{ServerCheck,DbSetup,InstallSession,Installer}` 네 클래스로 나누고 `public/install.php` 는 단계 라우팅과 HTML 만 맡는다.
 
-**Tech Stack:** PHP 8.1+, PDO(SQLite/MySQL/MariaDB), Slim 4, PHPUnit 10. 설치기와 점검 화면은 Slim·테마·DB 없이 도는 독립 HTML.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, PDO(SQLite/MySQL/MariaDB), Slim 4, PHPUnit 10. 설치기와 점검 화면은 Slim·테마·DB 없이 도는 독립 HTML.
 
 설계 원문: `docs/superpowers/specs/2026-08-30-installer-and-upgrader-design.md`
 
 ## Global Constraints
 
-- PHP 최소 판: `8.1.0` (`composer.json` 의 `>=8.1`). 서버는 composer·npm·컴파일이 없다. 빌드가 필요한 자산은 넣지 않는다.
+- PHP 8.2 이상 지원, PHP 8.4 권장 (`composer.json` 의 `>=8.2`, 설치기 최소 `8.2.0`). 서버는 composer·npm·컴파일이 없다. 빌드가 필요한 자산은 넣지 않는다.
 - 문구는 한국어, 프로젝트의 말투(~합니다, 짧은 문장). 오류 원문은 방문자 화면에 내지 않는다.
 - 설정 파일에서 `cors`, `auth.ttl`, `auth.leeway`, `bootstrap_admin` 은 더 이상 쓰지 않는다.
 - 백업은 SQLite 만, `storage/backups/board-v{옛판}-{Ymd-His}.sqlite`, 최근 5개만 남긴다.
@@ -1068,7 +1070,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Test: `tests/Install/ServerCheckTest.php`
 
 **Interfaces:**
-- Produces: `ServerCheck::__construct(string $configDir, string $storageDir, ?array $extensions = null, ?string $phpVersion = null, ?array $apacheModules = null)`, `run(): array{ok: bool, items: list<array{label: string, ok: bool, required: bool, note: string}>}`, 상수 `MIN_PHP = '8.1.0'`.
+- Produces: `ServerCheck::__construct(string $configDir, string $storageDir, ?array $extensions = null, ?string $phpVersion = null, ?array $apacheModules = null)`, `run(): array{ok: bool, items: list<array{label: string, ok: bool, required: bool, note: string}>}`, 상수 `MIN_PHP = '8.2.0'`.
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
@@ -1220,7 +1222,7 @@ namespace GnuCms\Install;
  */
 final class ServerCheck
 {
-    public const MIN_PHP = '8.1.0';
+    public const MIN_PHP = '8.2.0';
     public const DRIVERS = ['pdo_sqlite', 'pdo_mysql'];
 
     private string $configDir;

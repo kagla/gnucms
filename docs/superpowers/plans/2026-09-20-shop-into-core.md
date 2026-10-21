@@ -1,5 +1,7 @@
 # 쇼핑몰을 코어로 옮기기 — 구현 계획
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** 설계 변경 없는 이사다. 1) 코드·템플릿·테스트를 옮기고 이름공간을 바꾸며 라우트를 코어에 등록한다(이 단계에서는 아직 모듈식 표 설치가 남아 있다). 2) 코어 스키마가 표를 만들고 모듈 시절 표를 넘겨받으며, "데이터 설치" 흐름을 없앤다. 3) 확장 매니저가 옛 키를 퇴역시키고, 설치기의 내장 켜기를 지우고, 상단 탭·사이드바·공개 여부 설정을 붙인다. 4) 문서.
 
-**Tech Stack:** PHP 8.4, Slim, PHPUnit 10, SQLite(기본)·MySQL(선택). 새 Composer 의존성 금지.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, Slim, PHPUnit 10, SQLite(기본)·MySQL(선택). 새 Composer 의존성 금지.
 
 **Spec:** `docs/superpowers/specs/2026-09-20-shop-into-core-design.md`
 

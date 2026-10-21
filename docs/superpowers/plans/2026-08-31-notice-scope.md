@@ -1,5 +1,7 @@
 # 게시판 공지와 전체 공지 구현 계획
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** `posts.is_notice`(있음)는 그대로 두고 `notice_scope`(`board`|`global`) 한 칸을 더한다. 목록 위 공지 줄은 그 게시판 공지와 전체 공지를 함께 뽑되, 전체 공지는 그 글이 사는 게시판을 읽을 수 있는 사람에게만 보인다. 지정은 글쓰기·수정 폼의 라디오 하나로 하고 서버가 관리자 권한을 확인한다.
 
-**Tech Stack:** PHP 8.4 / Slim 4 / PDO(SQLite·MySQL/MariaDB), PHPUnit 10, PHP 파일 템플릿(`PhpTemplate`), daisyUI 5 CDN.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장 / Slim 4 / PDO(SQLite·MySQL/MariaDB), PHPUnit 10, PHP 파일 템플릿(`PhpTemplate`), daisyUI 5 CDN.
 
 스펙: `docs/superpowers/specs/2026-08-31-notice-scope-design.md`
 

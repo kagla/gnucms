@@ -1,5 +1,7 @@
 # 알림 채널 배선 구현 계획 (3/3)
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** `src/Notify/`에 `Notifier`를 두고 코어는 이벤트만 알린다. 채널은 `ChannelInterface` 구현 넷(`MailChannel`·`AlimtalkChannel`·`SmsChannel`·`InboxChannel`)이고, 발송은 계획 1의 `AligoService`를, 알림함은 기존 `Service\NotificationService`를, 메일은 기존 `MailerInterface`를 쓴다. 지금 `$this->mailer->send()`를 직접 부르는 다섯 곳이 `Notifier`를 지나도록 바뀐다.
 
-**Tech Stack:** PHP 8.1+, Slim 4, PHPUnit 10.5.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, Slim 4, PHPUnit 10.5.
 
 **Spec:** [docs/superpowers/specs/2026-09-17-aligo-messaging-design.md](../specs/2026-09-17-aligo-messaging-design.md) §6
 

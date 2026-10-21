@@ -1,5 +1,7 @@
 # 알리고 예약 발송과 취소 구현 계획 (4/4)
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** 알리고는 예약을 발송 요청의 파라미터 하나로 받는다 — 알림톡은 `senddate`, 문자는 `rdate`+`rtime`. 예약을 거는 순간 메시지는 알리고로 넘어가고, 우리가 다시 손댈 수 있는 유일한 방법은 취소 호출뿐이다. 그래서 이 계획의 규칙은 전부 "이미 남의 손에 있는 것을 어떻게 정직하게 다루는가"에서 나온다.
 
-**Tech Stack:** PHP 8.1+, Slim 4, PDO(SQLite·MySQL), PHPUnit 10.5. 새 Composer 의존성 없음.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, Slim 4, PDO(SQLite·MySQL), PHPUnit 10.5. 새 Composer 의존성 없음.
 
 **Spec:** [docs/superpowers/specs/2026-09-17-aligo-messaging-design.md](../specs/2026-09-17-aligo-messaging-design.md) §5-1
 

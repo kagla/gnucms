@@ -1,5 +1,7 @@
 # 글쓴이 모달과 목록 코드 합치기 구현 계획
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** 표와 페이저를 `posts/_table.php`·`posts/_pager.php` 조각으로 뽑아 두 화면이 함께 쓴다. 모달은 페이지당 `<dialog>` 하나를 두고 눌린 이름의 회원 번호를 스크립트가 채운다. 글 목록은 기존 전체 글 화면에 `?author=` 를 더해 재사용하고, 댓글 목록만 새 화면을 만든다.
 
-**Tech Stack:** PHP 8.4 / Slim 4 / PDO(SQLite·MySQL/MariaDB), PHPUnit 10, daisyUI 5 CDN, PHP 파일 템플릿(`PhpTemplate`).
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장 / Slim 4 / PDO(SQLite·MySQL/MariaDB), PHPUnit 10, daisyUI 5 CDN, PHP 파일 템플릿(`PhpTemplate`).
 
 스펙: `docs/superpowers/specs/2026-08-31-author-modal-design.md`
 

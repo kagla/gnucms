@@ -15,7 +15,7 @@
               "file": "manual/install/server-check.jpg",
               "title": "1. 서버 점검",
               "alt": "GNUCMS 1. 서버 점검 화면 예시",
-              "caption": "PHP·필수 확장·폴더 권한을 확인합니다. 실제 점검 결과는 서버 환경에 따라 다릅니다."
+              "caption": "PHP 8.2 이상 지원, PHP 8.4 권장. 필수 확장·폴더 권한과 본인 서버의 점검 결과를 확인합니다."
             },
             {
               "file": "manual/install/database.jpg",
@@ -63,7 +63,7 @@
           "rows": [
             [
               "PHP",
-              "8.2 이상. 운영 환경은 8.4 권장"
+              "PHP 8.2 이상 지원, PHP 8.4 권장"
             ],
             [
               "데이터베이스",

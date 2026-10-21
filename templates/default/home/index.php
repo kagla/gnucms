@@ -76,7 +76,7 @@ $hot = array_slice($pool, 0, 6);
       <ul class="hero-facts" aria-label="GNUCMS 특징">
         <li><?= $this->icon('board', 17) ?><div><strong>콘텐츠를 한곳에서</strong><span>게시판, 페이지, 회원 관리를 매끄럽게</span></div></li>
         <li><?= $this->icon('grid', 17) ?><div><strong>데이터베이스 지원</strong><span>MySQL, MariaDB 지원</span></div></li>
-        <li><?= $this->icon('sparkle', 17) ?><div><strong>가볍고 유연하게</strong><span>필요한 기능만 담은 단순한 PHP 구조</span></div></li>
+        <li><?= $this->icon('sparkle', 17) ?><div><strong>PHP 실행 환경</strong><span>PHP 8.2 이상 지원, PHP 8.4 권장</span></div></li>
       </ul>
     </div>
   </div>

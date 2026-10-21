@@ -1,5 +1,7 @@
 # 쇼핑몰 진열 유형 정리: 자동 묶음 + 분류 블록 — 구현 계획
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,7 +10,7 @@
 
 **Architecture:** 1) 설정·목록·스키마·공개 화면: `Settings` 의 묶음 정의가 바뀌고 `Listing` 이 규칙 SQL(또는 수동 분류)로 묶음을 만든다. 31판 이전이 깃발을 분류로 옮기고 칸을 지운다. 유형 페이지·메인·상단 메뉴가 새 묶음을 쓴다. 2) 관리자 화면: 설정의 메인 진열 섹션(기준·기간·분류 블록), 상품 폼·진열 유형 화면 정리. 3) 문서와 전체 검증.
 
-**Tech Stack:** PHP 8.4, Slim, PHPUnit 10, SQLite·MariaDB. 새 의존성 없음.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, Slim, PHPUnit 10, SQLite·MariaDB. 새 의존성 없음.
 
 **Spec:** `docs/superpowers/specs/2026-09-21-shop-collections-design.md`
 

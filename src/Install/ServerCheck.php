@@ -43,7 +43,7 @@ final class ServerCheck
     public function run(): array
     {
         $items = [];
-        $items[] = $this->item('PHP ' . self::MIN_PHP . ' 이상', version_compare($this->phpVersion, self::MIN_PHP, '>='), true, '지금 ' . $this->phpVersion);
+        $items[] = $this->item('PHP 8.2 이상 지원, PHP 8.4 권장', version_compare($this->phpVersion, self::MIN_PHP, '>='), true, '지금 ' . $this->phpVersion);
         $items[] = $this->item('PDO 확장', $this->has('pdo'), true, 'DB 접속에 씁니다');
 
         $drivers = array_values(array_filter(self::DRIVERS, fn (string $d): bool => $this->has($d)));

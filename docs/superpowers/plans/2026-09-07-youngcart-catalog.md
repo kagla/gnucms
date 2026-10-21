@@ -1,5 +1,7 @@
 # 영카트 모듈 1단계(기반과 카탈로그) Implementation Plan
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -8,13 +10,13 @@
 
 **Architecture:** GNUCMS 확장 런타임(`src/Extension`) 위의 모듈 하나. `PackageSchema`로 `yc_` 테이블 9개를 설치하고, 서비스 클래스(`Catalog\Categories`·`Products`·`Options`·`Listing`)가 DB를 다루며, 얇은 컨트롤러가 `View::forExtension()`으로 템플릿을 그린다. 코어는 설명 파일의 `aliases: false` 한 필드만 추가한다.
 
-**Tech Stack:** PHP 8.2+, Slim 4, PDO(SQLite·MySQL), PHPUnit 10, 빌드 없는 정적 CSS/JS, CKEditor4(코어 에디터 조각 재사용).
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, Slim 4, PDO(SQLite·MySQL), PHPUnit 10, 빌드 없는 정적 CSS/JS, CKEditor4(코어 에디터 조각 재사용).
 
 **Spec:** `docs/superpowers/specs/2026-09-07-youngcart-catalog-design.md`
 
 ## Global Constraints
 
-- PHP `>=8.2`, 새 Composer 의존성 금지, 운영 서버 빌드 금지(정적 자산은 그대로 배포).
+- PHP 8.2 이상 지원, PHP 8.4 권장, 새 Composer 의존성 금지, 운영 서버 빌드 금지(정적 자산은 그대로 배포).
 - SQLite와 MySQL/MariaDB에서 같은 의미로 동작. DB 테스트는 `connectionProvider`를 쓴다.
 - 테이블 접두사 `yc_`, 패키지 키 `modules/youngcart`, 네임스페이스 `GnuCms\Modules\YoungCart\`.
 - 사용자 주소 `/shop`, 관리자 주소 `/admin/shop`. `/modules/youngcart/…` 별칭 없음.

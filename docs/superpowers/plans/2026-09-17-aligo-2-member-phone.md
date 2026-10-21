@@ -1,12 +1,14 @@
 # 회원 휴대폰번호 구현 계획 (2/3)
 
+> 현재 PHP 지원 기준 (2026-10-21): **PHP 8.2 이상 지원, PHP 8.4 권장**. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 초기의 하위 버전 문법 제약과 실행 환경 기록은 현재 설치 조건이 아닙니다. [현재 PHP 지원 기준](../../php-support.md)을 따릅니다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 회원에게 알림톡·문자를 보낼 수 있도록 `users.phone`을 가입·회원정보 수정·관리자 회원 관리에서 받고 고칠 수 있게 한다.
 
 **Architecture:** 컬럼과 마이그레이션은 계획 1의 Task 6에서 이미 만들었다. 여기서는 그 칸을 화면에 연결하고, 가입 때 번호를 받을지를 "회원·글쓰기" 설정에서 고르게 한다. 번호 형식 처리는 계획 1의 `GnuCms\Aligo\PhoneNumber` 한 곳만 쓴다.
 
-**Tech Stack:** PHP 8.1+, Slim 4, PHPUnit 10.5.
+**Tech Stack:** PHP 8.2 이상 지원, PHP 8.4 권장, Slim 4, PHPUnit 10.5.
 
 **Spec:** [docs/superpowers/specs/2026-09-17-aligo-messaging-design.md](../specs/2026-09-17-aligo-messaging-design.md) §7
 
