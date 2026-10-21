@@ -50,7 +50,7 @@
     {
       "slug": "install",
       "title": "새로 설치하기",
-      "summary": "서버 요구사항, 폴더 배치, DB 준비와 관리자 계정 생성 순서를 설명합니다.",
+      "summary": "MySQL·MariaDB 지원 서버 요구사항, 폴더 배치, DB 준비와 관리자 계정 생성 순서를 설명합니다.",
       "group": "start",
       "audience": "운영자",
       "file": "install.json"
@@ -418,7 +418,7 @@
     {
       "slug": "development/database",
       "title": "DB 구조·접두어·마이그레이션",
-      "summary": "MySQL 전용 구조와 새 설치·업그레이드의 멱등 변경을 구현합니다.",
+      "summary": "MySQL·MariaDB를 지원하는 DB 구조와 새 설치·업그레이드의 멱등 변경을 설명합니다.",
       "group": "development",
       "audience": "개발자",
       "file": "development-database.json"

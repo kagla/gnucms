@@ -13,6 +13,10 @@
 - `content/<이름>.json`: 문서 본문
 - `content/search.json`: 작성된 설명서만 담은 본문 검색 자료
 
+## 데이터베이스 지원 표기
+
+GNUCMS는 MySQL과 MariaDB를 지원합니다. SQLite·PostgreSQL의 설치와 실행은 지원하지 않습니다. 설치·개발·백업 문서와 검색 자료에 같은 범위를 표시하고, 과거 설계 문서의 DB 예시를 현재 지원 범위로 안내하지 않습니다.
+
 ## 문서 추가·수정
 
 1. `catalog.json`의 `articles`에 `slug`, `title`, `summary`, `group`, `audience`, `file`을 등록합니다. slug는 `shop/orders`처럼 영문·숫자·밑줄·하이픈 경로입니다. 파일명은 `shop-orders.json`처럼 슬래시 없는 JSON 이름입니다.

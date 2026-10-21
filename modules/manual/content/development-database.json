@@ -6,7 +6,7 @@
       "blocks": [
         {
           "type": "p",
-          "text": "코어·알리고·쇼핑몰은 MySQL 전용입니다. MariaDB는 mysql PDO 드라이버를 사용합니다. utf8mb4를 사용하고 접두어가 있는 설치도 지원합니다. 테이블 이름을 SQL에 고정하기 전에 Connection의 접두어 처리 규칙을 확인합니다."
+          "text": "코어·알리고·쇼핑몰은 MySQL과 MariaDB를 지원합니다. SQLite·PostgreSQL은 지원하지 않습니다. MySQL과 MariaDB는 공통으로 PHP의 pdo_mysql 드라이버와 mysql: DSN을 사용합니다. utf8mb4를 사용하고 접두어가 있는 설치도 지원합니다. 테이블 이름을 SQL에 고정하기 전에 Connection의 접두어 처리 규칙을 확인합니다."
         },
         {
           "type": "p",

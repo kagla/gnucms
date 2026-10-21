@@ -67,7 +67,7 @@
             ],
             [
               "데이터베이스",
-              "MySQL 또는 MariaDB, utf8mb4 문자셋"
+              "MySQL, MariaDB 지원, utf8mb4 문자셋"
             ],
             [
               "필수 PHP 확장",
@@ -89,7 +89,7 @@
         },
         {
           "type": "p",
-          "text": "SQLite 설치는 지원하지 않습니다. 웹호스팅 관리 화면에서 DB와 전용 계정을 먼저 만들고 GNUCMS에 접속 정보를 입력합니다. GNUCMS가 호스팅 계정이나 DB 서버 자체를 만들어 주지는 않습니다."
+          "text": "GNUCMS는 MySQL과 MariaDB를 지원하며 SQLite·PostgreSQL의 설치와 실행은 지원하지 않습니다. 웹호스팅 관리 화면에서 DB와 전용 계정을 먼저 만들고 GNUCMS에 접속 정보를 입력합니다. GNUCMS가 호스팅 계정이나 DB 서버 자체를 만들어 주지는 않습니다."
         }
       ]
     },

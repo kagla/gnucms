@@ -225,7 +225,7 @@ PG별 프로토콜은 각각 구현해야 한다. 이 구조는 서로 다른 PG
 
 코어 DB 스키마 45판은 주문별 과세금액·공급가액·부가세·면세금액과 주문 상품별 면세 여부를
 추가한다. 이전 주문은 당시 면세 스냅샷이 없으므로 전체 결제금액을 과세로 이전한다. MySQL의
-기존 데이터는 보존한다. SQLite는 지원하지 않는다.
+기존 데이터는 보존한다. SQLite·PostgreSQL은 지원하지 않는다.
 
 - `pay_settings`: `(provider, id)` 기본키, 암호화 `payload`. ID는 환경 또는 설정 판이다.
 - `pay_transactions`: `(provider, id)` 기본키, 암호화 `payload`. ID는 결제 원장 키다.

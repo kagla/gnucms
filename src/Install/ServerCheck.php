@@ -48,7 +48,7 @@ final class ServerCheck
 
         $drivers = array_values(array_filter(self::DRIVERS, fn (string $d): bool => $this->has($d)));
         $items[] = $this->item(
-            'PDO 드라이버 (MySQL/MariaDB)',
+            'PDO 드라이버 (MySQL, MariaDB)',
             $drivers !== [],
             true,
             $drivers === [] ? 'pdo_mysql이 없습니다. 호스팅에 요청하세요' : '있음: ' . implode(', ', $drivers)

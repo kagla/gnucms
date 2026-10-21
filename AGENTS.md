@@ -6,7 +6,7 @@
 
 - PHP 8.2 이상에서 동작하는 Slim 4 기반 CMS다. 운영 환경은 PHP 8.4를 권장한다.
 - 애플리케이션 코드는 `src/`, 기본 화면은 `templates/default/`, 공개 자산과 진입점은 `www/`에 있다.
-- 사용자 결정에 따라 코어·알리고·쇼핑몰은 MySQL 전용이다(MariaDB는 같은 mysql 드라이버 사용). SQLite 설치와 실행은 지원하지 않는다.
+- 사용자 결정에 따라 코어·알리고·쇼핑몰은 MySQL과 MariaDB를 지원한다. 두 DB 모두 mysql PDO 드라이버를 사용하며 SQLite·PostgreSQL의 설치와 실행은 지원하지 않는다. 화면의 지원 문구는 “MySQL, MariaDB 지원”으로 표시하고 매뉴얼·검색 자료·샘플 설정도 같은 지원 범위로 유지한다.
 - `config/config.php`, `storage/`의 런타임 데이터와 `vendor/`는 로컬·배포 환경의 파일이며 저장소에 커밋하지 않는다.
 
 ## 배포 환경

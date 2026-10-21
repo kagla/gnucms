@@ -1,5 +1,7 @@
 # 쇼핑몰 분류: 무한 단계 트리와 슬러그 주소 — 구현 계획
 
+> 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 2자 코드 계층(최대 5단계)을 부모 id 트리(`path` 열, 10단계 상한)로 바꾸고, 공개 주소를 `/shop/c/{slug}` 로 옮기며, 옛 주소와 기존 데이터를 살린다.

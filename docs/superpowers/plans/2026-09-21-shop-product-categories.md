@@ -1,5 +1,7 @@
 # 상품의 분류 제한 없이, 목록에서 분류 일괄 넣기·빼기, 분류 메뉴 숨김 — 구현 계획
 
+> 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 상품에 붙는 분류를 대표 하나 + 추가 2개에서 대표 하나 + 추가 제한 없음(20개)으로 바꾸고, 상품 목록에서 선택한 상품을 분류에 넣거나 빼며, 분류에 "메뉴에서 숨김" 스위치를 둔다(이벤트성 분류).

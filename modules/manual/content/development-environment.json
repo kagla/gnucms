@@ -14,7 +14,7 @@
             "GitHub의 kagla/gnucms 저장소에서 Releases를 열고 해당 릴리스의 Assets에 첨부된 gnucms-X.Y.Z.zip을 내려받습니다. X.Y.Z는 사용할 릴리스 버전입니다.",
             "ZIP을 작업용 폴더에 풀고 vendor/autoload.php가 포함되어 있는지 확인합니다. GitHub의 Source code (zip)·main.zip이나 git clone으로 받은 소스에는 vendor가 없으므로 완성 배포본을 사용합니다.",
             "PHP 8.2 이상과 필수 PHP 확장을 사용할 수 있는 로컬 웹서버 또는 별도 개발용 호스팅을 준비합니다. PHP 8.4를 권장하며 필수 확장과 폴더 배치는 새로 설치하기 문서를 따릅니다.",
-            "MySQL/MariaDB에 개발 전용 DB와 계정을 만듭니다. 운영 DB를 연결하지 않으며 SQLite로 대체하지 않습니다.",
+            "지원 DB는 MySQL과 MariaDB입니다. MySQL 또는 MariaDB에 개발 전용 DB와 계정을 만들고 운영 DB를 연결하지 않습니다. SQLite·PostgreSQL로 대체하지 않습니다.",
             "웹 문서 루트를 www로 지정하고 config와 storage에 PHP 실행 계정의 쓰기 권한을 줍니다. vendor를 포함한 나머지 폴더는 웹 문서 루트보다 한 단계 위에 둡니다.",
             "브라우저에서 개발 사이트의 /install.php를 열고 개발 DB·사이트 주소·관리자 정보를 입력해 설치합니다. config/config.php는 웹 설치가 생성하므로 미리 만들 필요가 없습니다.",
             "설치한 작업용 복사본에서 templates·www의 테마 파일이나 modules·plugins의 확장 파일을 수정합니다. 기존 라이브러리를 그대로 사용하는 수정에는 의존성을 다시 설치할 필요가 없습니다."

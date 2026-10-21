@@ -1,5 +1,17 @@
 # Changelog
 
+현재 DB 지원 범위: **MySQL, MariaDB 지원**. SQLite·PostgreSQL은 지원하지 않습니다. 이전 릴리스의 DB 지원 설명과 시험 결과는 당시 이력이며, 현재 기준은 [데이터베이스 지원 정책](docs/database-support.md)을 따릅니다.
+
+## [Unreleased]
+
+### 문서·안내 개선
+
+* 메인·설치·유지보수 안내, README와 개발 문서 및 공개 매뉴얼·검색 자료의 DB 지원을 MySQL·MariaDB로 통일했습니다. 화면에는 “MySQL, MariaDB 지원”으로 표시하고 SQLite·PostgreSQL 미지원 범위를 문서에 명시합니다.
+
+### 업그레이드 안내
+
+* DB 구조·접속 설정 변경은 없습니다. MySQL과 MariaDB는 기존 mysql PDO 드라이버를 사용하며 별도 마이그레이션은 필요하지 않습니다.
+
 ## [0.9.6](https://github.com/kagla/gnucms/compare/v0.9.5...v0.9.6) (2026-10-21)
 
 ### 버그 수정

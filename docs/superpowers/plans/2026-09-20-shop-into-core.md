@@ -1,5 +1,7 @@
 # 쇼핑몰을 코어로 옮기기 — 구현 계획
 
+> 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `modules/youngcart`(켜고 끌 수 있는 모듈)를 코어 기능으로 옮긴다 — 코드는 `src/Shop`, 템플릿은 `templates/default/shop`, 표는 코어 스키마 27판이 만들고, 라우트·메뉴·사이드바는 코어가 그리며, 모듈은 사라진다.

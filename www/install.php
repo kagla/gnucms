@@ -163,7 +163,7 @@ if ($step === 2) {
             $errors = $e->details() !== [] ? $e->details() : ['_' => $e->getMessage()];
         }
     }
-    $body = '<p class="intro">MySQL/MariaDB 서버의 접속 정보를 입력하세요.</p>'
+    $body = '<p class="intro">MySQL, MariaDB를 지원합니다. 사용할 서버의 접속 정보를 입력하세요.</p>'
         . (isset($errors['_']) ? '<p class="alert">' . h($errors['_']) . '</p>' : '')
         . '<form method="post"><div id="server">'
         . field('호스트', 'host', $values['host'], $errors)
@@ -269,7 +269,7 @@ if ($method === 'POST') {
         $errors = $e->details() !== [] ? $e->details() : ['_' => $e->getMessage()];
     }
 }
-$dbLabel = 'MySQL / MariaDB';
+$dbLabel = 'MySQL, MariaDB';
 $body = '<p class="intro">아래 내용으로 설치합니다. 표를 만들고, 관리자를 만들고, <code>config/config.php</code> 를 씁니다.</p>';
 foreach ($errors as $message) {
     $body .= '<p class="alert">' . h((string) $message) . '</p>';

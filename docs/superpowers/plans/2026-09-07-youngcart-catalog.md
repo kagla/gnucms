@@ -1,5 +1,7 @@
 # 영카트 모듈 1단계(기반과 카탈로그) Implementation Plan
 
+> 현재 DB 지원 범위 (2026-10-21): GNUCMS는 **MySQL과 MariaDB를 지원**하며 SQLite·PostgreSQL은 지원하지 않습니다. 이 문서는 과거 설계·작업 계획을 보관한 자료입니다. 아래 SQLite 코드·시험 예시는 현재 설치·개발 절차에 적용하지 않습니다. 현재 기준은 [데이터베이스 지원 정책](../../database-support.md)을 따릅니다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `modules/youngcart` 확장 모듈을 새로 만들어 관리자가 분류·상품·옵션·이미지·재고를 관리하고 방문자가 `/shop`에서 메인·분류 목록·유형별 목록·검색·상세를 볼 수 있게 한다.
