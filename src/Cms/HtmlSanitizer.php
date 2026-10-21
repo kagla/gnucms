@@ -42,8 +42,10 @@ final class HtmlSanitizer
 
     public function clean(string $html): string
     {
+        // Tagless editor HTML may still contain entities such as &middot;.
+        // Preserve valid references while escaping markup and bare ampersands.
         if ($html !== '' && strip_tags($html) === $html) {
-            return '<p>' . nl2br(htmlspecialchars($html, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>';
+            return '<p>' . nl2br(htmlspecialchars($html, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8', false)) . '</p>';
         }
         return $this->purifier->purify($html);
     }
